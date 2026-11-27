@@ -8,8 +8,8 @@ import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./
 // The dialog tests are in gallery-tune, gallery-setup and gallery-palette, so vitest runs them in parallel.
 resetThemeAfterEach();
 
-// Axe runs on one section at a time, in gallery-axe-slip and gallery-axe-kiln. This only checks that the
-// gallery shows both themes and that every section is in their list.
+// Axe runs on one section at a time, in gallery-axe. The first and the anchors tests draw the whole gallery,
+// because they check what spans its sections: the panels list every section, and no id repeats across them.
 test("the gallery shows both themes, and every section has an axe test", () => {
   const { container } = render(<Gallery />);
   for (const [theme, prefix] of [["slip", ""], ["kiln", "kiln-"]] as const) {
@@ -23,7 +23,7 @@ test("the gallery shows both themes, and every section has an axe test", () => {
 test("the gallery's model dialog shows a download with its speed and time left, and passes axe", async () => {
   showTheme("slip");
   const user = userEvent.setup();
-  render(<Gallery />);
+  render(<Gallery only="model-dialog" />);
   await user.click(screen.getByRole("button", { name: "Download in progress, slip" }));
   const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
   expect(dialog.textContent).toContain("2.1 / 6.6 GB · 12 MB/s · 6 min");
@@ -32,10 +32,10 @@ test("the gallery's model dialog shows a download with its speed and time left, 
 });
 
 test("the gallery's Commands dialog lists the groups and passes axe", async () => {
-  showTheme("kiln");
+  showTheme("slip");
   const user = userEvent.setup();
-  render(<Gallery />);
-  await user.click(screen.getByRole("button", { name: "Commands, kiln" }));
+  render(<Gallery only="dock-slash-commands" />);
+  await user.click(screen.getByRole("button", { name: "Commands, slip" }));
   const dialog = await screen.findByRole("dialog", { name: "Commands" });
   expect(dialog.textContent).toContain("In the terminal for now");
   await expectAxeClean(dialog, DIALOG_RULES);
@@ -44,7 +44,7 @@ test("the gallery's Commands dialog lists the groups and passes axe", async () =
 test("the gallery's commit dialog lists the files, shows git's refusal, and passes axe", async () => {
   showTheme("slip");
   const user = userEvent.setup();
-  render(<Gallery />);
+  render(<Gallery only="commit-dialog" />);
   await user.click(screen.getByRole("button", { name: "Commit refused, slip" }));
   const dialog = await screen.findByRole("dialog", { name: "Commit changes" });
   expect(within(dialog).getAllByRole("checkbox")).toHaveLength(3);
@@ -63,7 +63,7 @@ test("each gallery section has a stable anchor, the slip one plain and the kiln 
 
 test("the gallery shows one theme when asked, and then the anchors have no prefix", async () => {
   const user = userEvent.setup();
-  const { container } = render(<Gallery />);
+  const { container } = render(<Gallery only="trace" />);
   await user.click(screen.getByRole("button", { name: "Kiln" }));
   expect(container.querySelector('[data-theme="slip"]')).toBeNull();
   expect(container.querySelector("#trace")).toBeTruthy();
@@ -72,7 +72,7 @@ test("the gallery shows one theme when asked, and then the anchors have no prefi
 
 test("the gallery has a Thinking section with streaming, done, none, and long cases", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="thinking" />);
   for (const label of ["streaming", "done", "no thinking", "hidden", "long thinking"]) {
     expect(screen.getAllByRole("group", { name: `Thinking, ${label}` }).length).toBeGreaterThan(0);
   }
@@ -84,22 +84,20 @@ test("the gallery has a Thinking section with streaming, done, none, and long ca
   }
 });
 
-for (const theme of ["slip", "kiln"] as const) {
-  test(`the gallery's turn with four tool steps folds into one activity line in ${theme}, and passes axe`, async () => {
-    showTheme(theme);
-    render(<Gallery />);
-    const normal = screen.getByRole("group", { name: "A turn with four tool steps, normal" });
-    expect(normal.querySelectorAll("svg[data-state]")).toHaveLength(1);
-    expect(within(normal).getAllByText("8.8s · 4 steps")).toHaveLength(1);
-    // A failed step does not open the line by itself; only Verbose and an approval do.
-    const line = within(normal).getByRole("button", { name: /github calls, 1 failed/ });
-    expect(line.getAttribute("aria-expanded")).toBe("false");
-    expect(within(normal).queryByRole("list", { name: "Tool calls" })).toBeNull();
-    const verbose = screen.getByRole("group", { name: "A turn with four tool steps, verbose" });
-    expect(within(verbose).getByRole("list", { name: "Tool calls" })).toBeTruthy();
-    expect(within(verbose).getAllByText("github · get_me").length).toBeGreaterThan(0);
-    const quiet = screen.getByRole("group", { name: "A turn with four tool steps, quiet" });
-    expect(within(quiet).getByRole("button", { name: "4 steps" })).toBeTruthy();
-    for (const group of [normal, verbose, quiet]) await expectAxeClean(group, DIALOG_RULES);
-  });
-}
+test("the gallery's turn with four tool steps folds into one activity line, and passes axe", async () => {
+  showTheme("slip");
+  render(<Gallery only="turn" />);
+  const normal = screen.getByRole("group", { name: "A turn with four tool steps, normal" });
+  expect(normal.querySelectorAll("svg[data-state]")).toHaveLength(1);
+  expect(within(normal).getAllByText("8.8s · 4 steps")).toHaveLength(1);
+  // A failed step does not open the line by itself; only Verbose and an approval do.
+  const line = within(normal).getByRole("button", { name: /github calls, 1 failed/ });
+  expect(line.getAttribute("aria-expanded")).toBe("false");
+  expect(within(normal).queryByRole("list", { name: "Tool calls" })).toBeNull();
+  const verbose = screen.getByRole("group", { name: "A turn with four tool steps, verbose" });
+  expect(within(verbose).getByRole("list", { name: "Tool calls" })).toBeTruthy();
+  expect(within(verbose).getAllByText("github · get_me").length).toBeGreaterThan(0);
+  const quiet = screen.getByRole("group", { name: "A turn with four tool steps, quiet" });
+  expect(within(quiet).getByRole("button", { name: "4 steps" })).toBeTruthy();
+  for (const group of [normal, verbose, quiet]) await expectAxeClean(group, DIALOG_RULES);
+});

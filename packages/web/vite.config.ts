@@ -97,7 +97,7 @@ export default defineConfig(async ({ command, mode }) => ({
     environment: "jsdom",
     setupFiles: ["src/test-setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
-    // axe walks the whole jsdom tree, and the gallery renders every component in both themes.
+    // axe walks a jsdom tree, and a gallery section renders many components at once.
     // On a shared CI runner that took 5.4 s, just over the 5 s default.
     testTimeout: 20_000,
   },

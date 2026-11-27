@@ -7,7 +7,7 @@ resetThemeAfterEach();
 
 test("the gallery shows a step result of each kind", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="workflow-run" />);
   const results = within(screen.getByRole("region", { name: "Step results by kind, slip" }));
   for (const kind of ["text", "record", "table", "file", "link", "changes", "empty", "other"]) expect(results.getByRole("group", { name: `Result, ${kind}` })).toBeTruthy();
   expect(results.getByText("Nothing found")).toBeTruthy();
@@ -15,7 +15,7 @@ test("the gallery shows a step result of each kind", () => {
 
 test("the gallery's Runs section shows the panel, the grouped list, and the banner for each trigger", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="runs" />);
   const panel = within(screen.getByRole("complementary", { name: "Runs, slip" }));
   expect(panel.getByRole("list", { name: "Needs you" })).toBeTruthy();
   expect(within(screen.getByRole("complementary", { name: "Runs, empty, slip" })).getByText("Nothing has run yet.")).toBeTruthy();
@@ -32,7 +32,7 @@ test("the gallery's Runs section shows the panel, the grouped list, and the bann
 
 test("the gallery's Runs page shows the filter chip with its result beside the list, a failed run open, and an empty filter", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="runs" />);
   const filtered = within(screen.getByRole("region", { name: "Runs page, filtered to a workflow, slip" }));
   expect(filtered.getByText("Workflow: pr_digest")).toBeTruthy();
   expect(filtered.getByText("3 things need you")).toBeTruthy();
@@ -49,7 +49,7 @@ test("the gallery's Runs page shows the filter chip with its result beside the l
 
 test("the gallery shows a run that goes with a known total, with none, a loop part way and a parallel group", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="workflow-run" />);
   const known = within(screen.getByRole("region", { name: "Workflow run, running, slip" }));
   expect(known.getByText("2 of 5 steps")).toBeTruthy();
   expect(known.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("5");

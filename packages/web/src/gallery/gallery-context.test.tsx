@@ -6,12 +6,11 @@ import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./
 
 resetThemeAfterEach();
 
-// One test per state and theme: axe is slow in jsdom, and a loop in one test outgrows the timeout on CI.
-for (const theme of ["slip", "kiln"] as const) {
-  for (const { label, errors } of CONTEXT_CASES) {
-    test(`the gallery's Context page shows "${label}" in ${theme}, and passes axe`, async () => {
-      showTheme(theme);
-      render(<Gallery />);
+// One test per state: axe is slow in jsdom, and a loop in one test outgrows the timeout on CI.
+for (const { label, errors } of CONTEXT_CASES) {
+    test(`the gallery's Context page shows "${label}" and passes axe`, async () => {
+      showTheme("slip");
+      render(<Gallery only="settings-context" />);
       const region = screen.getByRole("region", { name: `Context, ${label}` });
       const group = within(region);
       expect(group.getByRole("region", { name: "Right now" })).toBeTruthy();
@@ -27,5 +26,4 @@ for (const theme of ["slip", "kiln"] as const) {
       if (Object.keys(errors).length > 0) expect(group.getAllByRole("alert").length).toBeGreaterThan(0);
       await expectAxeClean(region, DIALOG_RULES);
     });
-  }
 }
