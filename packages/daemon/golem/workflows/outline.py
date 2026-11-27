@@ -21,7 +21,8 @@ Rules, in short:
   ``item=`` expression, ``group_title`` the ``title=`` of the ``run.parallel`` around the
   call, and ``does`` the first sentence of the docstring of the function a ``run.step`` calls,
   when the file defines it.
-* ``run.output(...)`` marks a result and is not a step: it is left out.
+* ``run.output(...)`` marks a result and ``run.progress(...)`` tells how far a step is;
+  neither is a step: both are left out.
 * ``getattr(run, x)(...)`` and unknown ``run.foo(...)`` are ``code`` steps titled
   by their source text.
 * ``after`` lists the steps whose results this step reads, by following names.
@@ -598,7 +599,7 @@ class Builder:
         for child in [*call.args, *(k.value for k in call.keywords)]:
             nested += self.visit(child, ctx)
         deps = frozenset(nested)
-        if method == "output":  # marks a result; it is not a step
+        if method in ("output", "progress"):  # marks a result or a progress text; not a step
             return nested
         span = self.span(call, ctx)
         if method not in STEP_KINDS:  # unknown or dynamic: still a step, titled by its source

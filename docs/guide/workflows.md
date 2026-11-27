@@ -188,6 +188,21 @@ await run.step("Read feed", read, url, item=url, of=len(feeds))
 
 `of=` is a label too; it is never passed to the function.
 
+### Progress while a step works
+
+A step that takes a while can say how far it is. Call `run.progress(text)` inside the function of a `run.step`; the run page shows the text on the step that works:
+
+```python
+def read_all(run, feeds):
+    for n, url in enumerate(feeds, 1):
+        fetch(url)
+        run.progress(f"{n} of {len(feeds)}")
+```
+
+`run.progress` is not a step and nothing is saved. It sends at most four times a second (the last text always goes out), and outside a step it does nothing. A `run.llm` step needs no call: when the model can stream, its answer is shown on the page as it is written. A model that answers in one piece shows nothing until it is done, as before. A page that you open in the middle of a run shows the text so far.
+
+The page also says "usually about 45s" while a run goes, from the median time of the last five runs of the workflow that finished. It says nothing until two have.
+
 ### Retries
 
 ```python

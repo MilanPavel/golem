@@ -16,7 +16,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 
 from golem.agents.model import WISHES
 from golem.config import ModelPrice
@@ -82,12 +83,20 @@ class LlmAnswer:
     cost_usd: float | None
 
 
-Llm = Callable[[str, dict[str, Any] | None, str | None, str | None], Awaitable[LlmAnswer]]
-"""``(prompt, json_schema, wish, folder) -> answer``. ``folder`` is the run's folder or None."""
+Llm = Callable[..., Awaitable[LlmAnswer]]
+"""``(prompt, json_schema, wish, folder) -> answer``. ``folder`` is the run's folder or None.
+
+An ``Llm`` that has a true ``streams`` attribute also takes ``progress=``, a function that is
+given the text so far each time more of the answer arrives (never for a model that answers in
+one piece). One without it is called with the four arguments only."""
+
+Progress = Callable[[str], None]
 
 
 class WorkflowLlm:
     """The ``Llm`` the daemon gives the engine."""
+
+    streams = True
 
     def __init__(
         self,
@@ -150,7 +159,12 @@ class WorkflowLlm:
         return self._role(local_only)
 
     async def __call__(
-        self, prompt: str, schema: dict[str, Any] | None, wish: str | None, folder: str | None
+        self,
+        prompt: str,
+        schema: dict[str, Any] | None,
+        wish: str | None,
+        folder: str | None,
+        progress: Progress | None = None,
     ) -> LlmAnswer:
         local_only = self._local_only(folder)
         profile = self.profile_for(wish, local_only)
@@ -166,7 +180,11 @@ class WorkflowLlm:
             messages.insert(0, SystemMessage(content=_schema_instruction(schema)))
         try:
             async with job_slot(self._dispatcher, line, None, "a workflow model call"):
-                answer = await model.ainvoke(messages)
+                answer = (
+                    await model.ainvoke(messages)
+                    if progress is None
+                    else await _streamed(model, messages, progress)
+                )
         except Exception:
             await self._record(profile, None, None, failed=True)
             raise
@@ -198,6 +216,32 @@ class WorkflowLlm:
             )
         except Exception:
             log.warning("recording the workflow model call failed", exc_info=True)
+
+
+def _can_stream(model: BaseChatModel) -> bool:
+    """True when the model class writes its own stream; the default one only wraps one call,
+    and would lose what a call reports (the token counts)."""
+    cls = type(model)
+    return cls._stream is not BaseChatModel._stream or cls._astream is not BaseChatModel._astream  # pyright: ignore[reportPrivateUsage]
+
+
+async def _streamed(
+    model: BaseChatModel, messages: list[SystemMessage | HumanMessage], progress: Progress
+) -> AIMessage:
+    """Ask the model and pass the text so far to ``progress`` as chunks arrive.
+
+    The first chunk is held back: a model that answers in one piece gives one chunk, and sends
+    no progress (nothing to show that the answer does not show at once)."""
+    if not _can_stream(model):
+        return await model.ainvoke(messages)
+    whole: AIMessageChunk | None = None
+    async for chunk in model.astream(messages):
+        whole = chunk if whole is None else whole + chunk
+        if whole is not chunk:
+            progress(whole.text)
+    if whole is None:
+        return await model.ainvoke(messages)
+    return whole
 
 
 def _schema_instruction(schema: dict[str, Any]) -> str:

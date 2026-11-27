@@ -54,6 +54,9 @@ class Seen:
         )
         return None
 
+    def progress(self, *args: Any) -> None:
+        return None
+
     async def llm(self, *args: Any) -> Any:
         return None
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import time
@@ -243,6 +244,8 @@ from golem.skills.registry import listed_skill
 from golem.tools.paths import NO_FOLDER, writable
 from golem.tools.registry import ToolError, ToolScope
 from golem.tools.write import DIFF_CHARS, Change, apply, diff_counts, diff_text
+from golem.workflows.outputs import OutputError, marked_file
+from golem.workflows.service import WorkflowService
 from golem_protocol.commands import (
     AgentsCopyParams,
     AgentsDeleteParams,
@@ -831,6 +834,25 @@ async def _fs_choose_folder(
     return FsChooseFolderResult(path=path)
 
 
+async def _marked_output(workflows: WorkflowService | None, params: FsRevealParams) -> Path:
+    """The file output ``output_index`` of a run marked, when it is ``params.path``.
+
+    Raises :class:`FolderError` when the run or output is unknown, the output is not that
+    path, or the file is refused (not a file, or in a folder golem keeps private)."""
+    if workflows is None or params.workflow_run_id is None or params.output_index is None:
+        raise FolderError("name both the run and the output to show")
+    outputs = await workflows.runs.list_outputs(params.workflow_run_id)
+    if params.output_index >= len(outputs):
+        raise FolderError("the run has no such output")
+    marked = json.loads(outputs[params.output_index].value_json)
+    if marked != params.path:
+        raise FolderError("that is not the file the run marked")
+    try:
+        return marked_file(marked, Path.home())
+    except OutputError as exc:
+        raise FolderError(str(exc)) from exc
+
+
 async def _fs_reveal(ctx: RequestContext, params: FsRevealParams) -> FsRevealResult:
     if ctx.connection.device is not None:
         raise RpcCallError(
@@ -841,6 +863,8 @@ async def _fs_reveal(ctx: RequestContext, params: FsRevealParams) -> FsRevealRes
     try:
         workflows = ctx.state.workflows
         listed = [] if workflows is None else [e.path for e in workflows.registry.entries()]
+        if params.workflow_run_id is not None or params.output_index is not None:
+            listed = [await _marked_output(workflows, params)]
         await reveal_folder(params.path, Path.home(), listed)
     except DialogUnsupportedError as exc:
         raise RpcCallError(UNSUPPORTED, str(exc), {"reason": "unsupported"}) from exc

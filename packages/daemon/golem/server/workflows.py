@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -431,11 +432,30 @@ async def _run_info(service: WorkflowService, run: WorkflowRunRecord) -> Workflo
             ],
             "summary": outputs[0].summary if outputs else None,
             "steps_expected": await service.engine.expected(run.workflow_run_id),
+            "usual_ms": await _usual_ms(service, run),
         }
     )
 
 
-def _step_info(step: WorkflowStepRecord, of: int | None = None) -> WorkflowStepInfo:
+USUAL_RUNS = 5
+"""A run's usual time is the median of this many of the last done runs of its workflow."""
+
+
+def median_ms(spans: list[int]) -> int | None:
+    """The median of the times, or None when there are fewer than two."""
+    if len(spans) < 2:
+        return None
+    return int(statistics.median(spans))
+
+
+async def _usual_ms(service: WorkflowService, run: WorkflowRunRecord) -> int | None:
+    """How long a run of this workflow usually takes, from its last done runs."""
+    return median_ms(await service.runs.recent_durations_ms(run.workflow_id, USUAL_RUNS))
+
+
+def _step_info(
+    step: WorkflowStepRecord, of: int | None = None, progress: str | None = None
+) -> WorkflowStepInfo:
     saved = json.loads(step.result_json) if step.result_json else None
     return WorkflowStepInfo.model_validate(
         {
@@ -456,6 +476,7 @@ def _step_info(step: WorkflowStepRecord, of: int | None = None) -> WorkflowStepI
             "result": saved,
             "line": result_line(saved, step.kind),
             "of": of,
+            "progress": progress,
         }
     )
 
@@ -481,7 +502,11 @@ async def workflow_status(
     return WorkflowStatusResult(
         run=await _run_info(service, run),
         steps=[
-            _step_info(s, service.engine.total_of(run.workflow_run_id, s.title or s.step_key))
+            _step_info(
+                s,
+                service.engine.total_of(run.workflow_run_id, s.title or s.step_key),
+                service.engine.progress_of(run.workflow_run_id, s.step_key),
+            )
             for s in steps
         ],
         reviews=reviews,

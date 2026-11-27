@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 
 from golem.sessions.ids import new_id
 from golem.store.database import Database, Params, Transaction
@@ -183,6 +184,27 @@ class WorkflowRuns:
             (*params, limit),
         )
         return [_run(row) for row in rows]
+
+    async def recent_durations_ms(self, workflow_id: str, limit: int = 5) -> list[int]:
+        """How long the last ``limit`` ``done`` runs of a workflow took, in ms, newest first.
+
+        A run with no start or end time is left out."""
+        rows = await self._database.fetch_all(
+            "SELECT started_at, finished_at FROM workflow_runs WHERE workflow_id = ?"
+            " AND status = 'done' AND started_at IS NOT NULL AND finished_at IS NOT NULL"
+            " ORDER BY finished_at DESC, rowid DESC LIMIT ?",
+            (workflow_id, limit),
+        )
+        spans: list[int] = []
+        for row in rows:
+            try:
+                took = datetime.fromisoformat(row["finished_at"]) - datetime.fromisoformat(
+                    row["started_at"]
+                )
+            except ValueError:
+                continue
+            spans.append(max(0, int(took.total_seconds() * 1000)))
+        return spans
 
     async def set_run_status(
         self, run_id: str, status: str, at: str | None = None, error: str | None = None

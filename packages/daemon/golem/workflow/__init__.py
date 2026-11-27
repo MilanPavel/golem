@@ -127,6 +127,10 @@ class StepBackend(Protocol):
         """Save result number ``position`` of the run (kept once, however often it is run)."""
         ...
 
+    def progress(self, workflow_run_id: str, key: str, text: str) -> None:
+        """Say how far step ``key`` is. Called from any thread; it never blocks."""
+        ...
+
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         """Tell the person ``text`` (through the Notifier, when the engine has one)."""
         ...
@@ -209,6 +213,7 @@ _group_title: ContextVar[str | None] = ContextVar("golem_workflow_group_title", 
 _position: ContextVar[int | None] = ContextVar("golem_workflow_position", default=None)
 IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
 MAY_HAVE_RUN: ContextVar[bool] = ContextVar("golem_workflow_may_have_run", default=False)
+CURRENT_STEP: ContextVar[str | None] = ContextVar("golem_workflow_step", default=None)
 
 
 ITEM_CHARS = 80
@@ -398,6 +403,19 @@ class Run:
         await self._backend.output(
             self.workflow_run_id, position, value, _clean(title), _clean(summary)
         )
+
+    def progress(self, text: str) -> None:
+        """Say how far the step you are in is ("3 of 12"); the run page shows it while it goes.
+
+        Call it from the function of a ``run.step`` (it may be a plain function). It is not a
+        step and is never saved: a run that is executed again sends what its steps send. Calls
+        come out at most four times a second; the last one is always sent. Outside a step it
+        does nothing. A ``run.llm`` step needs no call: its answer is shown as it is written,
+        when the model can stream.
+        """
+        key = CURRENT_STEP.get()
+        if key is not None:
+            self._backend.progress(self.workflow_run_id, key, text)
 
     async def notify(self, text: str, title: str | None = None, key: str | None = None) -> None:
         """Tell you ``text`` through the Notifier, once per run.

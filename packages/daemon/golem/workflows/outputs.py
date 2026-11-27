@@ -11,7 +11,7 @@ from pathlib import Path
 
 from golem.folders import hidden_folders, is_under
 
-__all__ = ["READ_CHARS", "OutputError", "read_marked_file"]
+__all__ = ["READ_CHARS", "OutputError", "marked_file", "read_marked_file"]
 
 READ_CHARS = 200_000
 """A read gives at most this many characters; ``truncated`` says the file was longer."""
@@ -38,14 +38,10 @@ def _is_text_type(path: Path) -> bool:
     return kind is not None and kind.startswith("text/")
 
 
-def read_marked_file(
-    marked: object, home: Path, limit: int = READ_CHARS
-) -> tuple[str, str, bool, int]:
-    """``(path, text, truncated, size)`` of the file path ``marked`` by a run; size is in bytes.
-
-    ``marked`` is the output's value. It must be an absolute path to a text file that is not in
-    a secret folder (symlinks are resolved first). Raises :class:`OutputError` otherwise.
-    """
+def marked_file(marked: object, home: Path) -> Path:
+    """The file a run marked with ``run.output``, resolved. Raises :class:`OutputError` unless
+    the value is an absolute path to an existing file outside the folders golem keeps private
+    (symlinks are resolved first)."""
     if not isinstance(marked, str) or not marked.strip():
         raise OutputError("this output is not a file path")
     if not Path(marked).is_absolute():
@@ -59,6 +55,18 @@ def read_marked_file(
         raise OutputError("golem keeps that folder private, so the file is not opened")
     if not target.is_file():
         raise OutputError(f"there is no file at {marked}")
+    return target
+
+
+def read_marked_file(
+    marked: object, home: Path, limit: int = READ_CHARS
+) -> tuple[str, str, bool, int]:
+    """``(path, text, truncated, size)`` of the file path ``marked`` by a run; size is in bytes.
+
+    ``marked`` is the output's value. It must be an absolute path to a text file that is not in
+    a secret folder (symlinks are resolved first). Raises :class:`OutputError` otherwise.
+    """
+    target = marked_file(marked, home)
     if not _is_text_type(target):
         raise OutputError(_NOT_TEXT)
     try:

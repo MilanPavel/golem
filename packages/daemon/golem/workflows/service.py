@@ -39,6 +39,7 @@ from golem_protocol.commands import (
     WorkflowOutputEvent,
     WorkflowRunEvent,
     WorkflowStepEvent,
+    WorkflowStepProgressEvent,
 )
 
 log = logging.getLogger("golem.server")
@@ -52,6 +53,7 @@ _NOTIFICATIONS: dict[str, type[BaseModel]] = {
     "workflow.run.failed": rpc.WorkflowRunFailedNotification,
     "workflow.run.cancelled": rpc.WorkflowRunCancelledNotification,
     "workflow.output.added": rpc.WorkflowOutputAddedNotification,
+    "workflow.step.progress": rpc.WorkflowStepProgressNotification,
     "workflow.step.started": rpc.WorkflowStepStartedNotification,
     "workflow.step.done": rpc.WorkflowStepDoneNotification,
     "workflow.step.failed": rpc.WorkflowStepFailedNotification,
@@ -260,6 +262,8 @@ class WorkflowService:
             if name.startswith("workflow.run.")
             else WorkflowOutputEvent
             if name.startswith("workflow.output.")
+            else WorkflowStepProgressEvent
+            if name == "workflow.step.progress"
             else WorkflowStepEvent
         )
         self._broadcast(model(params=params.model_validate(payload)))
