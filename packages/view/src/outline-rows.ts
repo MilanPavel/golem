@@ -66,6 +66,22 @@ export function repeatWords(forEach: string): string {
     .join("; ");
 }
 
+const KIND_WORDS: Readonly<Record<string, string>> = {
+  step: "Python",
+  llm: "Model",
+  agent: "Agent",
+  review: "Review",
+  notify: "Inbox",
+  tool: "Tool",
+  skill: "Skill",
+  code: "Code",
+};
+
+/** What a step's kind is called to a person: `step` is Python, `llm` is Model, `notify` is Inbox. An unknown kind reads as it is. */
+export function stepKindWords(kind: string): string {
+  return KIND_WORDS[kind] ?? kind;
+}
+
 /** How one step reads: its kind, then agent, `for each`, `if`, `gets` and `budget`. */
 export function outlineNotes(step: OutlineStepLike): string[] {
   const notes: string[] = [step.kind];

@@ -4,7 +4,7 @@ import type { WorkflowOutlineStep, WorkflowProblem } from "../../store/workflows
 
 import { outlineLine, outlineNotes } from "@golem/view";
 
-export { errorLine, groupWords, triggerText, workflowGroups, workflowRowLine, type WorkflowGroup } from "@golem/view";
+export { errorLine, groupWords, repeatWords, stepKindWords, triggerText, workflowGroups, workflowRowLine, type WorkflowGroup } from "@golem/view";
 
 /** The step's first line in the file (from 1), or null when the daemon sent none. */
 export const stepStart = outlineLine;
@@ -31,6 +31,23 @@ export function routinesStarting(routines: readonly RoutineInfo[], name: string)
 
 /** How one outline step reads in the outline: what it is, then what repeats or guards it. */
 export const stepNotes = outlineNotes;
+
+/** The steps a step reads the results of (`after`), each with its number in the outline. Ids that name no step are left out. */
+export function stepUses(steps: readonly WorkflowOutlineStep[], step: WorkflowOutlineStep): { title: string; number: number }[] {
+  const found: { title: string; number: number }[] = [];
+  for (const id of step.after ?? []) {
+    const at = steps.findIndex((other) => other.id === id);
+    const other = steps[at];
+    if (other !== undefined) found.push({ title: other.title, number: at + 1 });
+  }
+  return found;
+}
+
+/** A key for the step's `key=`, made from the first four words of its title: `Save the briefing` is `save-the-briefing`. */
+export function suggestedKey(step: WorkflowOutlineStep): string {
+  const slug = step.title.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word !== "").slice(0, 4).join("-");
+  return slug === "" ? step.kind : slug;
+}
 
 /** The first and last line of a step (from 1), or null when the daemon sent none. The last is never before the first. */
 export function stepRange(step: WorkflowOutlineStep): [number, number] | null {

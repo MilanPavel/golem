@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { groupWords, lastRunLine, outlineLine, outlineNotes, outlineRows, repeatWords, stepRanTimes } from "./outline-rows.ts";
+import { groupWords, lastRunLine, outlineLine, outlineNotes, outlineRows, repeatWords, stepKindWords, stepRanTimes } from "./outline-rows.ts";
+
+test("a kind reads in words, and an unknown kind reads as it is", () => {
+  assert.deepEqual(["step", "llm", "agent", "review", "notify", "tool", "skill", "code"].map(stepKindWords), ["Python", "Model", "Agent", "Review", "Inbox", "Tool", "Skill", "Code"]);
+  assert.equal(stepKindWords("other"), "other");
+});
 
 const NOW = new Date("2026-11-26T12:00:00").getTime();
 
