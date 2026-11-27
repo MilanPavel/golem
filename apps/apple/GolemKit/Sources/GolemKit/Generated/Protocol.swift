@@ -33291,6 +33291,28 @@ public struct WorkflowOutlineStepArg: Codable {
     }
 }
 
+/// One result a run marked with ``run.output``.
+///
+/// ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+// MARK: - WorkflowOutput
+public struct WorkflowOutput: Codable {
+    public let summary: String?
+    public let title: String?
+    public let value: JSONAny?
+
+    public enum CodingKeys: String, CodingKey {
+        case summary = "summary"
+        case title = "title"
+        case value = "value"
+    }
+
+    public init(summary: String?, title: String?, value: JSONAny?) {
+        self.summary = summary
+        self.title = title
+        self.value = value
+    }
+}
+
 /// One finding of ``workflow.check``, with the line it is on and the outline step it belongs
 /// to (null for the header or the whole file). ``fix`` is a short replacement text or the
 /// name
@@ -33533,6 +33555,47 @@ public struct StickyWorkflowStepArg: Codable {
     }
 }
 
+/// ``workflow.read_output``. The text of output ``index`` of a run, when it is a file path
+/// the run marked. Any other path is refused.
+// MARK: - WorkflowReadOutputParams
+public struct WorkflowReadOutputParams: Codable {
+    public let index: Int
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case index = "index"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(index: Int, workflowRunID: String) {
+        self.index = index
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// The file's text, cut at ``limit`` characters; ``truncated`` says it was cut.
+// MARK: - WorkflowReadOutputResult
+public struct WorkflowReadOutputResult: Codable {
+    public let path: String
+    public let size: Int
+    public let text: String
+    public let truncated: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case size = "size"
+        case text = "text"
+        case truncated = "truncated"
+    }
+
+    public init(path: String, size: Int, text: String, truncated: Bool?) {
+        self.path = path
+        self.size = size
+        self.text = text
+        self.truncated = truncated
+    }
+}
+
 /// ``workflow.resume``. Continue a run that stopped: ``running`` (left by a restart),
 /// ``waiting`` (``on_restart="ask"``) or ``failed``. Finished steps are not run again.
 // MARK: - WorkflowResumeParams
@@ -33568,41 +33631,78 @@ public struct WorkflowResumeResult: Codable {
 /// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowResumeResultRun
 public struct WorkflowResumeResultRun: Codable {
+    public let description: String?
     public let error: String?
     public let finishedAt: String?
     public let inputs: [String: JSONAny]?
     public let name: String
+    public let outputs: [PurpleWorkflowOutput]?
+    public let result: JSONAny?
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
+    public let summary: String?
+    public let title: String?
     public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
         case inputs = "inputs"
         case name = "name"
+        case outputs = "outputs"
+        case result = "result"
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
+        case title = "title"
         case trigger = "trigger"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [PurpleWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+        self.description = description
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
         self.name = name
+        self.outputs = outputs
+        self.result = result
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
+        self.title = title
         self.trigger = trigger
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
+    }
+}
+
+/// One result a run marked with ``run.output``.
+///
+/// ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+// MARK: - PurpleWorkflowOutput
+public struct PurpleWorkflowOutput: Codable {
+    public let summary: String?
+    public let title: String?
+    public let value: JSONAny?
+
+    public enum CodingKeys: String, CodingKey {
+        case summary = "summary"
+        case title = "title"
+        case value = "value"
+    }
+
+    public init(summary: String?, title: String?, value: JSONAny?) {
+        self.summary = summary
+        self.title = title
+        self.value = value
     }
 }
 
@@ -33670,41 +33770,78 @@ public struct WorkflowReviewAnswerResult: Codable {
 /// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowReviewAnswerResultRun
 public struct WorkflowReviewAnswerResultRun: Codable {
+    public let description: String?
     public let error: String?
     public let finishedAt: String?
     public let inputs: [String: JSONAny]?
     public let name: String
+    public let outputs: [FluffyWorkflowOutput]?
+    public let result: JSONAny?
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
+    public let summary: String?
+    public let title: String?
     public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
         case inputs = "inputs"
         case name = "name"
+        case outputs = "outputs"
+        case result = "result"
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
+        case title = "title"
         case trigger = "trigger"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [FluffyWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+        self.description = description
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
         self.name = name
+        self.outputs = outputs
+        self.result = result
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
+        self.title = title
         self.trigger = trigger
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
+    }
+}
+
+/// One result a run marked with ``run.output``.
+///
+/// ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+// MARK: - FluffyWorkflowOutput
+public struct FluffyWorkflowOutput: Codable {
+    public let summary: String?
+    public let title: String?
+    public let value: JSONAny?
+
+    public enum CodingKeys: String, CodingKey {
+        case summary = "summary"
+        case title = "title"
+        case value = "value"
+    }
+
+    public init(summary: String?, title: String?, value: JSONAny?) {
+        self.summary = summary
+        self.title = title
+        self.value = value
     }
 }
 
@@ -33980,41 +34117,78 @@ public struct WorkflowRunFailedNotificationParams: Codable {
 /// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowRunInfo
 public struct WorkflowRunInfo: Codable {
+    public let description: String?
     public let error: String?
     public let finishedAt: String?
     public let inputs: [String: JSONAny]?
     public let name: String
+    public let outputs: [WorkflowRunInfoOutput]?
+    public let result: JSONAny?
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
+    public let summary: String?
+    public let title: String?
     public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
         case inputs = "inputs"
         case name = "name"
+        case outputs = "outputs"
+        case result = "result"
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
+        case title = "title"
         case trigger = "trigger"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [WorkflowRunInfoOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+        self.description = description
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
         self.name = name
+        self.outputs = outputs
+        self.result = result
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
+        self.title = title
         self.trigger = trigger
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
+    }
+}
+
+/// One result a run marked with ``run.output``.
+///
+/// ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+// MARK: - WorkflowRunInfoOutput
+public struct WorkflowRunInfoOutput: Codable {
+    public let summary: String?
+    public let title: String?
+    public let value: JSONAny?
+
+    public enum CodingKeys: String, CodingKey {
+        case summary = "summary"
+        case title = "title"
+        case value = "value"
+    }
+
+    public init(summary: String?, title: String?, value: JSONAny?) {
+        self.summary = summary
+        self.title = title
+        self.value = value
     }
 }
 
@@ -34798,41 +34972,78 @@ public struct ReviewElement: Codable {
 /// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowStatusResultRun
 public struct WorkflowStatusResultRun: Codable {
+    public let description: String?
     public let error: String?
     public let finishedAt: String?
     public let inputs: [String: JSONAny]?
     public let name: String
+    public let outputs: [TentacledWorkflowOutput]?
+    public let result: JSONAny?
     public let sessionID: String?
     public let startedAt: String?
     public let status: WorkflowRunEventStatus
+    public let summary: String?
+    public let title: String?
     public let trigger: String
     public let workflowID: String
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
         case inputs = "inputs"
         case name = "name"
+        case outputs = "outputs"
+        case result = "result"
         case sessionID = "session_id"
         case startedAt = "started_at"
         case status = "status"
+        case summary = "summary"
+        case title = "title"
         case trigger = "trigger"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [TentacledWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+        self.description = description
         self.error = error
         self.finishedAt = finishedAt
         self.inputs = inputs
         self.name = name
+        self.outputs = outputs
+        self.result = result
         self.sessionID = sessionID
         self.startedAt = startedAt
         self.status = status
+        self.summary = summary
+        self.title = title
         self.trigger = trigger
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
+    }
+}
+
+/// One result a run marked with ``run.output``.
+///
+/// ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+// MARK: - TentacledWorkflowOutput
+public struct TentacledWorkflowOutput: Codable {
+    public let summary: String?
+    public let title: String?
+    public let value: JSONAny?
+
+    public enum CodingKeys: String, CodingKey {
+        case summary = "summary"
+        case title = "title"
+        case value = "value"
+    }
+
+    public init(summary: String?, title: String?, value: JSONAny?) {
+        self.summary = summary
+        self.title = title
+        self.value = value
     }
 }
 

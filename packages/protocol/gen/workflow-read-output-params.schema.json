@@ -1,0 +1,22 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.read_output``. The text of output ``index`` of a run, when it is a file path\nthe run marked. Any other path is refused.",
+  "properties": {
+    "index": {
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id",
+    "index"
+  ],
+  "title": "WorkflowReadOutputParams",
+  "type": "object"
+}

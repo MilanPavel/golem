@@ -1,7 +1,50 @@
 {
+  "$defs": {
+    "WorkflowOutput": {
+      "additionalProperties": false,
+      "description": "One result a run marked with ``run.output``.\n\n``value`` is the JSON given (text, a record, rows, a file path or a URL).",
+      "properties": {
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "value": {
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "title": "WorkflowOutput",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "description": "One run of a workflow, from its ``workflow_runs`` row.\n\nThe times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null\nuntil a step needs one. ``error`` says why a ``failed`` run failed.",
   "properties": {
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
     "error": {
       "anyOf": [
         {
@@ -34,6 +77,17 @@
     "name": {
       "title": "Name",
       "type": "string"
+    },
+    "outputs": {
+      "items": {
+        "$ref": "#/$defs/WorkflowOutput"
+      },
+      "title": "Outputs",
+      "type": "array"
+    },
+    "result": {
+      "default": null,
+      "title": "Result"
     },
     "session_id": {
       "anyOf": [
@@ -71,6 +125,30 @@
       ],
       "title": "Status",
       "type": "string"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
     },
     "trigger": {
       "title": "Trigger",

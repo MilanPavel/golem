@@ -193,6 +193,7 @@ public enum MethodAccess {
         "workflow.get",
         "workflow.list",
         "workflow.propose",
+        "workflow.read_output",
         "workflow.resume",
         "workflow.review.answer",
         "workflow.save",

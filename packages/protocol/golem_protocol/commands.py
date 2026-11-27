@@ -6421,6 +6421,19 @@ class WorkflowStartResult(BaseModel):
     workflow_run_id: str = Field(min_length=1)
 
 
+class WorkflowOutput(BaseModel):
+    """One result a run marked with ``run.output``.
+
+    ``value`` is the JSON given (text, a record, rows, a file path or a URL).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    title: str | None = None
+    value: Any = None
+    summary: str | None = None
+
+
 class WorkflowRunInfo(BaseModel):
     """One run of a workflow, from its ``workflow_runs`` row.
 
@@ -6440,6 +6453,16 @@ class WorkflowRunInfo(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     error: str | None = None
+    title: str | None = None
+    """The workflow's ``@workflow(title=)``; null when it gave none."""
+    description: str = ""
+    """The workflow's docstring (its goal), from its file as it is now."""
+    result: Any = None
+    """What the workflow function returned, or null while it has not."""
+    outputs: list[WorkflowOutput] = Field(default_factory=list[WorkflowOutput])
+    """What the run marked with ``run.output``, in the order it marked them."""
+    summary: str | None = None
+    """The summary of the first output, or null."""
 
 
 class WorkflowStepInfo(BaseModel):
@@ -6511,6 +6534,28 @@ class WorkflowStatusResult(BaseModel):
     run: WorkflowRunInfo
     steps: list[WorkflowStepInfo] = Field(default_factory=list[WorkflowStepInfo])
     reviews: list[WorkflowReviewInfo] = Field(default_factory=list[WorkflowReviewInfo])
+
+
+class WorkflowReadOutputParams(BaseModel):
+    """``workflow.read_output``. The text of output ``index`` of a run, when it is a file path
+    the run marked. Any other path is refused."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    index: int = Field(ge=0)
+
+
+class WorkflowReadOutputResult(BaseModel):
+    """The file's text, cut at ``limit`` characters; ``truncated`` says it was cut."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    text: str
+    truncated: bool = False
+    size: int = Field(ge=0)
+    """The size of the whole file, in bytes."""
 
 
 class WorkflowCancelParams(BaseModel):
@@ -7631,8 +7676,11 @@ __all__ = [
     "WorkflowListParams",
     "WorkflowListResult",
     "WorkflowOutlineStep",
+    "WorkflowOutput",
     "WorkflowProposeParams",
     "WorkflowProposeResult",
+    "WorkflowReadOutputParams",
+    "WorkflowReadOutputResult",
     "WorkflowResumeParams",
     "WorkflowResumeResult",
     "WorkflowReviewAnswerParams",
