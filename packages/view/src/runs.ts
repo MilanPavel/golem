@@ -21,6 +21,8 @@ export type RunLike = {
   session_id?: string | null;
   /** The workflow run's id, set for a workflow run. It is the row's key when `session_id` is not. */
   workflow_run_id?: string | null;
+  /** The id of the workflow a workflow run is of. Missing for the other rows, and for a row an older daemon sent. */
+  workflow_id?: string | null;
   /** `routine`, `ask` or `workflow`. */
   kind?: string;
   /** `workflow:<name>` for a workflow run. */
@@ -135,13 +137,13 @@ export function workflowNameOfId(id: string): string {
 }
 
 /**
- * The runs of one workflow, given its id: a workflow run, and a routine firing that started it, say
- * `workflow:<name>` in `origin`. A row does not carry the workflow's path, so two workflows of one name
- * in two folders are not told apart. Order is kept.
+ * The runs of one workflow, given its id. A row that carries its workflow's id is matched by it, so two workflows of
+ * one name in two folders are told apart; a row that has none (a routine firing that started the workflow, or a row an
+ * older daemon sent) says `workflow:<name>` in `origin` and is matched by the name. Order is kept.
  */
 export function runsOfWorkflow<T extends RunLike>(runs: readonly T[], workflowId: string): T[] {
   const origin = `workflow:${workflowNameOfId(workflowId)}`;
-  return runs.filter((run) => run.origin === origin);
+  return runs.filter((run) => (run.workflow_id !== undefined && run.workflow_id !== null && run.workflow_id !== "" ? run.workflow_id === workflowId : run.origin === origin));
 }
 
 /** The row's name: the routine's, the workflow's, or `golem ask` for a detached ask. */

@@ -110,7 +110,9 @@ async def test_start_sends_the_steps_in_order_and_the_run_is_done(short_home: Pa
         got = await _until(client, run_id, "done")
         steps = cast(Rows, got["steps"])
         assert [(s["key"], s["status"]) for s in steps] == [("first", "done"), ("second", "done")]
+        assert [s["line"] for s in steps] == ["5", "15"]
         assert cast(dict[str, object], got["run"])["inputs"] == {"n": 4}
+        assert cast(dict[str, object], got["run"])["steps_expected"] is None  # it is over
 
         await client.take_events()
         names = [
@@ -124,6 +126,11 @@ async def test_start_sends_the_steps_in_order_and_the_run_is_done(short_home: Pa
             "workflow.step.done",
             "workflow.run.done",
         ]
+        events = [n for n in client.notices if str(n["method"]).startswith("workflow.")]
+        started = cast(dict[str, object], events[0]["params"])
+        assert started["steps_expected"] == 2
+        last = cast(dict[str, object], events[-1]["params"])
+        assert (last["result"], last["result_size"], last["summary"]) == (15, 2, "15")
     finally:
         await client.close()
         await stop_daemon(app, task)
@@ -150,10 +157,73 @@ async def test_a_run_of_plain_steps_makes_no_session_and_is_still_in_runs(
         runs = cast(Rows, rpc_result(await client.call("run.list", {}))["runs"])
         row = next(r for r in runs if r["workflow_run_id"] == run_id)
         assert row["session_id"] is None and row["origin"] == "workflow:adder"
+        assert row["workflow_id"] == f"{path}::adder"
         assert (row["kind"], row["status"], row["steps"]) == ("workflow", "succeeded", 2)
         assert row["ended_at"] is not None and row["routine"] is None
         sessions = cast(Rows, rpc_result(await client.call("session.list", {}))["sessions"])
         assert sessions == []
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_a_run_that_goes_on_says_how_many_steps_it_expects(short_home: Path) -> None:
+    path = _write(short_home / "workflows", "slow.py", SLOW)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await client.call("workflow.list", {}, timeout=20)
+        started = rpc_result(await client.call("workflow.start", {"id": f"{path}::slow"}))
+        run_id = str(started["workflow_run_id"])
+        got = await _until(client, run_id, "running")
+        assert cast(dict[str, object], got["run"])["steps_expected"] == 1
+        await client.call("workflow.cancel", {"workflow_run_id": run_id})
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+SAYS = """\
+import time
+from golem.workflow import workflow, Run
+
+
+def count(run):
+    run.progress("3 of 12")
+    time.sleep(2)
+
+
+@workflow()
+async def says(run: Run):
+    await run.step("Count", count, run)
+"""
+
+
+async def test_a_client_that_opens_the_run_midway_sees_the_text_so_far(short_home: Path) -> None:
+    path = _write(short_home / "workflows", "says.py", SAYS)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        await client.call("workflow.list", {}, timeout=20)
+        started = rpc_result(await client.call("workflow.start", {"id": f"{path}::says"}))
+        run_id = str(started["workflow_run_id"])
+        seen = None
+        got: dict[str, object] = {}
+        for _ in range(100):
+            got = rpc_result(await client.call("workflow.status", {"workflow_run_id": run_id}))
+            steps = cast(Rows, got["steps"])
+            seen = steps[0].get("progress") if steps else None
+            if seen is not None:
+                break
+            await asyncio.sleep(0.05)
+        assert seen == "3 of 12"
+        assert cast(dict[str, object], got["run"])["usual_ms"] is None
+        await client.call("workflow.cancel", {"workflow_run_id": run_id})
+        await _until(client, run_id, "cancelled")
+        ended = rpc_result(await client.call("workflow.status", {"workflow_run_id": run_id}))
+        assert cast(Rows, ended["steps"])[0].get("progress") is None
     finally:
         await client.close()
         await stop_daemon(app, task)

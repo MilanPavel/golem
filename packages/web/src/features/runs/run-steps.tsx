@@ -1,4 +1,4 @@
-import { groupWords, shortTime, stepOutputLine, stepRowState, stepTook, stepWords, type RunStepRow } from "@golem/view";
+import { groupWords, repeatCount, shortTime, stepOutputLine, stepRowState, stepTook, stepWords, type RunStepRow } from "@golem/view";
 import { useState } from "react";
 import type { WorkflowStepInfo } from "../../store/workflows.ts";
 import { cn } from "../../ui/cn.ts";
@@ -56,6 +56,9 @@ function stepLine(step: WorkflowStepInfo): string {
   return step.status === "pending" ? "not started" : stepWords(step.status);
 }
 
+/** How many squares for items that have not started a repeating row draws. */
+const MAX_AHEAD = 120;
+
 const SQUARE: Record<string, string> = { done: "bg-allow", skipped: "bg-faint", failed: "bg-deny", in_doubt: "bg-wait", running: "bg-clay animate-pulse", waiting: "bg-wait" };
 
 /** The folded row: the title, a square for each item, a count, and the items that work or failed (all of them on request). */
@@ -65,22 +68,26 @@ function RepeatRow({ row, now, selected, onSelect }: { row: Extract<RunStepRow<W
   const interesting = row.items.filter((item) => item.status === "running" || item.status === "waiting" || item.status === "failed" || item.status === "in_doubt");
   const shown = all ? row.items : interesting;
   const state = stepRowState(row);
+  const count = repeatCount(row);
+  // The ones still to come are shown as empty squares, up to a screenful: a total is only drawn when the workflow said it.
+  const ahead = row.total === null ? 0 : Math.min(MAX_AHEAD, Math.max(0, row.total - row.items.length));
   const took = row.items.reduce((sum, item) => sum + (item.started_at ? Math.max(0, (Date.parse(item.finished_at ?? "") || now) - Date.parse(item.started_at)) : 0), 0);
   return (
     <div className="flex flex-col" data-fold={row.title}>
-      <button type="button" aria-expanded={open} aria-label={`${row.title}, ${row.done} of ${row.items.length}, ${stepWords(state)}`} className={ROW} onClick={() => setOpen((now) => !now)}>
+      <button type="button" aria-expanded={open} aria-label={`${row.title}, ${count}, ${stepWords(state)}`} className={ROW} onClick={() => setOpen((now) => !now)}>
         <StateMark state={state} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 truncate text-sm font-medium">{row.title}</span>
-            <span className="text-meta text-muted">
-              {row.done} of {row.items.length}
-            </span>
+            <span className="text-meta text-muted">{count}</span>
             <span className="ml-auto shrink-0 text-meta text-faint">{took > 0 ? shortTime(took) : ""}</span>
           </span>
           <span aria-hidden="true" className="flex flex-wrap gap-0.5">
             {row.items.map((item) => (
               <span key={item.key} className={cn("size-2 rounded-sm", SQUARE[item.status] ?? "border border-line")} />
+            ))}
+            {Array.from({ length: ahead }, (_, at) => (
+              <span key={`ahead-${at}`} className="size-2 rounded-sm border border-line" />
             ))}
           </span>
         </span>

@@ -23,6 +23,12 @@ export type StepLike = {
   started_at?: string | null;
   finished_at?: string | null;
   result?: unknown;
+  /** The one-line form of the result, as the daemon sends it: used when the result itself was too large for an event. */
+  line?: string | null;
+  /** How many steps of this title the workflow said it has in all (`run.step(of=)`), when it did. */
+  of?: number | null;
+  /** The text so far of a running step that sends progress. */
+  progress?: string | null;
 };
 
 const STEP_WORDS: Record<string, string> = {
@@ -162,9 +168,9 @@ function recordPairs(record: Record<string, unknown>): string {
 }
 
 /** The one line a step's saved result is, in words by its kind. Empty when there is no result at all. */
-export function stepOutputLine(step: Pick<StepLike, "kind" | "result">): string {
+export function stepOutputLine(step: Pick<StepLike, "kind" | "result" | "line">): string {
   const { result } = step;
-  if (result === null || result === undefined) return "";
+  if (result === null || result === undefined) return step.line ?? "";
   const kind = resultKind(result);
   if (kind === "empty") return EMPTY_RESULT_WORDS;
   if (typeof result === "string") return oneLine(result, 120);
@@ -248,7 +254,7 @@ export function stepTook(step: Pick<StepLike, "started_at" | "finished_at" | "st
 }
 
 /** One row of the run page's step list: a step on its own, or the steps that share one title, folded into one row. */
-export type RunStepRow<T extends StepLike = StepLike> = { kind: "step"; step: T } | { kind: "repeat"; title: string; items: T[]; state: string; done: number };
+export type RunStepRow<T extends StepLike = StepLike> = { kind: "step"; step: T } | { kind: "repeat"; title: string; items: T[]; state: string; done: number; total: number | null };
 
 /** The state of a folded row: failed if any item failed, working if any is going, done when all are, else not started. */
 function repeatState(items: readonly StepLike[]): string {
@@ -273,7 +279,7 @@ export function foldSteps<T extends StepLike>(steps: readonly T[]): RunStepRow<T
     }
     let fold = folds.get(step.title);
     if (fold === undefined) {
-      fold = { kind: "repeat", title: step.title, items: [], state: "pending", done: 0 };
+      fold = { kind: "repeat", title: step.title, items: [], state: "pending", done: 0, total: null };
       folds.set(step.title, fold);
       rows.push(fold);
     }
@@ -282,6 +288,9 @@ export function foldSteps<T extends StepLike>(steps: readonly T[]): RunStepRow<T
   for (const fold of folds.values()) {
     fold.state = repeatState(fold.items);
     fold.done = fold.items.filter((item) => item.status === "done" || item.status === "skipped").length;
+    // The total is what the workflow said, never fewer than the steps already seen; with no word from it there is none.
+    const said = Math.max(0, ...fold.items.map((item) => item.of ?? 0));
+    fold.total = said > 0 ? Math.max(said, fold.items.length) : null;
   }
   return rows;
 }
@@ -291,16 +300,101 @@ export function stepRowState(row: RunStepRow): string {
   return row.kind === "step" ? row.step.status : row.state;
 }
 
-/** The rows finished of the rows known, for the bar and the count, and the title of the one that works now. */
-export function stepsProgress(rows: readonly RunStepRow[]): { done: number; total: number; current: string | null; words: string } {
+/** What `stepsProgress` knows about the run's size. */
+export type ProgressOptions = {
+  /** The run goes on: its list of steps may still grow. */
+  live?: boolean;
+  /** How many steps the daemon expects the run to have (`steps_expected`), when it can say. */
+  expected?: number | null;
+};
+
+/**
+ * The rows finished, and the title of the one that works now. A run that is over has the rows it has as its total. While it
+ * goes, the total is what the daemon expects, when it can say and the rows seen do not pass it ("5 of 7 steps"); else there is
+ * none: the words count the rows so far ("5 steps so far") and `known` is false, so the bar is indeterminate. A total is never made up.
+ */
+export function stepsProgress(rows: readonly RunStepRow[], options: ProgressOptions = {}): { done: number; total: number; known: boolean; current: string | null; words: string } {
   const finished = (row: RunStepRow) => ["done", "skipped"].includes(stepRowState(row));
   const done = rows.filter(finished).length;
   const now = rows.find((row) => ["running", "waiting", "failed", "in_doubt"].includes(stepRowState(row)));
   const current = now === undefined ? null : now.kind === "step" ? now.step.title : now.title;
-  return { done, total: rows.length, current, words: `${done} of ${rows.length} ${rows.length === 1 ? "step" : "steps"}` };
+  const noun = (count: number) => (count === 1 ? "step" : "steps");
+  const { live = false, expected = null } = options;
+  if (!live) return { done, total: rows.length, known: true, current, words: `${done} of ${rows.length} ${noun(rows.length)}` };
+  if (expected !== null && expected >= rows.length && expected > 0) return { done, total: expected, known: true, current, words: `${done} of ${expected} ${noun(expected)}` };
+  return { done, total: rows.length, known: false, current, words: `${rows.length} ${noun(rows.length)} so far` };
+}
+
+/** The count of a repeating row: "12 of 30" when the workflow said the total, else the ones finished "12 so far" while it goes, and "12 of 14" once it is over. */
+export function repeatCount(row: Extract<RunStepRow, { kind: "repeat" }>): string {
+  if (row.total !== null) return `${row.done} of ${row.total}`;
+  return ["done", "failed"].includes(row.state) ? `${row.done} of ${row.items.length}` : `${row.done} so far`;
+}
+
+/** One thing that works now: what it is in words, and how long it has gone. */
+export type LiveLine = { key: string; text: string; took: string };
+
+/**
+ * What runs now, one line each: a step is its title and item ("Reading feed · example.com/rss"), an item of a repeating step
+ * says its place when the total is known ("Reading feed 12 of 30 · example.com/rss"). Steps that go at once (a parallel group)
+ * are each a line, in the order they started.
+ */
+export function liveLines(rows: readonly RunStepRow[], nowMs: number): LiveLine[] {
+  const lines: LiveLine[] = [];
+  for (const row of rows) {
+    const items = row.kind === "step" ? [row.step] : row.items;
+    items.forEach((step, at) => {
+      if (step.status !== "running") return;
+      const place = row.kind === "repeat" && row.total !== null ? ` ${at + 1} of ${row.total}` : "";
+      const item = step.item === null || step.item === undefined || step.item === "" ? "" : ` \u00b7 ${step.item}`;
+      lines.push({ key: step.key, text: `${step.title}${place}${item}`, took: stepTook(step, nowMs) });
+    });
+  }
+  return lines;
 }
 
 /** The steps that did something worth telling when the run marked no result: a notice sent, a review answered, a tool called. */
 export function whatItDid<T extends StepLike>(steps: readonly T[]): T[] {
   return steps.filter((step) => (step.kind === "notify" || step.kind === "review" || step.kind === "tool") && step.status === "done" && step.result !== null && step.result !== undefined);
+}
+
+/** "usually about 45s": how long a run of the workflow usually takes. Empty when the daemon has no usual time yet (fewer than two runs finished). */
+export function usualWords(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return "";
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `usually about ${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `usually about ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `usually about ${hours}h${minutes % 60 === 0 ? "" : ` ${minutes % 60} min`}`;
+}
+
+/** One finished thing a running run has found: what it is and its one line. */
+export type Found = { key: string; label: string; line: string };
+
+/**
+ * What a run has found so far, in the order it found it: the one line of each step that is done and has a result, a repeating
+ * row as one line with its count ("Reading feed", "12 of 30").
+ */
+export function foundSoFar(rows: readonly RunStepRow[]): Found[] {
+  const found: Found[] = [];
+  for (const row of rows) {
+    if (row.kind === "repeat") {
+      if (row.done > 0) found.push({ key: `repeat:${row.title}`, label: row.title, line: repeatCount(row) });
+      continue;
+    }
+    const line = row.step.status === "done" ? stepOutputLine(row.step) : "";
+    if (line !== "") found.push({ key: row.step.key, label: stepLabel(row.step), line });
+  }
+  return found;
+}
+
+/** The text of a running step as it comes. */
+export type LiveText = { key: string; label: string; text: string };
+
+/** The running steps that send progress text, in the order they started. A step that is not running has none to show. */
+export function liveTexts(steps: readonly StepLike[]): LiveText[] {
+  return steps
+    .filter((step) => step.status === "running" && step.progress !== null && step.progress !== undefined && step.progress !== "")
+    .map((step) => ({ key: step.key, label: stepLabel(step), text: step.progress ?? "" }));
 }

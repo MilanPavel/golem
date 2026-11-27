@@ -35,8 +35,10 @@ from golem_protocol.commands import (
     RuntimeInstallOutput,
     SessionSummary,
     SkillRegistryChanged,
+    WorkflowOutputEvent,
     WorkflowRunEvent,
     WorkflowStepEvent,
+    WorkflowStepProgressEvent,
 )
 from golem_protocol.events import ChatEvent
 
@@ -504,6 +506,29 @@ class WorkflowStepInDoubtNotification(BaseModel):
     params: WorkflowStepEvent
 
 
+class WorkflowStepProgressNotification(BaseModel):
+    """Server → every connection: ``workflow.step.progress``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.progress"] = "workflow.step.progress"
+    params: WorkflowStepProgressEvent
+
+
+class WorkflowOutputAddedNotification(BaseModel):
+    """Server → every connection: ``workflow.output.added``. Not stored.
+
+    The run marked a result with ``run.output``; the page shows it at once.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.output.added"] = "workflow.output.added"
+    params: WorkflowOutputEvent
+
+
 __all__ = [
     "AgentRegistryChangedNotification",
     "DataChangedNotification",
@@ -539,6 +564,7 @@ __all__ = [
     "RuntimeInstallOutputNotification",
     "SessionSummaryNotification",
     "SkillRegistryChangedNotification",
+    "WorkflowOutputAddedNotification",
     "WorkflowRunCancelledNotification",
     "WorkflowRunDoneNotification",
     "WorkflowRunFailedNotification",
@@ -549,6 +575,7 @@ __all__ = [
     "WorkflowStepDoneNotification",
     "WorkflowStepFailedNotification",
     "WorkflowStepInDoubtNotification",
+    "WorkflowStepProgressNotification",
     "WorkflowStepStartedNotification",
     "WorkflowStepWaitingNotification",
 ]

@@ -126,6 +126,19 @@
       "title": "Status",
       "type": "string"
     },
+    "steps_expected": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Steps Expected"
+    },
     "summary": {
       "anyOf": [
         {
@@ -153,6 +166,19 @@
     "trigger": {
       "title": "Trigger",
       "type": "string"
+    },
+    "usual_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usual Ms"
     },
     "workflow_id": {
       "minLength": 1,

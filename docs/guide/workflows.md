@@ -180,6 +180,29 @@ await run.parallel(
 
 The page shows "Count lines" and the item after it. `item=` is kept as text (cut at 80 characters) and is never passed to the function. Without `key=`, the item is part of the step key (`Count lines: a.md`), so the steps of a loop need no names that change. Titles and items are only labels: a file that uses none of them runs, and resumes a run made before, exactly as it did.
 
+While a run goes, its page counts steps against what golem reads from your file (the number of `run.step`, `run.llm` and other calls), and says "5 steps so far" when it cannot know, for example when a step sits under an `if`. A loop is one row. Pass `of=` with the number of items when you know it, and the row says "12 of 30" instead of "12 so far":
+
+```python
+await run.step("Read feed", read, url, item=url, of=len(feeds))
+```
+
+`of=` is a label too; it is never passed to the function.
+
+### Progress while a step works
+
+A step that takes a while can say how far it is. Call `run.progress(text)` inside the function of a `run.step`; the run page shows the text on the step that works:
+
+```python
+def read_all(run, feeds):
+    for n, url in enumerate(feeds, 1):
+        fetch(url)
+        run.progress(f"{n} of {len(feeds)}")
+```
+
+`run.progress` is not a step and nothing is saved. It sends at most four times a second (the last text always goes out), and outside a step it does nothing. A `run.llm` step needs no call: when the model can stream, its answer is shown on the page as it is written. A model that answers in one piece shows nothing until it is done, as before. A page that you open in the middle of a run shows the text so far.
+
+The page also says "usually about 45s" while a run goes, from the median time of the last five runs of the workflow that finished. It says nothing until two have.
+
 ### Retries
 
 ```python

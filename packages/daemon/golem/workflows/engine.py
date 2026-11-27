@@ -14,6 +14,7 @@ import importlib.util
 import inspect
 import json
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ from typing import Any, cast
 
 from golem.store.workflow_runs import WorkflowRuns
 from golem.workflow import (
+    CURRENT_STEP,
     IDEMPOTENCY_KEY,
     MAY_HAVE_RUN,
     SPEC_ATTR,
@@ -30,10 +32,18 @@ from golem.workflow import (
     WorkflowWaiting,
     agent_title,
 )
+from golem.workflows.lines import result_line, small
 from golem.workflows.llm import Llm, parse_object
+from golem.workflows.outline import expected_steps
 from golem.workflows.tools import SESSION_TOOLS, ToolVerdict, WorkflowTools
 
 __all__ = ["BIG_OUTPUT_CHARS", "WorkflowEngine", "restart_policy"]
+
+PROGRESS_INTERVAL = 0.25
+"""A step's progress text goes out at most this often (four times a second)."""
+
+PROGRESS_CHARS = 8000
+"""A progress text is cut to its last this many characters."""
 
 BIG_OUTPUT_CHARS = 4096
 """A tool's output over this goes to the artifact table; the step keeps a summary."""
@@ -124,6 +134,15 @@ class WorkflowEngine:
         self._agent = agent
         self._models: dict[str, tuple[str | None, str | None]] = {}
         """Per running run: the run's own model choice and the file's ``@workflow(model=)``."""
+        self._expected: dict[str, int | None] = {}
+        """Per run that has not ended: how many steps its file's outline lists (None: unknown)."""
+        self._totals: dict[str, dict[str, int]] = {}
+        """Per run: ``run.step(of=)`` by step title, how many such steps the workflow said."""
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._texts: dict[str, dict[str, str]] = {}
+        """Per run, per running step: the progress text so far. Memory only, never saved."""
+        self._sent: dict[tuple[str, str], float] = {}
+        self._trailing: set[tuple[str, str]] = set()
         self.stopping = False
         """True while the daemon shuts down: a cancelled run stays ``running`` and resumes later."""
 
@@ -201,12 +220,23 @@ class WorkflowEngine:
         if self._llm is None:
             raise WorkflowError("run.llm needs a model, and this daemon has none set up")
         record = await self._store.get_run(workflow_run_id)
-        answer = await self._llm(
+        asked = (
             prompt,
             schema,
             self.model_for(workflow_run_id, wish),
             record.project if record else None,
         )
+        if getattr(self._llm, "streams", False):
+            # The model streams: its answer goes out as it is written, and ends with the step.
+            def tell(text: str) -> None:
+                self.say_progress(workflow_run_id, key, text)
+
+            try:
+                answer = await self._llm(*asked, progress=tell)
+            finally:
+                self.say_progress(workflow_run_id, key, "", done=True)
+        else:
+            answer = await self._llm(*asked)
         await self._store.set_step_model(workflow_run_id, key, answer.model, answer.cost_usd)
         if schema is None:
             return answer.text
@@ -297,38 +327,132 @@ class WorkflowEngine:
         await self.execute(run_id)
         return run_id
 
+    async def expected(self, workflow_run_id: str) -> int | None:
+        """How many steps the run is expected to have in all, read once from its file's outline.
+
+        None when it cannot be known (see :func:`expected_steps`) or the run has ended."""
+        if workflow_run_id in self._expected:
+            return self._expected[workflow_run_id]
+        record = await self._store.get_run(workflow_run_id)
+        if record is None or record.status not in ("pending", "running", "waiting"):
+            return None
+        try:
+            text = await asyncio.to_thread(Path(record.path).read_text, encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            found = None
+        else:
+            found = expected_steps(text, record.name)
+        self._expected[workflow_run_id] = found
+        return found
+
+    def progress_of(self, workflow_run_id: str, key: str) -> str | None:
+        """The text so far of a running step that sends progress, or None."""
+        return self._texts.get(workflow_run_id, {}).get(key)
+
+    def say_progress(self, workflow_run_id: str, key: str, text: str, done: bool = False) -> None:
+        """Say how far step ``key`` is. Safe from any thread (a plain step runs in one)."""
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            self._progress_now(workflow_run_id, key, text, done)
+            return
+        with contextlib.suppress(RuntimeError):  # the loop closed meanwhile
+            loop.call_soon_threadsafe(self._progress_now, workflow_run_id, key, text, done)
+
+    def _send_progress(self, workflow_run_id: str, key: str, done: bool) -> None:
+        texts = self._texts.get(workflow_run_id, {})
+        self._sent[(workflow_run_id, key)] = time.monotonic()
+        self.send(
+            "workflow.step.progress",
+            {
+                "workflow_run_id": workflow_run_id,
+                "key": key,
+                "text": texts.get(key, ""),
+                "done": done,
+            },
+        )
+
+    def _progress_now(self, workflow_run_id: str, key: str, text: str, done: bool) -> None:
+        texts = self._texts.setdefault(workflow_run_id, {})
+        if done:
+            if key in texts:
+                self._send_progress(workflow_run_id, key, True)
+                del texts[key]
+            if not texts:
+                self._texts.pop(workflow_run_id, None)
+            self._sent.pop((workflow_run_id, key), None)
+            return
+        texts[key] = text[-PROGRESS_CHARS:]
+        mark = (workflow_run_id, key)
+        wait = PROGRESS_INTERVAL - (time.monotonic() - self._sent.get(mark, -PROGRESS_INTERVAL))
+        if wait <= 0:
+            self._send_progress(workflow_run_id, key, False)
+        elif mark not in self._trailing and self._loop is not None:
+            # Too soon: the latest text goes out when the interval is over.
+            self._trailing.add(mark)
+
+            def flush() -> None:
+                self._trailing.discard(mark)
+                if key in self._texts.get(workflow_run_id, {}):
+                    self._send_progress(workflow_run_id, key, False)
+
+            self._loop.call_later(wait, flush)
+
+    def say_total(self, workflow_run_id: str, title: str, of: int) -> None:
+        """Note that the workflow said it has ``of`` steps titled ``title`` in all."""
+        self._totals.setdefault(workflow_run_id, {})[title] = of
+
+    def total_of(self, workflow_run_id: str, title: str) -> int | None:
+        """How many steps titled ``title`` the workflow said the run has (``of=``), or None."""
+        return self._totals.get(workflow_run_id, {}).get(title)
+
     async def _run_event(self, name: str, workflow_run_id: str) -> None:
         """Send a run event from the row as it is now (the shape of ``WorkflowRunEvent``)."""
         run = await self._store.get_run(workflow_run_id)
         if run is None:
             return
-        self.send(
-            name,
-            {
-                "workflow_run_id": run.workflow_run_id,
-                "workflow_id": run.workflow_id,
-                "name": run.name,
-                "status": run.status,
-                "trigger": run.trigger,
-                "session_id": run.session_id,
-                "started_at": run.started_at,
-                "finished_at": run.finished_at,
-                "error": run.error,
-            },
-        )
+        ended = run.status in ("done", "failed", "cancelled")
+        payload: dict[str, Any] = {
+            "workflow_run_id": run.workflow_run_id,
+            "workflow_id": run.workflow_id,
+            "name": run.name,
+            "status": run.status,
+            "trigger": run.trigger,
+            "session_id": run.session_id,
+            "started_at": run.started_at,
+            "finished_at": run.finished_at,
+            "error": run.error,
+            "steps_expected": None if ended else await self.expected(workflow_run_id),
+        }
+        if name == "workflow.run.done":
+            returned = json.loads(run.result_json) if run.result_json else None
+            value, size = small(returned)
+            payload["result"] = value
+            payload["result_size"] = size
+            outputs = await self._store.list_outputs(workflow_run_id)
+            payload["summary"] = next((o.summary for o in outputs if o.summary), None) or (
+                result_line(returned)
+            )
+        if ended:
+            self._texts.pop(workflow_run_id, None)
+            self._expected.pop(workflow_run_id, None)
+            self._totals.pop(workflow_run_id, None)
+        self.send(name, payload)
 
     async def step_event(self, name: str, workflow_run_id: str, key: str) -> None:
         """Send a step event from the row as it is now (the shape of ``WorkflowStepEvent``)."""
         step = await self._store.get_step(workflow_run_id, key)
         if step is None:
             return
+        saved = json.loads(step.result_json) if step.result_json else None
+        value, size = small(saved)
+        title = step.title or step.step_key
         self.send(
             name,
             {
                 "workflow_run_id": step.workflow_run_id,
                 "key": step.step_key,
                 "kind": step.kind,
-                "title": step.title or step.step_key,
+                "title": title,
                 "status": step.status,
                 "group": step.group_key,
                 "group_title": step.group_title,
@@ -340,7 +464,10 @@ class WorkflowEngine:
                 "cost_usd": step.cost_usd,
                 "started_at": step.started_at,
                 "finished_at": step.finished_at,
-                "result": json.loads(step.result_json) if step.result_json else None,
+                "result": value,
+                "result_size": size,
+                "line": result_line(saved, step.kind),
+                "of": self.total_of(workflow_run_id, title),
             },
         )
 
@@ -364,6 +491,7 @@ class WorkflowEngine:
         record = await self._store.get_run(workflow_run_id)
         if record is None:
             raise WorkflowError(f"no workflow run {workflow_run_id}")
+        self._loop = asyncio.get_running_loop()
         await self._store.set_run_status(workflow_run_id, "running", _now())
         await self._run_event("workflow.run.started", workflow_run_id)
         try:
@@ -407,6 +535,9 @@ class _Journal:
     def __init__(self, engine: WorkflowEngine) -> None:
         self._engine = engine
 
+    def progress(self, workflow_run_id: str, key: str, text: str) -> None:
+        self._engine.say_progress(workflow_run_id, key, text)
+
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
         await self._engine.notify(workflow_run_id, title, text)
 
@@ -426,6 +557,18 @@ class _Journal:
                 " and dicts"
             ) from exc
         await self._engine.store.add_output(workflow_run_id, position, title, encoded, summary)
+        shown, size = small(value)
+        self._engine.send(
+            "workflow.output.added",
+            {
+                "workflow_run_id": workflow_run_id,
+                "position": position,
+                "title": title,
+                "summary": summary,
+                "value": shown,
+                "size": size,
+            },
+        )
 
     async def llm(
         self,
@@ -453,9 +596,12 @@ class _Journal:
         backoff: float = 0.0,
         item: str | None = None,
         group_title: str | None = None,
+        of: int | None = None,
     ) -> Any:
         store = self._engine.store
         event = self._engine.step_event
+        if of is not None:
+            self._engine.say_total(workflow_run_id, title, of)
         before = await store.get_step(workflow_run_id, key)
         doubt = before is not None and before.status in ("running", "in_doubt") and keyed
         if doubt and before is not None and before.status == "running":
@@ -469,6 +615,7 @@ class _Journal:
             return json.loads(row.result_json) if row.result_json is not None else None
 
         await event("workflow.step.started", workflow_run_id, key)
+        step_token = CURRENT_STEP.set(key)
         key_token = IDEMPOTENCY_KEY.set(key if keyed else None)
         doubt_token = MAY_HAVE_RUN.set(doubt)
         result: Any = None
@@ -513,6 +660,8 @@ class _Journal:
         finally:
             IDEMPOTENCY_KEY.reset(key_token)
             MAY_HAVE_RUN.reset(doubt_token)
+            CURRENT_STEP.reset(step_token)
+            self._engine.say_progress(workflow_run_id, key, "", done=True)
         await store.finish_step(workflow_run_id, key, encoded, _now())
         await event("workflow.step.done", workflow_run_id, key)
         return result

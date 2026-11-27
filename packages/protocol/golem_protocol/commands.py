@@ -3098,6 +3098,9 @@ class RunInfo(BaseModel):
     steps: int | None = Field(default=None, ge=0)
     workflow_run_id: str | None = Field(default=None, min_length=1)
     """The run id of a workflow run's row, which ``workflow.status`` takes. Null for the others."""
+    workflow_id: str | None = Field(default=None, min_length=1)
+    """The id of the workflow a workflow run is of, so the Runs page can filter by it. Null for the
+    others, and for a row an older daemon sent (a client then matches ``origin``)."""
 
 
 class RunListParams(BaseModel):
@@ -5543,6 +5546,11 @@ class FsRevealParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     path: str = Field(min_length=1)
+    workflow_run_id: str | None = Field(default=None, min_length=1)
+    output_index: int | None = Field(default=None, ge=0)
+    """With ``workflow_run_id``: ``path`` is the file that output of the run marked with
+    ``run.output`` (as ``workflow.read_output`` reads it). It is shown if it is that file, an
+    existing file outside the folders golem keeps private, wherever it is. Both or neither."""
 
 
 class FsRevealResult(BaseModel):
@@ -6395,7 +6403,8 @@ class WorkflowStarterInfo(BaseModel):
     line: str
     needs_folder: bool
     schedule: str | None = None
-    """When it runs by itself, as a line to show before it is added. Null for never."""
+    """Unused: always null. The routine holds the when. Removing it would break a shape on the
+    wire, so it stays until the next major version."""
     routine: WorkflowStarterRoutine | None = None
 
 
@@ -6505,6 +6514,13 @@ class WorkflowRunInfo(BaseModel):
     """What the run marked with ``run.output``, in the order it marked them."""
     summary: str | None = None
     """The summary of the first output, or null."""
+    steps_expected: int | None = Field(default=None, ge=1)
+    """How many steps (rows of the list, a repeating step being one) the run is expected to have
+    in all, read from the workflow file's outline. Null when it cannot be known: the file cannot
+    be read, a step may be skipped, or the run is over."""
+    usual_ms: int | None = Field(default=None, ge=0)
+    """How long a run of this workflow usually takes: the median of the last five runs that
+    finished (``done``), in milliseconds. Null when fewer than two have."""
 
 
 class WorkflowStepInfo(BaseModel):
@@ -6537,6 +6553,15 @@ class WorkflowStepInfo(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     result: Any = None
+    line: str | None = None
+    """The one-line form of ``result``, for a list. Null while the step has no result."""
+    of: int | None = Field(default=None, ge=1)
+    """How many steps of this title the run has in all (``run.step(of=)``), when the workflow
+    said. Null when it did not: the page then counts the ones it has seen, and says so."""
+    progress: str | None = None
+    """The text so far of a running step that sends progress (the answer of a ``run.llm`` as it
+    is written, or the last ``run.progress``). Kept in memory while the step runs, never saved;
+    null when it has none. It lets a client that opens the run midway show what came so far."""
 
 
 class WorkflowStatusParams(BaseModel):
@@ -6681,6 +6706,16 @@ class WorkflowRunEvent(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     error: str | None = None
+    steps_expected: int | None = Field(default=None, ge=1)
+    """As ``WorkflowRunInfo.steps_expected``."""
+    result: Any = None
+    """What the workflow returned, on ``workflow.run.done`` only, and only when it is small (see
+    ``result_size``)."""
+    result_size: int = Field(default=0, ge=0)
+    """The length of the result as JSON; 0 for none. A result that is large is left out of
+    ``result``, and the client reads it with ``workflow.status``."""
+    summary: str | None = None
+    """The one line of how the run came out, on ``workflow.run.done`` only."""
 
 
 class WorkflowStepEvent(BaseModel):
@@ -6712,7 +6747,50 @@ class WorkflowStepEvent(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     result: Any = None
-    """The step's saved JSON, parsed."""
+    """The step's saved JSON, parsed, when it is small (see ``result_size``)."""
+    result_size: int = Field(default=0, ge=0)
+    """The length of the step's result as JSON; 0 for none. A result that is large is left out
+    of ``result`` and the client reads it with ``workflow.status``."""
+    line: str | None = None
+    """The one-line form of the result, for a list. Always sent with a result."""
+    of: int | None = Field(default=None, ge=1)
+    """As ``WorkflowStepInfo.of``."""
+
+
+class WorkflowStepProgressEvent(BaseModel):
+    """The params of ``workflow.step.progress``: the text of a running step, as it comes.
+
+    ``text`` is the text so far, not a delta (a client that missed one event needs no other),
+    cut to its last 8000 characters. It is sent at most four times a second for a step, and
+    once more with ``done`` true when the step ends (``text`` is then the last text, and the
+    client drops what it kept). A model that cannot stream sends nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    text: str = ""
+    done: bool = False
+
+
+class WorkflowOutputEvent(BaseModel):
+    """The params of ``workflow.output.added``: the run marked a result with ``run.output``.
+
+    ``position`` is its place among the run's outputs (a run that is executed again sends the
+    same ones again, so a client keeps one for each). ``value`` is left out when it is large
+    (see ``size``), and the client reads it with ``workflow.status``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    position: int = Field(ge=0)
+    title: str | None = None
+    summary: str | None = None
+    value: Any = None
+    size: int = Field(default=0, ge=0)
+    """The length of the value as JSON."""
 
 
 DataPrivacy = Literal["open", "local", "schema"]
@@ -7771,6 +7849,7 @@ __all__ = [
     "WorkflowListResult",
     "WorkflowOutlineStep",
     "WorkflowOutput",
+    "WorkflowOutputEvent",
     "WorkflowProposeParams",
     "WorkflowProposeResult",
     "WorkflowReadOutputParams",
@@ -7799,6 +7878,7 @@ __all__ = [
     "WorkflowStepEvent",
     "WorkflowStepInfo",
     "WorkflowStepKind",
+    "WorkflowStepProgressEvent",
     "WorkflowStepStatus",
     "WorkflowTriggerInfo",
     "WorkflowTriggerKind",

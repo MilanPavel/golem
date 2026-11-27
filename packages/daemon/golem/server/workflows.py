@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from golem.server.routines import routine_update
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import CheckEnv, Problem
 from golem.workflows.edit import EditError, remove_argument, set_argument
+from golem.workflows.lines import result_line
 from golem.workflows.model_view import step_model, workflow_model
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.outputs import OutputError, read_marked_file
@@ -285,7 +287,6 @@ async def workflow_starters(
                 title=s.title,
                 line=s.line,
                 needs_folder=s.needs_folder,
-                schedule=s.schedule,
                 routine=None
                 if s.routine is None
                 else WorkflowStarterRoutine(
@@ -430,11 +431,32 @@ async def _run_info(service: WorkflowService, run: WorkflowRunRecord) -> Workflo
                 for o in outputs
             ],
             "summary": outputs[0].summary if outputs else None,
+            "steps_expected": await service.engine.expected(run.workflow_run_id),
+            "usual_ms": await _usual_ms(service, run),
         }
     )
 
 
-def _step_info(step: WorkflowStepRecord) -> WorkflowStepInfo:
+USUAL_RUNS = 5
+"""A run's usual time is the median of this many of the last done runs of its workflow."""
+
+
+def median_ms(spans: list[int]) -> int | None:
+    """The median of the times, or None when there are fewer than two."""
+    if len(spans) < 2:
+        return None
+    return int(statistics.median(spans))
+
+
+async def _usual_ms(service: WorkflowService, run: WorkflowRunRecord) -> int | None:
+    """How long a run of this workflow usually takes, from its last done runs."""
+    return median_ms(await service.runs.recent_durations_ms(run.workflow_id, USUAL_RUNS))
+
+
+def _step_info(
+    step: WorkflowStepRecord, of: int | None = None, progress: str | None = None
+) -> WorkflowStepInfo:
+    saved = json.loads(step.result_json) if step.result_json else None
     return WorkflowStepInfo.model_validate(
         {
             "key": step.step_key,
@@ -451,7 +473,10 @@ def _step_info(step: WorkflowStepRecord) -> WorkflowStepInfo:
             "cost_usd": step.cost_usd,
             "started_at": step.started_at,
             "finished_at": step.finished_at,
-            "result": json.loads(step.result_json) if step.result_json else None,
+            "result": saved,
+            "line": result_line(saved, step.kind),
+            "of": of,
+            "progress": progress,
         }
     )
 
@@ -475,7 +500,16 @@ async def workflow_status(
         for r in await runs.list_open_reviews(params.workflow_run_id)
     ]
     return WorkflowStatusResult(
-        run=await _run_info(service, run), steps=[_step_info(s) for s in steps], reviews=reviews
+        run=await _run_info(service, run),
+        steps=[
+            _step_info(
+                s,
+                service.engine.total_of(run.workflow_run_id, s.title or s.step_key),
+                service.engine.progress_of(run.workflow_run_id, s.step_key),
+            )
+            for s in steps
+        ],
+        reviews=reviews,
     )
 
 

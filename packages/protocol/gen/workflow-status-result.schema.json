@@ -161,6 +161,19 @@
           "title": "Status",
           "type": "string"
         },
+        "steps_expected": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Steps Expected"
+        },
         "summary": {
           "anyOf": [
             {
@@ -188,6 +201,19 @@
         "trigger": {
           "title": "Trigger",
           "type": "string"
+        },
+        "usual_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usual Ms"
         },
         "workflow_id": {
           "minLength": 1,
@@ -324,6 +350,18 @@
           "title": "Kind",
           "type": "string"
         },
+        "line": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
         "model": {
           "anyOf": [
             {
@@ -335,6 +373,31 @@
           ],
           "default": null,
           "title": "Model"
+        },
+        "of": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Of"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
         },
         "result": {
           "default": null,

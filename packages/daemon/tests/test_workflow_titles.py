@@ -39,6 +39,7 @@ class Seen:
         backoff: float = 0.0,
         item: str | None = None,
         group_title: str | None = None,
+        of: int | None = None,
     ) -> Any:
         self.steps.append(
             {
@@ -51,6 +52,9 @@ class Seen:
                 "group_title": group_title,
             }
         )
+        return None
+
+    def progress(self, *args: Any) -> None:
         return None
 
     async def llm(self, *args: Any) -> Any:

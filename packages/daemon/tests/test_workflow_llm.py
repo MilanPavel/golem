@@ -5,15 +5,16 @@ from __future__ import annotations
 
 import asyncio
 import textwrap
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fakes import ScriptedChatModel
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.messages.ai import UsageMetadata
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 from golem.config import GolemSettings, ModelPrice
 from golem.models.dispatcher import Call, Dispatcher
@@ -54,6 +55,21 @@ class _Model(ScriptedChatModel):
             },
         )
         return ChatResult(generations=[ChatGeneration(message=message)])
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        """Streams the answer in two pieces; the last one reports the tokens, as providers do."""
+        del stop, run_manager, kwargs
+        text = self._take(messages)
+        half = len(text) // 2
+        yield ChatGenerationChunk(message=AIMessageChunk(content=text[:half]))
+        usage = UsageMetadata(input_tokens=1_000_000, output_tokens=0, total_tokens=1_000_000)
+        yield ChatGenerationChunk(message=AIMessageChunk(content=text[half:], usage_metadata=usage))
 
 
 class _Router(ModelRouter):

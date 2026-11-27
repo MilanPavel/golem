@@ -307,9 +307,9 @@ async function follow(client: WorkflowClient, label: () => string, begin: () => 
     if (notice.params.workflow_run_id !== runId) return;
     if (notice.kind === "step") {
       deps.write(stepLine(notice));
-    } else if (notice.method === "workflow.run.waiting") {
+    } else if (notice.kind === "run" && notice.method === "workflow.run.waiting") {
       deps.error(`waiting for you: golem workflow answer ${runId}`);
-    } else if (FINAL.has(notice.method)) {
+    } else if (notice.kind === "run" && FINAL.has(notice.method)) {
       finish(notice);
     }
   };
