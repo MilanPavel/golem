@@ -13,7 +13,7 @@ import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { RunRow } from "./runs-list.tsx";
 import { RUNS_NOW } from "./sample.ts";
 import { WorkflowRunView, type WorkflowRunViewProps } from "./workflow-run-view.tsx";
-import { SAMPLE_BRIEFING_PATH, SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RESULTS, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_LOOP_MIDWAY, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_PARALLEL, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, SAMPLE_RUN_UNKNOWN_TOTAL, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
+import { SAMPLE_BRIEFING_PATH, SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RESULTS, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_LOOP_MIDWAY, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_PARALLEL, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_STREAMING, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, SAMPLE_RUN_UNKNOWN_TOTAL, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -474,4 +474,40 @@ test("/runs/:id reads the run again when an event left out a large result", asyn
     fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { ...reviewer, workflow_run_id: "wr_live", status: "done", result: null, line: "6000 characters of notes\u2026", result_size: 6000 } as never });
   });
   await waitFor(() => expect(fake.raw.workflowStatus.mock.calls.length).toBeGreaterThan(reads));
+});
+
+test("a model step that is writing shows what was found so far, then its text, and the usual time in the header", () => {
+  view(SAMPLE_RUN_STREAMING);
+  const live = within(screen.getByRole("group", { name: "Live" }));
+  expect(live.getByText("2 projects changed")).toBeTruthy();
+  expect(live.getByText("1 error in app.log")).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Writing the briefing, as it comes" }).textContent).toContain("3 pull requests wait on you");
+  expect(screen.getByText(/usually about 45s/)).toBeTruthy();
+});
+
+test("a run whose steps send no text keeps the page it had, and says nothing of a usual time it does not have", () => {
+  view(SAMPLE_RUN_RUNNING);
+  expect(screen.queryByRole("group", { name: "Live" })).toBeNull();
+  expect(screen.getByRole("group", { name: "What it did" })).toBeTruthy();
+  expect(screen.queryByText(/usually about/)).toBeNull();
+});
+
+test("/runs/:id shows the text of a step as it comes from events, and a page opened midway has the text so far", async () => {
+  const fake = mount("/runs/wr_live", (one) => {
+    one.raw.workflowStatus.mockResolvedValue({ run: { ...SAMPLE_RUN_STREAMING.run, workflow_run_id: "wr_live" }, steps: SAMPLE_RUN_STREAMING.steps, reviews: [] });
+  });
+  // Opened midway: the status carries the text so far.
+  expect(await screen.findByText(/3 pull requests wait on you/)).toBeTruthy();
+  const reads = fake.raw.workflowStatus.mock.calls.length;
+  act(() => {
+    fake.emitWorkflow({ kind: "progress", method: "workflow.step.progress", params: { workflow_run_id: "wr_live", key: "write", text: "Good morning. Two projects changed overnight. Read the mail first.", done: false } as never });
+  });
+  expect(await screen.findByText(/Read the mail first/)).toBeTruthy();
+  // The step ends: its text goes, and the run is not read again for any of it.
+  act(() => {
+    fake.emitWorkflow({ kind: "progress", method: "workflow.step.progress", params: { workflow_run_id: "wr_live", key: "write", text: "Good morning.", done: true } as never });
+    fake.emitWorkflow({ kind: "step", method: "workflow.step.done", params: { key: "write", kind: "llm", title: "Writing the briefing", status: "done", attempts: 1, workflow_run_id: "wr_live", result: "Good morning.", result_size: 15, line: "Good morning." } as never });
+  });
+  await waitFor(() => expect(screen.queryByRole("group", { name: "Live" })).toBeNull());
+  expect(fake.raw.workflowStatus.mock.calls.length).toBe(reads);
 });

@@ -261,3 +261,21 @@ export const SAMPLE_RUN_LOOP_MIDWAY: WorkflowRunSample = {
   ],
   reviews: [],
 };
+
+/** A run whose model step is writing: what was found so far, then the answer as far as it has come, and the usual time in the header. */
+export const SAMPLE_RUN_STREAMING: WorkflowRunSample = {
+  run: run({ status: "running", finished_at: null, started_at: at(28), steps_expected: 4, usual_ms: 45_000, title: "Morning briefing", description: "Tell me what needs me today." }),
+  steps: [
+    step("folders", { title: "Read the folders", started_at: at(28), finished_at: at(28, 3), result: raw("2 projects changed"), line: "2 projects changed" }),
+    step("logs", { title: "Read the logs", started_at: at(28, 3), finished_at: at(28, 6), result: raw("1 error in app.log"), line: "1 error in app.log" }),
+    step("write", {
+      kind: "llm",
+      title: "Writing the briefing",
+      status: "running",
+      started_at: at(28, 6),
+      finished_at: null,
+      progress: "Good morning. Two projects changed overnight and one log has an error:\n\n- golem: 3 pull requests wait on you",
+    }),
+  ],
+  reviews: [],
+};

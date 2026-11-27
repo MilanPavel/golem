@@ -61,4 +61,8 @@ test("the gallery shows a run that goes with a known total, with none, a loop pa
   expect(loop.getByText(/Reading feed 13 of 30 · feed-13\.example\.com\/rss/)).toBeTruthy();
   const group = within(screen.getByRole("region", { name: "Workflow run, running, a parallel group, slip" }));
   expect(within(group.getByRole("list", { name: "Working now" })).getAllByRole("listitem")).toHaveLength(3);
+  const writing = within(screen.getByRole("region", { name: "Workflow run, running, a model answer as it is written, slip" }));
+  expect(within(writing.getByRole("group", { name: "Live" })).getByText("2 projects changed")).toBeTruthy();
+  expect(writing.getByRole("group", { name: "Writing the briefing, as it comes" }).textContent).toContain("3 pull requests wait on you");
+  expect(writing.getByText(/usually about 45s/)).toBeTruthy();
 });

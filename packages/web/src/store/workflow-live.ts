@@ -38,13 +38,22 @@ export function foldWorkflowNotice(current: WorkflowStatusResult, notice: Workfl
     const stale = asked || notice.method === "workflow.run.waiting" || (done && cut(event.result_size, event.result));
     return { status: { ...current, run }, stale };
   }
+  if (notice.kind === "progress") {
+    // The text of a running step as it comes: kept on the step, dropped when the step ends. Nothing to read again.
+    const { key, text, done } = notice.params;
+    const steps = current.steps ?? [];
+    if (!steps.some((step) => step.key === key)) return { status: current, stale: false };
+    return { status: { ...current, steps: steps.map((step) => (step.key === key ? { ...step, progress: done ? null : text } : step)) }, stale: false };
+  }
   if (notice.kind === "step") {
     const { result_size, ...withRun } = notice.params;
     const info: Omit<typeof withRun, "workflow_run_id"> & { workflow_run_id?: string } = { ...withRun };
     delete info.workflow_run_id;
     const steps = current.steps ?? [];
     const at = steps.findIndex((step) => step.key === info.key);
-    const next = at < 0 ? [...steps, info] : steps.map((step, index) => (index === at ? { ...step, ...info } : step));
+    // A step that is no longer running has no text in progress.
+    const ended = info.status !== "running" ? { progress: null } : {};
+    const next = at < 0 ? [...steps, { ...info, ...ended }] : steps.map((step, index) => (index === at ? { ...step, ...info, ...ended } : step));
     const stale = asked || notice.method === "workflow.step.waiting" || cut(result_size, info.result);
     return { status: { ...current, steps: next }, stale };
   }

@@ -1,4 +1,4 @@
-import { foldSteps, liveLines, stepMetaLine, stepOutputLine, stepsProgress, stepTook, workflowRunTook, type LiveLine } from "@golem/view";
+import { foldSteps, foundSoFar, liveLines, liveTexts, stepMetaLine, stepOutputLine, stepsProgress, stepTook, usualWords, workflowRunTook, type LiveLine } from "@golem/view";
 import { useRef, useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { runsPath } from "../../store/router.ts";
@@ -9,6 +9,7 @@ import { Code } from "../../ui/code.tsx";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
+import { LivePane } from "./live-pane.tsx";
 import { ResultView } from "./result-view.tsx";
 import { ReviewCard } from "./review-card.tsx";
 import { RunResult, runOutputs } from "./run-result.tsx";
@@ -99,12 +100,14 @@ const money = (usd: number): string => (usd === 0 ? "$0" : `$${usd < 0.01 ? usd.
 /** Who started it, when, how long, which models and what it cost, as the run's facts. */
 function facts(run: WorkflowRunInfo, steps: readonly WorkflowStepInfo[], now: number): string {
   const took = workflowRunTook(run, now);
+  const usual = run.status === "running" ? usualWords(run.usual_ms) : "";
   const models = [...new Set(steps.map((step) => step.model).filter((model): model is string => model !== null && model !== undefined && model !== ""))];
   const costs = steps.map((step) => step.cost_usd).filter((cost): cost is number => cost !== null && cost !== undefined);
   return [
     run.trigger,
     run.started_at === null || run.started_at === undefined ? "" : `started ${new Date(run.started_at).toLocaleString()}`,
     took,
+    usual,
     models.join(", "),
     costs.length === 0 ? "" : money(costs.reduce((sum, cost) => sum + cost, 0)),
   ]
@@ -196,6 +199,8 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
   const rows = foldSteps(steps);
   const progress = stepsProgress(rows, { live, expected: run.steps_expected ?? null });
   const working = live ? liveLines(rows, now) : [];
+  // The Live side shows a step's text as it comes, and only while one sends text.
+  const texts = live ? liveTexts(steps) : [];
   const title = run.title !== null && run.title !== undefined && run.title !== "" ? run.title : run.name;
   const goal = run.description !== null && run.description !== undefined && run.description !== "" ? run.description : null;
   const summary = run.summary !== null && run.summary !== undefined && run.summary !== "" ? run.summary : null;
@@ -326,7 +331,7 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
               />
             </div>
             <div className="min-w-0 flex-1 rounded-lg border border-line bg-bg p-4">
-              {picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
+              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
             </div>
           </div>
         </TabsContent>

@@ -58,3 +58,18 @@ test("an output is added at its place, again when it is sent again, and a gap as
   expect(foldWorkflowNotice(first.status, output({ position: 3, value: "x" }))!.stale).toBe(true);
   expect(foldWorkflowNotice(status(), output({ value: null, size: 9000 }))!.stale).toBe(true);
 });
+
+test("progress text is kept on its running step, replaced by the next, and dropped when the step ends", () => {
+  const progress = (params: Record<string, unknown>): WorkflowNotice => ({ kind: "progress", method: "workflow.step.progress", params: { workflow_run_id: "wr_1", key: "a", text: "", done: false, ...params } as never });
+  const one = foldWorkflowNotice(status(), progress({ text: "3 of 12" }))!;
+  expect(one.stale).toBe(false);
+  expect(one.status.steps![0]!.progress).toBe("3 of 12");
+  expect(foldWorkflowNotice(one.status, progress({ text: "4 of 12" }))!.status.steps![0]!.progress).toBe("4 of 12");
+  expect(foldWorkflowNotice(one.status, progress({ text: "4 of 12", done: true }))!.status.steps![0]!.progress).toBeNull();
+  const ended = foldWorkflowNotice(one.status, step("workflow.step.done", {}))!;
+  expect(ended.status.steps![0]!.progress).toBeNull();
+  // A step this page has not seen has no place for the text, and nothing is read again for it.
+  const stranger = foldWorkflowNotice(status(), progress({ key: "zzz", text: "x" }))!;
+  expect(stranger.stale).toBe(false);
+  expect(stranger.status.steps).toHaveLength(1);
+});

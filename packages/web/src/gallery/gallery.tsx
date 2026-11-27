@@ -102,7 +102,7 @@ import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRI
 import { RoutineDetail, RoutineEditor, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
 import { LeadRun, ResultView, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
-import { SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_LOOP_MIDWAY, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_PARALLEL, SAMPLE_RUN_UNKNOWN_TOTAL, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RESULTS, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
+import { SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_LOOP_MIDWAY, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_PARALLEL, SAMPLE_RUN_STREAMING, SAMPLE_RUN_UNKNOWN_TOTAL, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RESULTS, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
 import { RunsPageGallery } from "./gallery-runs-page.tsx";
 import { DataIconsGallery } from "./gallery-data-icons.tsx";
@@ -2562,6 +2562,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             ["Workflow run, running, no total to count against", SAMPLE_RUN_UNKNOWN_TOTAL],
             ["Workflow run, running, a loop twelve feeds in", SAMPLE_RUN_LOOP_MIDWAY],
             ["Workflow run, running, a parallel group", SAMPLE_RUN_PARALLEL],
+            ["Workflow run, running, a model answer as it is written", SAMPLE_RUN_STREAMING],
             ["Workflow run, waiting for a review", SAMPLE_RUN_REVIEW],
             ["Workflow run, tool ask and worker row", SAMPLE_RUN_TOOL_ASK],
             ["Workflow run, failed", SAMPLE_RUN_FAILED],
