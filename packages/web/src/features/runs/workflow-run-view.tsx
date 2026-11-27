@@ -80,6 +80,10 @@ export type WorkflowRunViewProps = {
   onReadOutput?: (index: number) => Promise<WorkflowReadOutputResult>;
   /** Asks golem a question about the run (the Ask golem path of the workflow page) and resolves with its answer. Without it "Why did this fail?" is not offered. */
   onAsk?: (question: string) => Promise<string>;
+  /** Starts a new chat with this text in its box ("Ask about this" on a result). Without it the action is not offered. */
+  onAskAbout?: (text: string) => void;
+  /** Opens the workflow page with this step of the run selected. Without it the link is not offered. */
+  onSeeStep?: (step: WorkflowStepInfo) => void;
   /** The Trace tab's content. Without it the tab is not offered. */
   trace?: ReactNode;
   initialTab?: "steps" | "trace";
@@ -116,7 +120,7 @@ function facts(run: WorkflowRunInfo, steps: readonly WorkflowStepInfo[], now: nu
 }
 
 /** One step shown in the place of the result: what it is, its output with Readable / Raw, its chat and Resume. */
-function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: number; resume: ReactNode; props: Pick<WorkflowRunViewProps, "chatPath" | "onNavigate"> }) {
+function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: number; resume: ReactNode; props: Pick<WorkflowRunViewProps, "chatPath" | "onNavigate" | "onSeeStep"> }) {
   const took = stepTook(step, now);
   const child = step.child_session_id;
   const failed = step.status === "failed" || step.status === "in_doubt";
@@ -134,6 +138,11 @@ function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: n
           <Link href={props.chatPath(child)} onNavigate={props.onNavigate} className={LINK}>
             Open chat
           </Link>
+        )}
+        {props.onSeeStep === undefined ? null : (
+          <button type="button" onClick={() => props.onSeeStep?.(step)} className={LINK}>
+            See this step in the workflow
+          </button>
         )}
         {step.status === "failed" ? resume : null}
       </div>
@@ -331,7 +340,7 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
               />
             </div>
             <div className="min-w-0 flex-1 rounded-lg border border-line bg-bg p-4">
-              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
+              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} onAskAbout={props.onAskAbout} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
             </div>
           </div>
         </TabsContent>

@@ -90,7 +90,9 @@ test("parseRoute reads the workflows page and one workflow, and workflowPath rou
   expect(parseRoute("/workflows")).toEqual({ name: "workflows" });
   const id = "/Users/me/.golem/workflows/pr_digest.py::pr_digest";
   expect(workflowPath()).toBe("/workflows");
-  expect(parseRoute(workflowPath(id))).toEqual({ name: "workflow", id });
+  expect(parseRoute(workflowPath(id))).toEqual({ name: "workflow", id, step: null });
+  expect(workflowPath(id, "llm:brief")).toBe(`${workflowPath(id)}?step=llm%3Abrief`);
+  expect(parseRoute(workflowPath(id), "?step=llm%3Abrief")).toEqual({ name: "workflow", id, step: "llm:brief" });
   for (const bad of ["/workflows/", "/workflows/a/b", "/workflowsx"]) {
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }

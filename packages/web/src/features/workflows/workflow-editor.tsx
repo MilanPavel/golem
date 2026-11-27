@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import type { WorkflowCheckResult, WorkflowEditStepResult, WorkflowEntryInfo, WorkflowModelInfo, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowSaveResult } from "../../store/workflows.ts";
 import { Badge } from "../../ui/badge.tsx";
@@ -9,6 +9,7 @@ import { cn } from "../../ui/cn.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { WorkflowModelPill } from "./model-pill.tsx";
 import { StepFields } from "./step-fields.tsx";
+import { LastRunBlock, lastRunLine, stepsOfOutline, type LastRun } from "./last-run.tsx";
 import { changedLines, compareSteps, groupWords, lineDiff, problemCounts, repeatWords, stepAtLine, stepKindWords, stepNumberLines, stepRange, stepUses, type StepChange } from "./text.ts";
 
 /** How long the code rests before it is checked. */
@@ -48,6 +49,10 @@ export type WorkflowEditorProps = {
   onOpenAgent?: (name: string) => void;
   /** Opens the file's folder in Finder. Without it, the action is not offered. */
   onReveal?: (path: string) => Promise<void>;
+  /** What the steps gave in the workflow's last run. Without it nothing is said about a last run. */
+  lastRun?: LastRun | null;
+  /** Opens a run's page. Without it the last run has no link. */
+  onOpenRun?: (runId: string) => void;
   /** Told whenever the text differs from the saved one, or stops doing so. */
   onDirtyChange?: (dirty: boolean) => void;
   /** Told how many problems the last check found, or null before any check has come back, for the page header's Checks pill. */
@@ -73,7 +78,7 @@ function NumberDot({ number, selected }: { number: number; selected: boolean }) 
   return <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full text-meta font-medium", selected ? "bg-clay text-on-clay" : "bg-bg text-muted ring-1 ring-line")}>{number}</span>;
 }
 
-function StepCard({ step, number, selected, problems, change, onSelect }: { step: WorkflowOutlineStep; number: number; selected: boolean; problems: readonly WorkflowProblem[]; change?: StepChange; onSelect: () => void }) {
+function StepCard({ step, number, selected, problems, change, lastLine = "", onSelect }: { step: WorkflowOutlineStep; number: number; selected: boolean; problems: readonly WorkflowProblem[]; change?: StepChange; lastLine?: string; onSelect: () => void }) {
   return (
     <button
       type="button"
@@ -103,6 +108,11 @@ function StepCard({ step, number, selected, problems, change, onSelect }: { step
           if <Code tone="muted">{step.condition}</Code>
         </span>
       ) : null}
+      {lastLine === "" ? null : (
+        <span className="pl-7 text-meta text-muted wrap-anywhere">
+          <span className="text-faint">Last run:</span> {lastLine}
+        </span>
+      )}
       {problems.map((problem, at) => (
         <span key={at} className={cn("pl-7 text-meta wrap-anywhere", problem.severity === "error" ? "text-deny" : "text-wait")}>
           <ProblemMark problem={problem} /> {problem.message}
@@ -113,7 +123,7 @@ function StepCard({ step, number, selected, problems, change, onSelect }: { step
 }
 
 /** The steps in order. Steps that run at the same time sit in one dashed box: the first of them carries its title and count, and the box is drawn around them by their borders. */
-function Outline({ steps, selected, problemsOf, changes, onSelect }: { steps: readonly WorkflowOutlineStep[]; selected: string | null; problemsOf: (step: WorkflowOutlineStep) => WorkflowProblem[]; changes?: ReadonlyMap<string, StepChange>; onSelect: (step: WorkflowOutlineStep) => void }) {
+function Outline({ steps, selected, problemsOf, changes, lastLineOf, onSelect }: { steps: readonly WorkflowOutlineStep[]; selected: string | null; problemsOf: (step: WorkflowOutlineStep) => WorkflowProblem[]; changes?: ReadonlyMap<string, StepChange>; lastLineOf?: (step: WorkflowOutlineStep) => string; onSelect: (step: WorkflowOutlineStep) => void }) {
   if (steps.length === 0) return <p className="text-sm text-muted">No steps found in the code.</p>;
   return (
     <ol aria-label="Outline" className="flex flex-col">
@@ -135,7 +145,7 @@ function Outline({ steps, selected, problemsOf, changes, onSelect }: { steps: re
                   <span className="text-faint">· these {count} run at the same time</span>
                 </span>
               ) : null}
-              <StepCard step={step} number={at + 1} selected={selected === step.id} problems={problemsOf(step)} change={changes?.get(step.id)} onSelect={() => onSelect(step)} />
+              <StepCard step={step} number={at + 1} selected={selected === step.id} problems={problemsOf(step)} change={changes?.get(step.id)} lastLine={lastLineOf?.(step)} onSelect={() => onSelect(step)} />
             </div>
           </li>
         );
@@ -169,9 +179,11 @@ type StepPaneProps = {
   /** Switches to Steps and code and shows the step's lines. Without it, no link. */
   onShow?: () => void;
   refused?: { name: string; message: string } | null;
+  /** What the step gave in the last run, when there was one. */
+  last?: ReactNode;
 };
 
-function StepPane({ step, number, steps, lines, text, onEdit, agents, models, onOpenAgent, onJump, onShow, refused }: StepPaneProps) {
+function StepPane({ step, number, steps, lines, text, onEdit, agents, models, onOpenAgent, onJump, onShow, refused, last }: StepPaneProps) {
   if (step === null) return <p className="text-sm text-muted">Pick a step in the outline, or put the cursor in its lines.</p>;
   const range = stepRange(step);
   const brief = step.brief_line === null || step.brief_line === undefined ? null : (text.split("\n")[step.brief_line - 1]?.trim() ?? null);
@@ -228,6 +240,7 @@ function StepPane({ step, number, steps, lines, text, onEdit, agents, models, on
         {editable || !step.budget ? null : <Field name="Budget">{step.budget}</Field>}
       </dl>
       {editable ? <StepFields step={step} onEdit={onEdit} agents={agents} models={models} onOpenAgent={onOpenAgent} onJump={onJump} refused={refused} /> : null}
+      {last}
       {lines.length === 0 ? null : (
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline gap-2">
@@ -411,7 +424,7 @@ function AskBox({ value, onChange, onAsk, chips, refining, working, inputRef }: 
  * and the selected step. Typing redraws the outline and the problems after a pause (`workflow.check`); Save
  * (or ⌘S) writes the file (`workflow.save`) against the hash the editor started from.
  */
-export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, models, workflowModel, onOpenAgent, onReveal, onDirtyChange, onProblemsChange, initial }: WorkflowEditorProps) {
+export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, models, workflowModel, onOpenAgent, onReveal, lastRun, onOpenRun, onDirtyChange, onProblemsChange, initial }: WorkflowEditorProps) {
   const readOnly = workflow.state !== "ok" || onSave === undefined || codeHash === null;
   const [text, setText] = useState(initial?.text ?? code);
   const [saved, setSaved] = useState(code);
@@ -507,6 +520,8 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   const marked = new Set(numbers.keys());
   const selected = steps.find((step) => step.id === selectedId) ?? null;
   const selectedAt = selected === null ? 0 : steps.indexOf(selected) + 1;
+  const gaveOf = (step: WorkflowOutlineStep) => (lastRun === null || lastRun === undefined ? [] : stepsOfOutline(steps, step, lastRun.steps));
+  const lastGave = selected === null ? [] : gaveOf(selected);
   const range = selected === null ? null : stepRange(selected);
   const lines = text.split("\n");
   const bands: { from: number; to: number; kind: "step" | "problem" }[] = [];
@@ -796,7 +811,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
         {showOutline ? (
           <div className={cn("flex min-w-0 flex-col gap-2 lg:min-h-0 lg:shrink-0 lg:overflow-y-auto", view === "outline" ? "lg:w-100" : "lg:w-72")}>
             <h2 className="text-meta font-medium text-faint">Steps, read from the code</h2>
-            <Outline steps={shownSteps} selected={proposing ? null : selectedId} problemsOf={problemsOf} changes={changes} onSelect={proposing ? () => undefined : pick} />
+            <Outline steps={shownSteps} selected={proposing ? null : selectedId} problemsOf={problemsOf} changes={changes} lastLineOf={proposing ? undefined : (step) => lastRunLine(gaveOf(step))} onSelect={proposing ? () => undefined : pick} />
           </div>
         ) : null}
         {showCode && diff !== null ? (
@@ -852,6 +867,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
                     }
               }
               refused={initial?.refusedField ?? null}
+              last={lastRun === null || lastRun === undefined || lastGave.length === 0 ? undefined : <LastRunBlock given={lastGave} when={lastRun.when} onOpen={onOpenRun === undefined ? undefined : () => onOpenRun(lastRun.runId)} />}
             />
           </div>
         ) : null}

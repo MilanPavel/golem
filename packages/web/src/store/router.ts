@@ -12,7 +12,7 @@ export type Route =
   | { name: "data-source"; source: string; tab: DataTab }
   | { name: "workflows" }
   | { name: "workflow-new" }
-  | { name: "workflow"; id: string }
+  | { name: "workflow"; id: string; /** The step of the outline selected at first (`?step=`), by its id; null selects none. */ step: string | null }
   | { name: "runs"; /** The workflow whose runs are shown, by its id; null shows every run. */ workflow: string | null }
   | { name: "run"; id: string }
   | { name: "welcome"; step: WelcomeStep; from: "send" | null }
@@ -46,7 +46,7 @@ export type Router = StoreSource<Route> & {
  * `/routines` is the routines page with none picked, `/routines/:routine` one routine (name decoded, no further `/`),
  * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
  * `?new=<starter>` fills it from a starter, and `&workflow=<id>` from a workflow (its id, decoded).
- * `/workflows` is the workflows page with none picked, `/workflows/new` the page that makes a new one, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
+ * `/workflows` is the workflows page with none picked, `/workflows/new` the page that makes a new one, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded); `?step=<id>` selects that step of its outline.
  * `/runs` is the Runs page: what needs you, what is running, and what ran. `?workflow=<id>` shows only that workflow's runs. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
  * `/data` is the Data page with none picked, and `/data/:name` one source (name decoded, no further `/`); `?tab=` names its tab (tables when missing or unknown).
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
@@ -110,7 +110,10 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (workflow !== undefined) {
     try {
       const id = decodeURIComponent(workflow);
-      if (id !== "") return { name: "workflow", id };
+      if (id !== "") {
+        const step = new URLSearchParams(search).get("step");
+        return { name: "workflow", id, step: step === null || step === "" ? null : step };
+      }
     } catch {
       // A malformed escape is not a workflow.
     }
@@ -193,9 +196,11 @@ export function routinePath(name?: string, folder?: string | null): string {
   return folder === undefined || folder === null ? base : `${base}?folder=${encodeURIComponent(folder)}`;
 }
 
-/** The path of the workflows page, or of one workflow on it. */
-export function workflowPath(id?: string): string {
-  return id === undefined ? "/workflows" : `/workflows/${encodeURIComponent(id)}`;
+/** The path of the workflows page, or of one workflow on it, with the step of its outline (by id) selected when given. */
+export function workflowPath(id?: string, step?: string | null): string {
+  if (id === undefined) return "/workflows";
+  const base = `/workflows/${encodeURIComponent(id)}`;
+  return step === undefined || step === null ? base : `${base}?step=${encodeURIComponent(step)}`;
 }
 
 /** The path of the page that makes a new workflow. */
@@ -245,7 +250,7 @@ function sameRoute(a: Route, b: Route): boolean {
   if (a.name === "runs") return b.name === "runs" && a.workflow === b.workflow;
   if (a.name === "run") return b.name === "run" && a.id === b.id;
   if (a.name === "data-source") return b.name === "data-source" && a.source === b.source && a.tab === b.tab;
-  if (a.name === "workflow") return b.name === "workflow" && a.id === b.id;
+  if (a.name === "workflow") return b.name === "workflow" && a.id === b.id && a.step === b.step;
   if (a.name === "routine") return b.name === "routine" && a.routine === b.routine && a.folder === b.folder;
   if (a.name === "settings") return b.name === "settings" && a.section === b.section;
   return a.name === b.name;

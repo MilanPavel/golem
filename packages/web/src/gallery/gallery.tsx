@@ -110,7 +110,7 @@ import { DataQueriesGallery } from "./gallery-data-queries.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
 import { DataTableViewGallery } from "./gallery-data-table-view.tsx";
 import { RunForm, WorkflowDetail, WorkflowNew, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_CREATED, SAMPLE_DRAFT, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_ANSWER, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_CREATED, SAMPLE_DRAFT, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_ANSWER, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW, SAMPLE_PR_DIGEST_LAST_RUN, SAMPLE_BRIEFING } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2476,6 +2476,28 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         ))}
         {(
           [
+            ["Workflow editor, last run, step card", SAMPLE_PR_DIGEST_LAST_RUN, { problems: [], view: "outline" }],
+            ["Workflow editor, last run, selected step", SAMPLE_PR_DIGEST_LAST_RUN, { problems: [], selected: "s2", view: "outline" }],
+            ["Workflow editor, no run yet", null, { problems: [], selected: "s2", view: "outline" }],
+          ] as const
+        ).map(([title, lastRun, initialEditor]) => (
+          <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            <WorkflowDetail
+              workflow={SAMPLE_PR_DIGEST}
+              steps={SAMPLE_PR_DIGEST_STEPS}
+              code={SAMPLE_PR_DIGEST_CODE}
+              codeHash={SAMPLE_PR_DIGEST_HASH}
+              runs={[]}
+              now={WORKFLOWS_NOW}
+              onNavigate={() => {}}
+              lastRun={lastRun}
+              initialEditor={initialEditor}
+              initialTab="code"
+            />
+          </div>
+        ))}
+        {(
+          [
             ["Step fields, agent step", "agent:worker", undefined],
             ["Step fields, a value the code computes", "agent:reviewer", undefined],
             ["Step fields, code step", "code-1", undefined],
@@ -2606,6 +2628,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onResume={() => Promise.resolve()}
               onAnswer={() => Promise.resolve()}
               onReadOutput={() => Promise.resolve(title.endsWith("cut") ? SAMPLE_FILE_CUT : SAMPLE_FILE_READ)}
+              onAskAbout={() => {}}
+              onSeeStep={() => {}}
               onAsk={() => Promise.resolve("The sign-in for the GitHub tool ran out. Sign in again in Settings, then resume the run.")}
               trace={<p className="m-auto p-5 text-sm text-muted">The trace of the run&apos;s session.</p>}
             />
