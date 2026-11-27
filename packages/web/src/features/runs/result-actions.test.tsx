@@ -11,7 +11,7 @@ import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { SAMPLE_PR_DIGEST_GET } from "../workflows/sample.ts";
 import { WorkflowRunView, type WorkflowRunViewProps } from "./workflow-run-view.tsx";
-import { SAMPLE_BRIEFING_PATH, SAMPLE_RUN_DONE, SAMPLE_RUN_AGAIN, SAMPLE_RUN_FILE, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_TEXT, SAMPLE_RESULTS, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
+import { SAMPLE_BRIEFING_PATH, SAMPLE_RUN_DONE, SAMPLE_RUN_AGAIN, SAMPLE_RUN_AGAIN_CHANGED, SAMPLE_RUN_FILE, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_TEXT, SAMPLE_RESULTS, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -175,6 +175,14 @@ test("a run started again says where it came from, links back, and marks the ste
   await user.click(screen.getByRole("button", { name: /list_pull_requests/ }));
   expect(screen.getByRole("group", { name: "Step list_pull_requests" }).textContent).toMatch(/from the run of /);
   expect(props.onNavigate).not.toHaveBeenCalled();
+});
+
+test("the file-changed sentence shows only when the run says the file changed", () => {
+  const { unmount } = view(SAMPLE_RUN_AGAIN);
+  expect(screen.queryByText(/The file changed since that run/)).toBeNull();
+  unmount();
+  view(SAMPLE_RUN_AGAIN_CHANGED);
+  expect(screen.getByText(/The file changed since that run; the steps before this one are taken as they were\./)).toBeTruthy();
 });
 
 test("the result with its actions passes axe", async () => {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from pathlib import Path
 from typing import cast
 
@@ -152,7 +153,17 @@ async def test_from_one_item_of_a_repeating_step_runs_that_item_and_what_follows
         await stop_daemon(app, task)
 
 
-async def test_a_changed_file_is_refused_before_the_step_and_taken_after_it(
+async def _again(client: RpcClient, old_id: str, key: str) -> dict[str, object]:
+    params = {"from_run": old_id, "from_key": key}
+    new_id = str(rpc_result(await client.call("workflow.start", params))["workflow_run_id"])
+    return await _until(client, new_id, "done")
+
+
+def _origin(got: dict[str, object]) -> dict[str, object]:
+    return cast(dict[str, object], cast(dict[str, object], got["run"])["from_run"])
+
+
+async def test_a_file_changed_below_the_step_starts_and_is_not_flagged(
     short_home: Path, tmp_path: Path
 ) -> None:
     log = tmp_path / "log.txt"
@@ -162,25 +173,61 @@ async def test_a_changed_file_is_refused_before_the_step_and_taken_after_it(
     try:
         old_id = await _first_run(client, path)
         log.unlink()
-
-        # A change below "two": a run again from "two" is fine.
         path.write_text(
             path.read_text(encoding="utf-8").replace('"last", note, "last"', '"last", note, "end"'),
             encoding="utf-8",
         )
-        params = {"from_run": old_id, "from_key": "two"}
-        new_id = str(rpc_result(await client.call("workflow.start", params))["workflow_run_id"])
-        await _until(client, new_id, "done")
+        got = await _again(client, old_id, "two")
         assert _ran(log)[-1] == "end"
+        assert _origin(got)["file_changed"] is False
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
 
-        # A change above "two": refused with the reason.
+
+async def test_a_file_changed_above_the_step_starts_reuses_and_is_flagged(
+    short_home: Path, tmp_path: Path
+) -> None:
+    log = tmp_path / "log.txt"
+    path = _write(short_home, FLOW, log)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        old_id = await _first_run(client, path)
+        log.unlink()
         path.write_text(
             path.read_text(encoding="utf-8").replace('note, "one", 1', 'note, "one", 5'),
             encoding="utf-8",
         )
-        refused = await client.call("workflow.start", params)
-        assert error_code(refused) == INVALID_PARAMS
-        assert "code before two changed" in _message(refused)
+        got = await _again(client, old_id, "two")
+        assert _ran(log) == ["two", "each-x", "each-y", "last"]
+        assert _origin(got)["file_changed"] is True
+        steps = {str(s["key"]): s for s in cast(Rows, got["steps"])}
+        assert steps["one"]["reused_from"] == old_id and steps["one"]["result"] == 1
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
+async def test_an_old_run_with_no_stored_text_is_flagged_only_when_the_file_changed(
+    short_home: Path, tmp_path: Path
+) -> None:
+    log = tmp_path / "log.txt"
+    path = _write(short_home, FLOW, log)
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        old_id = await _first_run(client, path)
+        with sqlite3.connect(app.paths.database_file) as db:
+            db.execute("UPDATE workflow_runs SET source_text = NULL")
+        same = await _again(client, old_id, "two")
+        assert _origin(same)["file_changed"] is False
+        path.write_text(
+            path.read_text(encoding="utf-8").replace('note, "one", 1', 'note, "one", 5'),
+            encoding="utf-8",
+        )
+        changed = await _again(client, old_id, "two")
+        assert _origin(changed)["file_changed"] is True
     finally:
         await client.close()
         await stop_daemon(app, task)

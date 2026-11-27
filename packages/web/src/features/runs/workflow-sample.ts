@@ -191,7 +191,13 @@ export const SAMPLE_RUN_AGAIN: WorkflowRunSample = {
   reviews: [],
 };
 
-const BRIEFING = "# Morning briefing\n\n**3 things need you.** Device sync is failing.\n\n- Review the typer pull request\n- Look at the sync log";
+/** The same, when the workflow file had changed above the step since the older run. */
+export const SAMPLE_RUN_AGAIN_CHANGED: WorkflowRunSample = {
+  ...SAMPLE_RUN_AGAIN,
+  run: { ...SAMPLE_RUN_AGAIN.run, from_run: { ...SAMPLE_RUN_AGAIN.run.from_run!, file_changed: true } },
+};
+
+const BRIEFING ="# Morning briefing\n\n**3 things need you.** Device sync is failing.\n\n- Review the typer pull request\n- Look at the sync log";
 
 /** A finished run that marked one text result: the briefing, drawn as Markdown. */
 export const SAMPLE_RUN_TEXT: WorkflowRunSample = {

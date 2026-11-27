@@ -1,4 +1,4 @@
-import { foldSteps, foundSoFar, liveLines, liveTexts, reuseNote, reusedWords, RUN_AGAIN_WORDS, runAgainFromWords, stepMetaLine, stepOutputLine, stepsProgress, stepTook, usualWords, workflowRunTook, type LiveLine } from "@golem/view";
+import { FILE_CHANGED_WORDS, foldSteps, foundSoFar, liveLines, liveTexts, reuseNote, reusedWords, RUN_AGAIN_WORDS, runAgainFromWords, stepMetaLine, stepOutputLine, stepsProgress, stepTook, usualWords, workflowRunTook, type LiveLine } from "@golem/view";
 import { useRef, useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { runPath, runsPath } from "../../store/router.ts";
@@ -289,6 +289,7 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
               </Link>
               {" · "}
               {reuseNote(origin, steps, originWhen ?? "an earlier day")}
+              {origin.file_changed === true ? ` ${FILE_CHANGED_WORDS}` : ""}
             </p>
           )}
         </div>

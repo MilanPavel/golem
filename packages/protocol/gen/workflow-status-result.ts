@@ -8,6 +8,7 @@ export type Reviews = WorkflowReviewInfo[];
 export type Description = string;
 export type Error = string | null;
 export type FinishedAt = string | null;
+export type FileChanged = boolean;
 export type StartedAt = string | null;
 export type StepKey = string;
 export type StepNumber = number;
@@ -114,6 +115,7 @@ export interface WorkflowRunInfo {
  * via the `definition` "WorkflowRunOrigin".
  */
 export interface WorkflowRunOrigin {
+  file_changed?: FileChanged;
   started_at?: StartedAt;
   step_key: StepKey;
   step_number: StepNumber;

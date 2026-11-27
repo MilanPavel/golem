@@ -6586,8 +6586,8 @@ class WorkflowStartParams(BaseModel):
     ``from_run`` and ``from_key`` start a run again from a step: a new run of the same workflow
     with the same inputs that takes the saved results of the steps before ``from_key`` in
     ``from_run`` and runs that step and what follows. ``id``, ``inputs`` and ``trigger`` are then
-    not given. It is refused, with the reason, when ``from_run`` is not over, the step is inside a
-    ``run.parallel`` group, or the code before the step changed.
+    not given. It is refused, with the reason, when ``from_run`` is not over or the step is inside
+    a ``run.parallel`` group. A file that changed above the step does not refuse: the run says so.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -6648,6 +6648,9 @@ class WorkflowRunOrigin(BaseModel):
     """The step it started again from, by its title."""
     step_number: int = Field(ge=1)
     """The place of that step among the steps of that run (the first is 1)."""
+    file_changed: bool = False
+    """True when the workflow file had changed above that step since that run. The run started
+    anyway, taking the steps before it as they were."""
 
 
 class WorkflowRunInfo(BaseModel):

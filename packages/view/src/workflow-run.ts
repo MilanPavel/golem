@@ -421,12 +421,15 @@ export function liveTexts(steps: readonly StepLike[]): LiveText[] {
 export const RUN_AGAIN_WORDS = "Run again from here";
 
 /** Where a run started again from a step came from, as `workflow.status` sends it. */
-export type RunOrigin = { started_at?: string | null; step_title: string; step_number: number };
+export type RunOrigin = { started_at?: string | null; step_title: string; step_number: number; file_changed?: boolean };
 
 /** The line a run started again says about where it came from: `Run again from step 2 of the run of 26 Nov, 08:00`. */
 export function runAgainFromWords(origin: RunOrigin, when: string): string {
   return `Run again from step ${origin.step_number} of the run of ${when}`;
 }
+
+/** The sentence a run started again adds when the workflow file changed above its step since the older run. */
+export const FILE_CHANGED_WORDS = "The file changed since that run; the steps before this one are taken as they were.";
 
 /** The mark of a step whose result was taken from the older run. */
 export function reusedWords(when: string): string {

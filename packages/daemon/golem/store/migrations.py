@@ -490,6 +490,7 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         # taken over from the old run says which run it came from.
         "ALTER TABLE workflow_runs ADD COLUMN from_run_id TEXT",
         "ALTER TABLE workflow_runs ADD COLUMN from_key TEXT",
+        "ALTER TABLE workflow_runs ADD COLUMN file_changed INTEGER",
         "ALTER TABLE workflow_runs ADD COLUMN source_text TEXT",
         "ALTER TABLE workflow_steps ADD COLUMN reused_from TEXT",
     ),

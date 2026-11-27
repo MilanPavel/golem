@@ -577,7 +577,7 @@ class WorkflowService:
         inputs: dict[str, Any],
         trigger: str,
         model: str | None = None,
-        again: tuple[WorkflowRunRecord, str, list[WorkflowStepRecord]] | None = None,
+        again: tuple[WorkflowRunRecord, str, list[WorkflowStepRecord], bool] | None = None,
     ) -> tuple[str, str | None]:
         """Write a run and launch it. Returns ``(run id, session id)``; the session id is None
         until a step needs a session, so it is usually None here.
@@ -599,6 +599,7 @@ class WorkflowService:
             from_run_id=None if again is None else again[0].workflow_run_id,
             from_key=None if again is None else again[1],
             source_text=data.decode("utf-8", errors="replace"),
+            file_changed=None if again is None else again[3],
         )
         if again is not None:
             await self.runs.copy_steps(run_id, again[2])
@@ -611,8 +612,9 @@ class WorkflowService:
         the steps before ``from_key`` of ``from_run`` and running that step and what follows.
 
         The old run is left as it is. Raises :class:`StartError` with the reason when the run is
-        unknown or not over, the step is unknown, not in a run of its own (inside a
-        ``run.parallel`` group), or the code before it changed."""
+        unknown or not over, the step is unknown, or it is not in a run of its own (inside a
+        ``run.parallel`` group). A file that changed above the step does not refuse: the run
+        starts and records it (``file_changed``)."""
         old = await self.runs.get_run(from_run)
         if old is None:
             raise StartError(f"there is no workflow run {from_run}")
@@ -635,13 +637,23 @@ class WorkflowService:
         if problem is not None or entry is None:
             raise StartError(problem or f"there is no workflow called {old.name}")
         text = await asyncio.to_thread(entry.path.read_text, encoding="utf-8", errors="replace")
-        changed = code_changed_before(
-            old.source_text, text, old.name, chosen.kind, chosen.title or from_key
-        )
-        if changed is not None:
-            raise StartError(changed)
+        # A file that changed above the step does not stop the run: it says so, and the steps
+        # before are taken as they were.
+        if old.source_text is None:
+            # An old run kept no text: only the hash of the whole file can say.
+            now_hash = hashlib.sha256(await asyncio.to_thread(entry.path.read_bytes)).hexdigest()
+            changed = old.source_hash is None or now_hash != old.source_hash
+        else:
+            changed = (
+                code_changed_before(
+                    old.source_text, text, old.name, chosen.kind, chosen.title or from_key
+                )
+                is not None
+            )
         taken = [s for s in steps if s.seq < chosen.seq and s.status == "done"]
-        return await self.start_run(entry, inputs, "manual", old.model, (old, from_key, taken))
+        return await self.start_run(
+            entry, inputs, "manual", old.model, (old, from_key, taken, changed)
+        )
 
     async def start_named(
         self,

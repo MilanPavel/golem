@@ -35052,6 +35052,7 @@ public struct WorkflowResumeResultRun: Codable {
 /// Where a run started again from a step came from.
 // MARK: - PurpleWorkflowRunOrigin
 public struct PurpleWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
     public let startedAt: String?
     public let stepKey: String
     public let stepNumber: Int
@@ -35059,6 +35060,7 @@ public struct PurpleWorkflowRunOrigin: Codable {
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
         case startedAt = "started_at"
         case stepKey = "step_key"
         case stepNumber = "step_number"
@@ -35066,7 +35068,8 @@ public struct PurpleWorkflowRunOrigin: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
         self.startedAt = startedAt
         self.stepKey = stepKey
         self.stepNumber = stepNumber
@@ -35226,6 +35229,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
 /// Where a run started again from a step came from.
 // MARK: - FluffyWorkflowRunOrigin
 public struct FluffyWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
     public let startedAt: String?
     public let stepKey: String
     public let stepNumber: Int
@@ -35233,6 +35237,7 @@ public struct FluffyWorkflowRunOrigin: Codable {
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
         case startedAt = "started_at"
         case stepKey = "step_key"
         case stepNumber = "step_number"
@@ -35240,7 +35245,8 @@ public struct FluffyWorkflowRunOrigin: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
         self.startedAt = startedAt
         self.stepKey = stepKey
         self.stepNumber = stepNumber
@@ -35656,6 +35662,7 @@ public struct WorkflowRunInfo: Codable {
 /// Where a run started again from a step came from.
 // MARK: - WorkflowRunInfoWorkflowRunOrigin
 public struct WorkflowRunInfoWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
     public let startedAt: String?
     public let stepKey: String
     public let stepNumber: Int
@@ -35663,6 +35670,7 @@ public struct WorkflowRunInfoWorkflowRunOrigin: Codable {
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
         case startedAt = "started_at"
         case stepKey = "step_key"
         case stepNumber = "step_number"
@@ -35670,7 +35678,8 @@ public struct WorkflowRunInfoWorkflowRunOrigin: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
         self.startedAt = startedAt
         self.stepKey = stepKey
         self.stepNumber = stepNumber
@@ -35704,6 +35713,7 @@ public struct WorkflowRunInfoOutput: Codable {
 /// Where a run started again from a step came from.
 // MARK: - WorkflowRunOrigin
 public struct WorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
     public let startedAt: String?
     public let stepKey: String
     public let stepNumber: Int
@@ -35711,6 +35721,7 @@ public struct WorkflowRunOrigin: Codable {
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
         case startedAt = "started_at"
         case stepKey = "step_key"
         case stepNumber = "step_number"
@@ -35718,7 +35729,8 @@ public struct WorkflowRunOrigin: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
         self.startedAt = startedAt
         self.stepKey = stepKey
         self.stepNumber = stepNumber
@@ -36366,9 +36378,10 @@ public struct WorkflowSaveResultWorkflowModelInfo: Codable {
 /// with the same inputs that takes the saved results of the steps before ``from_key`` in
 /// ``from_run`` and runs that step and what follows. ``id``, ``inputs`` and ``trigger`` are
 /// then
-/// not given. It is refused, with the reason, when ``from_run`` is not over, the step is
-/// inside a
-/// ``run.parallel`` group, or the code before the step changed.
+/// not given. It is refused, with the reason, when ``from_run`` is not over or the step is
+/// inside
+/// a ``run.parallel`` group. A file that changed above the step does not refuse: the run
+/// says so.
 // MARK: - WorkflowStartParams
 public struct WorkflowStartParams: Codable {
     public let fromKey: String?
@@ -36681,6 +36694,7 @@ public struct WorkflowStatusResultRun: Codable {
 /// Where a run started again from a step came from.
 // MARK: - TentacledWorkflowRunOrigin
 public struct TentacledWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
     public let startedAt: String?
     public let stepKey: String
     public let stepNumber: Int
@@ -36688,6 +36702,7 @@ public struct TentacledWorkflowRunOrigin: Codable {
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
         case startedAt = "started_at"
         case stepKey = "step_key"
         case stepNumber = "step_number"
@@ -36695,7 +36710,8 @@ public struct TentacledWorkflowRunOrigin: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
         self.startedAt = startedAt
         self.stepKey = stepKey
         self.stepNumber = stepNumber

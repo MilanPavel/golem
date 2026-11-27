@@ -14,8 +14,8 @@ export type Trigger = 'manual' | 'try' | 'chat';
  * ``from_run`` and ``from_key`` start a run again from a step: a new run of the same workflow
  * with the same inputs that takes the saved results of the steps before ``from_key`` in
  * ``from_run`` and runs that step and what follows. ``id``, ``inputs`` and ``trigger`` are then
- * not given. It is refused, with the reason, when ``from_run`` is not over, the step is inside a
- * ``run.parallel`` group, or the code before the step changed.
+ * not given. It is refused, with the reason, when ``from_run`` is not over or the step is inside
+ * a ``run.parallel`` group. A file that changed above the step does not refuse: the run says so.
  */
 export interface WorkflowStartParams {
   from_key?: FromKey;

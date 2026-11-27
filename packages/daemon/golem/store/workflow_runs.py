@@ -51,6 +51,8 @@ class WorkflowRunRecord:
     """The step of ``from_run_id`` it started again from."""
     source_text: str | None = None
     """The text of the workflow file as the run started."""
+    file_changed: int | None = None
+    """1 when the file had changed above the step a run started again from, 0 when not."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,13 +138,15 @@ class WorkflowRuns:
         from_run_id: str | None = None,
         from_key: str | None = None,
         source_text: str | None = None,
+        file_changed: bool | None = None,
     ) -> str:
         """Write a ``pending`` run. Returns its id."""
         run_id = new_id("wr")
         await self._write(
             "INSERT INTO workflow_runs (workflow_run_id, workflow_id, name, path, project,"
             " status, inputs_json, trigger, created_at, source_hash, model, from_run_id, from_key,"
-            " source_text) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)",
+            " source_text, file_changed) VALUES"
+            " (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 workflow_id,
@@ -157,6 +161,7 @@ class WorkflowRuns:
                 from_run_id,
                 from_key,
                 source_text,
+                None if file_changed is None else int(file_changed),
             ),
         )
         return run_id

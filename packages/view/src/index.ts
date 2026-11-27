@@ -450,6 +450,7 @@ export {
   workflowRunTook,
   workflowStepsList,
   workflowStepSpans,
+  FILE_CHANGED_WORDS,
   RUN_AGAIN_WORDS,
   reusedWords,
   reuseNote,

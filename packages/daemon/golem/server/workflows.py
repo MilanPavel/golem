@@ -487,6 +487,7 @@ async def _origin(service: WorkflowService, run: WorkflowRunRecord) -> dict[str,
         "step_key": step.step_key,
         "step_title": step.title or step.step_key,
         "step_number": place,
+        "file_changed": bool(run.file_changed),
     }
 
 

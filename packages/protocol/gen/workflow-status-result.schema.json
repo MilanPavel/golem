@@ -251,6 +251,11 @@
       "additionalProperties": false,
       "description": "Where a run started again from a step came from.",
       "properties": {
+        "file_changed": {
+          "default": false,
+          "title": "File Changed",
+          "type": "boolean"
+        },
         "started_at": {
           "anyOf": [
             {
