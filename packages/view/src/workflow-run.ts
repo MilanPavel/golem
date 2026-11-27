@@ -27,6 +27,8 @@ export type StepLike = {
   line?: string | null;
   /** How many steps of this title the workflow said it has in all (`run.step(of=)`), when it did. */
   of?: number | null;
+  /** The text so far of a running step that sends progress. */
+  progress?: string | null;
 };
 
 const STEP_WORDS: Record<string, string> = {
@@ -354,4 +356,45 @@ export function liveLines(rows: readonly RunStepRow[], nowMs: number): LiveLine[
 /** The steps that did something worth telling when the run marked no result: a notice sent, a review answered, a tool called. */
 export function whatItDid<T extends StepLike>(steps: readonly T[]): T[] {
   return steps.filter((step) => (step.kind === "notify" || step.kind === "review" || step.kind === "tool") && step.status === "done" && step.result !== null && step.result !== undefined);
+}
+
+/** "usually about 45s": how long a run of the workflow usually takes. Empty when the daemon has no usual time yet (fewer than two runs finished). */
+export function usualWords(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return "";
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `usually about ${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `usually about ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `usually about ${hours}h${minutes % 60 === 0 ? "" : ` ${minutes % 60} min`}`;
+}
+
+/** One finished thing a running run has found: what it is and its one line. */
+export type Found = { key: string; label: string; line: string };
+
+/**
+ * What a run has found so far, in the order it found it: the one line of each step that is done and has a result, a repeating
+ * row as one line with its count ("Reading feed", "12 of 30").
+ */
+export function foundSoFar(rows: readonly RunStepRow[]): Found[] {
+  const found: Found[] = [];
+  for (const row of rows) {
+    if (row.kind === "repeat") {
+      if (row.done > 0) found.push({ key: `repeat:${row.title}`, label: row.title, line: repeatCount(row) });
+      continue;
+    }
+    const line = row.step.status === "done" ? stepOutputLine(row.step) : "";
+    if (line !== "") found.push({ key: row.step.key, label: stepLabel(row.step), line });
+  }
+  return found;
+}
+
+/** The text of a running step as it comes. */
+export type LiveText = { key: string; label: string; text: string };
+
+/** The running steps that send progress text, in the order they started. A step that is not running has none to show. */
+export function liveTexts(steps: readonly StepLike[]): LiveText[] {
+  return steps
+    .filter((step) => step.status === "running" && step.progress !== null && step.progress !== undefined && step.progress !== "")
+    .map((step) => ({ key: step.key, label: stepLabel(step), text: step.progress ?? "" }));
 }

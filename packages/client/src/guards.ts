@@ -113,6 +113,7 @@ import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-resu
 import type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
 import type { WorkflowStepEvent } from "../../protocol/gen/workflow-step-event.ts";
 import type { WorkflowOutputEvent } from "../../protocol/gen/workflow-output-event.ts";
+import type { WorkflowStepProgressEvent } from "../../protocol/gen/workflow-step-progress-event.ts";
 import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
 import type { SkillReadResult } from "../../protocol/gen/skill-read-result.ts";
@@ -435,6 +436,10 @@ export function isWorkflowReviewAnswerResult(value: unknown): value is WorkflowR
 
 export function isWorkflowRunEvent(value: unknown): value is WorkflowRunEvent {
   return isRecord(value) && typeof value["workflow_run_id"] === "string" && typeof value["status"] === "string";
+}
+
+export function isWorkflowStepProgressEvent(value: unknown): value is WorkflowStepProgressEvent {
+  return isRecord(value) && typeof value["workflow_run_id"] === "string" && typeof value["key"] === "string" && typeof value["text"] === "string";
 }
 
 export function isWorkflowOutputEvent(value: unknown): value is WorkflowOutputEvent {

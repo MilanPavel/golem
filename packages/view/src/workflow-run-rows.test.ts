@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { foldSteps, liveLines, repeatCount, shortTime, stepOutputLine, stepRowState, stepsProgress, stepTook, whatItDid } from "./workflow-run.ts";
+import { foldSteps, foundSoFar, liveLines, liveTexts, usualWords, repeatCount, shortTime, stepOutputLine, stepRowState, stepsProgress, stepTook, whatItDid } from "./workflow-run.ts";
 
 const T = (s: number) => new Date(Date.UTC(2026, 10, 26, 8, 0, s)).toISOString();
 const step = (key: string, extra: Record<string, unknown> = {}) => ({ key, kind: "step", title: key, status: "done", started_at: T(0), finished_at: T(10), ...extra });
@@ -103,4 +103,35 @@ test("a step whose result was too large for its event still has its one line", (
   assert.equal(stepOutputLine({ kind: "step", result: null, line: "3 rows" }), "3 rows");
   assert.equal(stepOutputLine({ kind: "step", result: "text", line: "other" }), "text");
   assert.equal(stepOutputLine({ kind: "step", result: undefined }), "");
+});
+
+test("the usual time is said in words, and not at all before there is one", () => {
+  assert.equal(usualWords(null), "");
+  assert.equal(usualWords(undefined), "");
+  assert.equal(usualWords(400), "usually about 1s");
+  assert.equal(usualWords(45_000), "usually about 45s");
+  assert.equal(usualWords(25 * 60_000), "usually about 25 min");
+  assert.equal(usualWords(90 * 60_000), "usually about 1h 30 min");
+});
+
+test("what was found so far is the one line of each done step, a loop as its count", () => {
+  const rows = foldSteps([
+    step("a", { title: "List", result: "30 feeds" }),
+    step("r0", { title: "Read", item: "x", status: "done", of: 30 }),
+    step("r1", { title: "Read", item: "y", status: "running", of: 30 }),
+    step("b", { title: "Write", status: "running" }),
+    step("c", { title: "Send", status: "done", result: null }),
+  ]);
+  assert.deepEqual(
+    foundSoFar(rows).map((one) => [one.label, one.line]),
+    [
+      ["List", "30 feeds"],
+      ["Read", "1 of 30"],
+    ],
+  );
+});
+
+test("the live texts are those of the steps that run and send progress", () => {
+  const texts = liveTexts([step("a", { status: "running", progress: "Good morning" }), step("b", { status: "running" }), step("c", { status: "done", progress: "old" }), step("d", { status: "running", progress: "" })]);
+  assert.deepEqual(texts, [{ key: "a", label: "a", text: "Good morning" }]);
 });

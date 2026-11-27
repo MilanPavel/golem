@@ -161,6 +161,7 @@ export type { WorkflowStartResult } from "../../protocol/gen/workflow-start-resu
 export type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
 export type { WorkflowStepEvent } from "../../protocol/gen/workflow-step-event.ts";
 export type { WorkflowOutputEvent } from "../../protocol/gen/workflow-output-event.ts";
+export type { WorkflowStepProgressEvent } from "../../protocol/gen/workflow-step-progress-event.ts";
 export type { WorkflowNotice } from "./connect.ts";
 export type { RunInfo } from "../../protocol/gen/run-info.ts";
 export type { RunListResult } from "../../protocol/gen/run-list-result.ts";

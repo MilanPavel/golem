@@ -127,12 +127,14 @@ import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-resu
 import type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
 import type { WorkflowStepEvent } from "../../protocol/gen/workflow-step-event.ts";
 import type { WorkflowOutputEvent } from "../../protocol/gen/workflow-output-event.ts";
+import type { WorkflowStepProgressEvent } from "../../protocol/gen/workflow-step-progress-event.ts";
 
 /** A `workflow.run.*`, `workflow.step.*` or `workflow.output.added` notification: `method` names the change, `params` is the state after it. */
 export type WorkflowNotice =
   | { kind: "run"; method: string; params: WorkflowRunEvent }
   | { kind: "step"; method: string; params: WorkflowStepEvent }
-  | { kind: "output"; method: string; params: WorkflowOutputEvent };
+  | { kind: "output"; method: string; params: WorkflowOutputEvent }
+  | { kind: "progress"; method: string; params: WorkflowStepProgressEvent };
 import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
@@ -371,6 +373,7 @@ import {
   isWorkflowStartResult,
   isWorkflowStatusResult,
   isWorkflowOutputEvent,
+  isWorkflowStepProgressEvent,
   isWorkflowStepEvent,
   isRunListResult,
   isSkillCreateResult,
@@ -1518,7 +1521,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const method = message["method"];
       const params = message["params"];
       const notice: WorkflowNotice | null =
-        method.startsWith("workflow.run.") && isWorkflowRunEvent(params)
+        method === "workflow.step.progress" && isWorkflowStepProgressEvent(params)
+          ? { kind: "progress", method, params }
+          : method.startsWith("workflow.run.") && isWorkflowRunEvent(params)
           ? { kind: "run", method, params }
           : method.startsWith("workflow.step.") && isWorkflowStepEvent(params)
             ? { kind: "step", method, params }
