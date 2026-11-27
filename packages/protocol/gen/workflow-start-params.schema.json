@@ -1,11 +1,45 @@
 {
   "additionalProperties": false,
-  "description": "``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.\n\n``trigger`` says what asked for it. A person pressing Run is ``manual``.",
+  "description": "``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.\n\n``trigger`` says what asked for it. A person pressing Run is ``manual``.\n\n``from_run`` and ``from_key`` start a run again from a step: a new run of the same workflow\nwith the same inputs that takes the saved results of the steps before ``from_key`` in\n``from_run`` and runs that step and what follows. ``id``, ``inputs`` and ``trigger`` are then\nnot given. It is refused, with the reason, when ``from_run`` is not over, the step is inside a\n``run.parallel`` group, or the code before the step changed.",
   "properties": {
+    "from_key": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "From Key"
+    },
+    "from_run": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "From Run"
+    },
     "id": {
-      "minLength": 1,
-      "title": "Id",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Id"
     },
     "inputs": {
       "additionalProperties": true,
@@ -35,9 +69,6 @@
       "type": "string"
     }
   },
-  "required": [
-    "id"
-  ],
   "title": "WorkflowStartParams",
   "type": "object"
 }

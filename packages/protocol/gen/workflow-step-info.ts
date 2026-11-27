@@ -14,6 +14,7 @@ export type Line = string | null;
 export type Model = string | null;
 export type Of = number | null;
 export type Progress = string | null;
+export type ReusedFrom = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'in_doubt';
 export type Title = string;
@@ -42,6 +43,7 @@ export interface WorkflowStepInfo {
   of?: Of;
   progress?: Progress;
   result?: Result;
+  reused_from?: ReusedFrom;
   started_at?: StartedAt;
   status: Status;
   title: Title;

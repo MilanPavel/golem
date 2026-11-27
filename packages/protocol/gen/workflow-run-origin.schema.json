@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "Where a run started again from a step came from.",
+  "properties": {
+    "started_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "step_key": {
+      "minLength": 1,
+      "title": "Step Key",
+      "type": "string"
+    },
+    "step_number": {
+      "minimum": 1,
+      "title": "Step Number",
+      "type": "integer"
+    },
+    "step_title": {
+      "title": "Step Title",
+      "type": "string"
+    },
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id",
+    "step_key",
+    "step_title",
+    "step_number"
+  ],
+  "title": "WorkflowRunOrigin",
+  "type": "object"
+}
