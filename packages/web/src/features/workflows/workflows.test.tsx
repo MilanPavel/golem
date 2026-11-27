@@ -113,7 +113,7 @@ test("the Triggers tab says By hand with no routine, and shows a routine's next 
   unmount();
   render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE] }));
   await user.click(screen.getByRole("tab", { name: "Triggers" }));
-  expect(screen.getByRole("list", { name: "Routines that start it" }).textContent).toContain("next in 15 h");
+  expect(screen.getByRole("list", { name: "Routines that start it" }).textContent).toMatch(/next in \d+ h/); // WORKFLOWS_NOW is local time and next_at is fixed at +01:00, so the hours depend on the time zone.
 });
 
 test("the Code tab shows the file read only with a dot on each step's line, and Show in Finder reveals it", async () => {
