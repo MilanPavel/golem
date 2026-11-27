@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "The firing ``routine.run`` started, and the session it runs in.",
+  "description": "The firing ``routine.run`` started, and the session it runs in.\n\n``session_id`` is null for a workflow routine whose run has no session yet: a run gets one\nonly when a step needs it.",
   "properties": {
     "routine_run_id": {
       "minLength": 1,
@@ -8,14 +8,21 @@
       "type": "string"
     },
     "session_id": {
-      "minLength": 1,
-      "title": "Session Id",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
     }
   },
   "required": [
-    "routine_run_id",
-    "session_id"
+    "routine_run_id"
   ],
   "title": "RoutineRunResult",
   "type": "object"

@@ -411,6 +411,19 @@ class WorkflowRunResumedNotification(BaseModel):
     params: WorkflowRunEvent
 
 
+class WorkflowRunUpdatedNotification(BaseModel):
+    """Server → every connection: ``workflow.run.updated``. Not stored.
+
+    A field of the run changed while it goes on, such as its ``session_id`` once a step needed one.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.run.updated"] = "workflow.run.updated"
+    params: WorkflowRunEvent
+
+
 class WorkflowRunDoneNotification(BaseModel):
     """Server → every connection: ``workflow.run.done``. Not stored."""
 
@@ -531,6 +544,7 @@ __all__ = [
     "WorkflowRunFailedNotification",
     "WorkflowRunResumedNotification",
     "WorkflowRunStartedNotification",
+    "WorkflowRunUpdatedNotification",
     "WorkflowRunWaitingNotification",
     "WorkflowStepDoneNotification",
     "WorkflowStepFailedNotification",

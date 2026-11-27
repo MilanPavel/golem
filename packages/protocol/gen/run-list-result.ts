@@ -8,7 +8,7 @@ export type Origin = string;
 export type Reason = string | null;
 export type Routine = string | null;
 export type RoutineRunId = string | null;
-export type SessionId = string;
+export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'queued' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'skipped' | 'cancelled';
 export type Steps = number | null;
@@ -27,7 +27,9 @@ export interface RunListResult {
 /**
  * One row of the Runs list: a headless session and how its run is going (ADR-050).
  *
- * One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+ * One row for each session whose origin is not ``user``, and one for each workflow run that
+ * has no session (``session_id`` is null: a run gets a session only when a step needs one, so
+ * a client keys a workflow run by ``workflow_run_id``). ``kind`` is ``routine`` for a
  * routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
  * (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
  * ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of a
@@ -54,7 +56,7 @@ export interface RunInfo {
   reason?: Reason;
   routine?: Routine;
   routine_run_id?: RoutineRunId;
-  session_id: SessionId;
+  session_id?: SessionId;
   started_at?: StartedAt;
   status: Status;
   steps?: Steps;

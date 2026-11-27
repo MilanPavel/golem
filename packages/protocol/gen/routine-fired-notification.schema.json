@@ -2,7 +2,7 @@
   "$defs": {
     "RoutineFired": {
       "additionalProperties": false,
-      "description": "A routine started a run. ``scope`` is ``user`` or the project folder.",
+      "description": "A routine started a run. ``scope`` is ``user`` or the project folder.\n\n``session_id`` is null for a workflow run that has no session yet.",
       "properties": {
         "routine": {
           "minLength": 1,
@@ -20,9 +20,17 @@
           "type": "string"
         },
         "session_id": {
-          "minLength": 1,
-          "title": "Session Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
         },
         "trigger": {
           "enum": [
@@ -38,7 +46,6 @@
       "required": [
         "routine",
         "routine_run_id",
-        "session_id",
         "trigger",
         "scope"
       ],
