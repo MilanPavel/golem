@@ -52,9 +52,11 @@ async def upgrade_dependencies(run: Run) -> None: ...
 
 `key=` means "do this once": a finished step with a key never runs again, across retries and restarts. A real-world action (a pull request, an email) carries one. One gap remains, which no engine can close: a crash after the action happened but before golem saved its result. Then the step is left "may have run", and on retry golem passes the key to the receiver as an idempotency key, so the receiver can drop the second copy (spike, 2026-11-24).
 
-### A run owns one headless session
+### A run owns a headless session only when a step needs one
 
-- Each workflow run owns one headless session, `origin="workflow:<name>"`, made through `SessionManager.create`, like a routine's.
+- A workflow run gets a headless session, `origin="workflow:<name>"`, made through `SessionManager.create`, the first time a step needs one: an agent, a skill, a tool that reads the session (`SESSION_TOOLS`), or a tool output big enough to keep as an artifact. A run of plain steps has none. One lock makes parallel steps share one session. It is titled `<workflow> · run of <date>`, `workflow_runs.session_id` is set, and `workflow.run.updated` tells clients.
+- Notifications and reviews belong to the run (`workflow_run_id`), not to the session. `run.list` lists a run that has no session; its key is `workflow_run_id`.
+- A session with an `origin` that starts with `workflow:` is never in `session.list`. It opens by its id, from "Open chat" on a step.
 - Each `run.agent` is a helper of that session. It is an ADR-059 child session with `parent_call_id` set to the step key (`wf:<step key>`).
 - Helpers start only through `start_helper` and `helper_results`, and only from one place: `D/workflows/agents.py` (the seam). Workflow code never reaches into dispatcher or session internals.
 - ADR-059 does not change. A small refactor moves the part of `start_helpers` that does not need the chat graph's state into a function that both paths call (ticket A.6).
