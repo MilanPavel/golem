@@ -11,6 +11,7 @@ export type Route =
   | { name: "data" }
   | { name: "data-source"; source: string; tab: DataTab }
   | { name: "workflows" }
+  | { name: "workflow-new" }
   | { name: "workflow"; id: string }
   | { name: "runs"; /** The workflow whose runs are shown, by its id; null shows every run. */ workflow: string | null }
   | { name: "run"; id: string }
@@ -45,7 +46,7 @@ export type Router = StoreSource<Route> & {
  * `/routines` is the routines page with none picked, `/routines/:routine` one routine (name decoded, no further `/`),
  * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
  * `?new=<starter>` fills it from a starter, and `&workflow=<id>` from a workflow (its id, decoded).
- * `/workflows` is the workflows page with none picked, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
+ * `/workflows` is the workflows page with none picked, `/workflows/new` the page that makes a new one, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
  * `/runs` is the Runs page: what needs you, what is running, and what ran. `?workflow=<id>` shows only that workflow's runs. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
  * `/data` is the Data page with none picked, and `/data/:name` one source (name decoded, no further `/`); `?tab=` names its tab (tables when missing or unknown).
  * `/welcome` is first run: `?step=engine|model|tools|ready` (engine when missing or unknown) and `?from=send`.
@@ -100,6 +101,9 @@ export function parseRoute(pathname: string, search = ""): Route {
   }
   if (pathname === "/workflows") {
     return { name: "workflows" };
+  }
+  if (pathname === "/workflows/new") {
+    return { name: "workflow-new" };
   }
   // The old `/workflows/:id/runs` and `/workflows/:id/triggers` land on the workflow's page: it has no tabs now.
   const workflow = /^\/workflows\/([^/]+)(?:\/(?:runs|triggers))?$/.exec(pathname)?.[1];
@@ -192,6 +196,11 @@ export function routinePath(name?: string, folder?: string | null): string {
 /** The path of the workflows page, or of one workflow on it. */
 export function workflowPath(id?: string): string {
   return id === undefined ? "/workflows" : `/workflows/${encodeURIComponent(id)}`;
+}
+
+/** The path of the page that makes a new workflow. */
+export function workflowNewPath(): string {
+  return "/workflows/new";
 }
 
 /** The path of the Data page, or of one source on it, at a tab other than the first. */

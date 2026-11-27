@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -7,14 +7,14 @@ import { ConnectionProvider } from "../../store/connection-context.tsx";
 import type { ConnectionSnapshot } from "../../store/connection.ts";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
-import { fakeClient, fakeFrame, summary } from "../../store/test-support.ts";
+import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
-import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_GET, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_STEPS, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTER_FOLDER, SAMPLE_STARTERS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "./sample.ts";
+import { SAMPLE_BROKEN, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_GET, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_STEPS, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_UNTRUSTED, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "./sample.ts";
 import { SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE } from "../routines/sample.ts";
 import { routinesStarting, stepLines, workflowGroups, workflowRuns } from "./text.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
 import { WorkflowsPanel } from "./workflows-panel.tsx";
-import { WorkflowStarters, WorkflowsEmpty, starterStillToAdd } from "./workflows-empty.tsx";
+import { WorkflowsEmpty, starterStillToAdd } from "./workflows-empty.tsx";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -45,14 +45,26 @@ test("the panel lists This project first, then Yours, and a broken workflow show
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("under the workflows a Starters group lists the starters not added yet, each opening /workflows", async () => {
+test("the panel starts with + New workflow, which opens the New workflow page", async () => {
+  const user = userEvent.setup();
+  const onNavigate = vi.fn();
+  const { container } = render(<WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} selected={null} onNavigate={onNavigate} />);
+  const button = screen.getByRole("button", { name: "+ New workflow" });
+  // It is the first thing in the panel, above the filter.
+  expect(button.compareDocumentPosition(screen.getByRole("textbox", { name: "Filter workflows" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  await user.click(button);
+  expect(onNavigate).toHaveBeenCalledWith("/workflows/new");
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("under the workflows a Starters group lists the starters not added yet, each opening the New workflow page", async () => {
   const onNavigate = vi.fn();
   const { container, rerender } = render(<WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} starters={SAMPLE_STARTERS} selected={null} onNavigate={onNavigate} />);
   const group = within(screen.getByRole("list", { name: "Starters" }));
   const link = group.getByRole("link", { name: /Morning briefing/ });
-  expect(link.getAttribute("href")).toBe("/workflows");
+  expect(link.getAttribute("href")).toBe("/workflows/new");
   await userEvent.setup().click(link);
-  expect(onNavigate).toHaveBeenCalledWith("/workflows");
+  expect(onNavigate).toHaveBeenCalledWith("/workflows/new");
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
   rerender(<WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} starters={[]} selected={null} onNavigate={onNavigate} />);
   expect(screen.queryByRole("list", { name: "Starters" })).toBeNull();
@@ -348,59 +360,6 @@ test("/workflows/:id: Run starts the workflow and opens the run by its id", asyn
 });
 
 const BOTH = [SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER];
-const cardOf = (title: string) => within(screen.getAllByRole("listitem").find((item) => item.textContent?.includes(title))!);
-
-test("the empty state shows a starter card whose line says what it leaves, and adds it through the daemon", async () => {
-  const user = userEvent.setup();
-  const onAdd = vi.fn(async () => {});
-  const { container } = render(<WorkflowsEmpty starters={SAMPLE_STARTERS} folder={null} onAdd={onAdd} />);
-  expect(screen.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
-  const card = cardOf("Morning briefing");
-  expect(card.getByRole("heading").textContent).toBe("Morning briefing");
-  expect(card.getByText(/leave one short briefing/)).toBeTruthy();
-  await user.click(card.getByRole("button", { name: "Add" }));
-  expect(onAdd).toHaveBeenLastCalledWith(SAMPLE_BRIEFING, false);
-  await user.click(card.getByRole("button", { name: "Add and run every weekday at 07:30" }));
-  expect(onAdd).toHaveBeenLastCalledWith(SAMPLE_BRIEFING, true);
-  expect((await axe.run(container, noContrast)).violations).toEqual([]);
-});
-
-test("a starter without a routine has the one button, and adds without one", async () => {
-  const user = userEvent.setup();
-  const onAdd = vi.fn(async () => {});
-  render(<WorkflowsEmpty starters={[SAMPLE_PROJECT_STARTER]} folder={SAMPLE_STARTER_FOLDER} onAdd={onAdd} />);
-  const card = cardOf("Review the changes");
-  expect(card.getAllByRole("button")).toHaveLength(1);
-  await user.click(card.getByRole("button", { name: "Use this starter" }));
-  expect(onAdd).toHaveBeenCalledWith(SAMPLE_PROJECT_STARTER, false);
-});
-
-test("without a project folder a project starter says why and its button is off, and the others work", () => {
-  render(<WorkflowsEmpty starters={BOTH} folder={null} onAdd={async () => {}} />);
-  const review = cardOf("Review the changes");
-  const button = review.getByRole("button", { name: "Use this starter" });
-  expect((button as HTMLButtonElement).disabled).toBe(true);
-  expect(review.getByText(/This one works on a project/)).toBeTruthy();
-  expect(button.getAttribute("aria-describedby")).toBeTruthy();
-  expect((cardOf("Morning briefing").getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
-});
-
-test("with a project folder a project starter's button is on", () => {
-  render(<WorkflowsEmpty starters={BOTH} folder={SAMPLE_STARTER_FOLDER} onAdd={async () => {}} />);
-  expect((cardOf("Review the changes").getByRole("button", { name: "Use this starter" }) as HTMLButtonElement).disabled).toBe(false);
-});
-
-test("a refused add shows the daemon's reason on its card and the button works again", async () => {
-  const user = userEvent.setup();
-  const onAdd = vi.fn(async () => {
-    throw new Error("/x is not trusted; add it to trusted_projects in config.toml first");
-  });
-  render(<WorkflowsEmpty starters={SAMPLE_STARTERS} folder="/x" onAdd={onAdd} />);
-  const card = cardOf("Morning briefing");
-  await user.click(card.getByRole("button", { name: "Add" }));
-  expect((await card.findByRole("alert")).textContent).toContain("trusted_projects");
-  expect((card.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
-});
 
 test("starterStillToAdd drops a starter whose file is in the project folder or in your own folder", () => {
   const entry = (name: string, project: string | null) => ({ ...SAMPLE_PR_DIGEST, id: `${project}/${name}`, name, project });
@@ -413,82 +372,36 @@ test("starterStillToAdd drops a starter whose file is in the project folder or i
   expect(left([entry("morning_briefing", "/p")], "/p")).toContain("morning_briefing");
 });
 
-test("the Starters section shows nothing once every starter is added", () => {
-  const { container } = render(<WorkflowStarters starters={[]} folder="/p" onAdd={async () => {}} />);
-  expect(container.textContent).toBe("");
+test("the empty Workflows page has a + New workflow button and no starter cards", async () => {
+  const user = userEvent.setup();
+  const onNew = vi.fn();
+  const { container } = render(<WorkflowsEmpty onNew={onNew} />);
+  expect(screen.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
+  expect(screen.queryByRole("list", { name: "Starter workflows" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "+ New workflow" }));
+  expect(onNew).toHaveBeenCalledTimes(1);
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
-test("/workflows with none lists the starter, adds it in your own folder and opens it", async () => {
+test("/workflows with none opens the New workflow page from its button", async () => {
   const user = userEvent.setup();
-  const id = "/h/.golem/workflows/morning_briefing.py::morning_briefing";
-  const fake = mount("/workflows", ({ raw }) => {
-    raw.listWorkflows.mockResolvedValue({ workflows: [] });
-    raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
-    raw.addWorkflowStarter.mockResolvedValue({ id, name: "morning_briefing", path: "/h/.golem/workflows/morning_briefing.py" });
-  });
-  act(() => fake.emitSummary(summary("x", "2026-11-01T11:59:00Z", SAMPLE_STARTER_FOLDER)));
-  expect(await screen.findByRole("heading", { name: "No workflows yet" })).toBeTruthy();
-  expect(screen.getByText(/leave one short briefing/)).toBeTruthy();
-  await user.click(await screen.findByRole("button", { name: "Add" }));
-  await waitFor(() => expect(location.pathname).toBe(`/workflows/${encodeURIComponent(id)}`));
-  expect(fake.raw.addWorkflowStarter).toHaveBeenCalledWith("morning_briefing");
-});
-
-test("Add and run asks for the routine too and opens the workflow; a routine that failed is said on the page", async () => {
-  const user = userEvent.setup();
-  const id = "/h/.golem/workflows/morning_briefing.py::morning_briefing";
-  const path = "/h/.golem/workflows/morning_briefing.py";
-  const fake = mount("/workflows", ({ raw }) => {
-    raw.listWorkflows.mockResolvedValue({ workflows: [] });
-    raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
-    raw.addWorkflowStarter.mockResolvedValue({ id, name: "morning_briefing", path, routine: "morning-briefing" });
-  });
-  await user.click(await screen.findByRole("button", { name: "Add and run every weekday at 07:30" }));
-  await waitFor(() => expect(location.pathname).toBe(`/workflows/${encodeURIComponent(id)}`));
-  expect(fake.raw.addWorkflowStarter).toHaveBeenCalledWith("morning_briefing", undefined, true);
-});
-
-test("when the routine could not be made the workflow is still added, the page stays and says why", async () => {
-  const user = userEvent.setup();
-  const id = "/h/.golem/workflows/morning_briefing.py::morning_briefing";
   mount("/workflows", ({ raw }) => {
     raw.listWorkflows.mockResolvedValue({ workflows: [] });
     raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
-    raw.addWorkflowStarter.mockResolvedValue({ id, name: "morning_briefing", path: "/h/x.py", routine_problem: "the routine morning-briefing was not added: there is already a routine called morning-briefing" });
   });
-  await user.click(await screen.findByRole("button", { name: "Add and run every weekday at 07:30" }));
-  expect((await screen.findByRole("status")).textContent).toBe("The workflow was added. The routine morning-briefing was not added: there is already a routine called morning-briefing");
-  expect(location.pathname).toBe("/workflows");
+  expect(await screen.findByRole("heading", { name: "No workflows yet" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "+ New workflow" }));
+  expect(location.pathname).toBe("/workflows/new");
+  expect(await screen.findByRole("heading", { name: "New workflow" })).toBeTruthy();
 });
 
-test("/workflows shows a refusal of the add on the card and stays on the page", async () => {
-  const user = userEvent.setup();
-  const fake = mount("/workflows", ({ raw }) => {
-    raw.listWorkflows.mockResolvedValue({ workflows: [] });
-    raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
-    raw.addWorkflowStarter.mockRejectedValue(new Error("/h/.golem/workflows/morning_briefing.py exists already; it was not changed"));
-  });
-  await user.click(await screen.findByRole("button", { name: "Add" }));
-  expect((await screen.findByRole("alert")).textContent).toContain("exists already");
-  expect(fake.raw.addWorkflowStarter).toHaveBeenCalledTimes(1);
-  expect(location.pathname).toBe("/workflows");
-});
-
-test("/workflows with some workflows shows the Starters section until the starter is added", async () => {
+test("/workflows with some workflows has no Starters section: the starters are on the New workflow page", async () => {
   mount("/workflows", ({ raw }) => {
     raw.listWorkflows.mockResolvedValue(SAMPLE_WORKFLOW_LIST);
     raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
   });
-  expect(await screen.findByRole("heading", { name: "Starters" })).toBeTruthy();
-  expect(within(screen.getByRole("list", { name: "Starter workflows" })).getAllByRole("heading").map((h) => h.textContent)).toEqual(["Morning briefing"]);
-});
-
-test("/workflows hides the Starters section once the starter is among the workflows", async () => {
-  mount("/workflows", ({ raw }) => {
-    raw.listWorkflows.mockResolvedValue({ workflows: [...SAMPLE_WORKFLOW_LIST.workflows, { ...SAMPLE_PR_DIGEST, id: "/h/morning_briefing.py::morning_briefing", name: "morning_briefing", project: undefined }] });
-    raw.listWorkflowStarters.mockResolvedValue({ starters: SAMPLE_STARTERS });
-  });
-  expect(await screen.findByText("5 workflows · 1 broken")).toBeTruthy();
+  expect(await screen.findByText("4 workflows · 1 broken")).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "Starters" })).toBeNull();
 });
 

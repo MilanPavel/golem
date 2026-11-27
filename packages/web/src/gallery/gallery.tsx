@@ -109,8 +109,8 @@ import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataQueriesGallery } from "./gallery-data-queries.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
 import { DataTableViewGallery } from "./gallery-data-table-view.tsx";
-import { RunForm, WorkflowDetail, WorkflowStarters, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_ANSWER, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { RunForm, WorkflowDetail, WorkflowNew, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
+import { SAMPLE_BROKEN, SAMPLE_CREATED, SAMPLE_DRAFT, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_ANSWER, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2372,21 +2372,35 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             </SidebarPanel>
           </div>
         </div>
+        <div className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`Workflows, nothing yet, ${theme}`}>
+          <WorkflowsEmpty onNew={() => {}} />
+        </div>
         {(
           [
-            ["Workflows, nothing yet", "empty", SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, undefined],
-            ["Workflows, nothing yet, project starter", "empty", [...SAMPLE_STARTERS, SAMPLE_PROJECT_STARTER], SAMPLE_STARTER_FOLDER, undefined],
-            ["Workflows, nothing yet, no folder", "empty", [...SAMPLE_STARTERS, SAMPLE_PROJECT_STARTER], null, undefined],
-            ["Workflows, nothing yet, add refused", "empty", SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, { id: "morning_briefing", text: "/Users/you/.golem/workflows/morning_briefing.py exists already; it was not changed" }],
-            ["Workflows, starters left", "section", [SAMPLE_BRIEFING], SAMPLE_STARTER_FOLDER, undefined],
+            ["New workflow, the page", { starters: SAMPLE_STARTERS, folder: null, initial: undefined }],
+            ["New workflow, in a project, with a project starter", { starters: [...SAMPLE_STARTERS, SAMPLE_PROJECT_STARTER], folder: SAMPLE_STARTER_FOLDER, initial: { where: "project" as const, name: "Weekly invoices" } }],
+            ["New workflow, name taken", { starters: SAMPLE_STARTERS, folder: null, initial: { name: "Pr digest" }, workflows: SAMPLE_WORKFLOW_LIST.workflows }],
+            ["New workflow, name refused by the daemon", { starters: SAMPLE_STARTERS, folder: null, initial: { name: "Weekly invoices", nameError: "/Users/you/.golem/workflows/weekly_invoices.py exists already; it was not changed. Try weekly_invoices_2" } }],
+            ["New workflow, golem could not write", { starters: SAMPLE_STARTERS, folder: null, initial: { name: "Weekly invoices", ask: "Every Friday add up the new invoices and give me a table.", model: "qwen3.5:9b", draftError: "no model is available to write a proposal" } }],
+            ["New workflow, a draft, not saved", { starters: SAMPLE_STARTERS, folder: null, initial: { session: { code: SAMPLE_DRAFT.code, steps: SAMPLE_DRAFT.steps ?? [], problems: [], workflowModel: null, note: SAMPLE_DRAFT.note, writtenBy: SAMPLE_DRAFT.model, file: "weekly_invoices", title: "Weekly invoices", where: "yours" as const, hash: null, made: null, view: "both" as const } } }],
+            ["New workflow, saved, run it on a schedule", { starters: SAMPLE_STARTERS, folder: null, initial: { scheduleOpen: true, session: { code: SAMPLE_PR_DIGEST_CODE, steps: SAMPLE_PR_DIGEST_STEPS, problems: [], workflowModel: null, note: SAMPLE_DRAFT.note, writtenBy: SAMPLE_DRAFT.model, file: "pr_digest", title: "Weekly invoices", where: "yours" as const, hash: SAMPLE_PR_DIGEST_HASH, made: SAMPLE_PR_DIGEST, view: "both" as const } } }],
+            ["New workflow, an empty file", { starters: SAMPLE_STARTERS, folder: null, initial: { scheduleOpen: true, session: { code: SAMPLE_PR_DIGEST_CODE, steps: SAMPLE_PR_DIGEST_STEPS, problems: [], workflowModel: null, note: "", writtenBy: null, file: "pr_digest", title: "Weekly invoices", where: "yours" as const, hash: SAMPLE_PR_DIGEST_HASH, made: SAMPLE_PR_DIGEST, view: "code" as const } } }],
           ] as const
-        ).map(([title, kind, starters, folder, failed]) => (
+        ).map(([title, story]) => (
           <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
-            {kind === "empty" ? (
-              <WorkflowsEmpty starters={starters} folder={folder} onAdd={() => Promise.resolve()} failed={failed} />
-            ) : (
-              <WorkflowStarters starters={starters} folder={folder} onAdd={() => Promise.resolve()} failed={failed} />
-            )}
+            <WorkflowNew
+              starters={story.starters}
+              workflows={"workflows" in story ? story.workflows : []}
+              folder={story.folder}
+              models={["qwen3.5:9b", "deepseek/chat"]}
+              defaultModel="qwen3.5:9b"
+              onAddStarter={() => Promise.resolve()}
+              onDraft={() => Promise.resolve(SAMPLE_DRAFT)}
+              onCreate={() => Promise.resolve(SAMPLE_CREATED)}
+              onSave={() => Promise.resolve(SAMPLE_CREATED)}
+              onNavigate={() => {}}
+              initial={story.initial}
+            />
           </div>
         ))}
         {(

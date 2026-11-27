@@ -1,5 +1,5 @@
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStarterInfo, WorkflowStepArg } from "../../store/workflows.ts";
+import type { WorkflowCreateResult, WorkflowDraftResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStarterInfo, WorkflowStepArg } from "../../store/workflows.ts";
 
 /** "Now" for the samples: a Tuesday evening. Run times are placed relative to it, so Today and Earlier hold in any time zone. */
 export const WORKFLOWS_NOW = new Date(2026, 10, 17, 18, 30).getTime();
@@ -277,3 +277,21 @@ export const SAMPLE_STARTERS: WorkflowStarterInfo[] = [SAMPLE_BRIEFING];
 
 /** The folder the gallery's project starter works on. */
 export const SAMPLE_STARTER_FOLDER = "/Users/you/work/golem";
+
+/** What `workflow.draft` gives for "Weekly pull request digest": the steps in words, the code, nothing saved. */
+export const SAMPLE_DRAFT: WorkflowDraftResult = {
+  code: SAMPLE_PR_DIGEST_CODE,
+  note: "Reads the open pull requests, writes one line about each, and asks you to check the digest before it goes out.",
+  steps: SAMPLE_PR_DIGEST_STEPS,
+  problems: [],
+  model: "qwen3.5:9b",
+};
+
+/** What `workflow.create` gives for a new file: loaded, with its steps and the hash of the text on disk. */
+export const SAMPLE_CREATED: WorkflowCreateResult = {
+  code: SAMPLE_PR_DIGEST_CODE,
+  code_hash: SAMPLE_PR_DIGEST_HASH,
+  problems: [],
+  steps: SAMPLE_PR_DIGEST_STEPS,
+  workflow: SAMPLE_PR_DIGEST,
+};

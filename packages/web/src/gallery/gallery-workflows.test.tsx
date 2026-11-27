@@ -154,7 +154,7 @@ test("the gallery's Workflow run section shows each state, in both themes", () =
   }
 });
 
-test("the gallery's starter stories show the empty page, a project starter, no folder, a refusal and the section, in both themes", () => {
+test("the gallery's New workflow stories show the empty page, the page, a project, a taken name, a refusal, a draft and the schedule question, in both themes", () => {
   for (const theme of ["slip", "kiln"] as const) {
     showTheme(theme);
     const { container, unmount } = render(<Gallery />);
@@ -165,12 +165,25 @@ test("the gallery's starter stories show the empty page, a project starter, no f
     };
     const nothing = story("Workflows, nothing yet");
     expect(nothing.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
-    expect(nothing.getByText(/leave one short briefing/)).toBeTruthy();
-    expect(story("Workflows, nothing yet, project starter").getAllByRole("button", { name: "Use this starter" }).every((button) => !(button as HTMLButtonElement).disabled)).toBe(true);
-    const noFolder = story("Workflows, nothing yet, no folder");
-    expect(noFolder.getAllByRole("button", { name: "Use this starter" }).filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(1);
-    expect(story("Workflows, nothing yet, add refused").getByRole("alert").textContent).toContain("exists already");
-    expect(story("Workflows, starters left").getByRole("heading", { name: "Starters" })).toBeTruthy();
+    expect(nothing.getByRole("button", { name: "+ New workflow" })).toBeTruthy();
+    expect(nothing.queryByRole("list", { name: "Starter workflows" })).toBeNull();
+    const page = story("New workflow, the page");
+    expect(page.getByRole("heading", { name: "New workflow" })).toBeTruthy();
+    expect(page.getByRole("heading", { name: "Morning briefing" })).toBeTruthy();
+    expect(page.getByRole("heading", { name: "From a chat" }).parentElement?.querySelector("button")).toBeNull();
+    const project = story("New workflow, in a project, with a project starter");
+    expect(project.getAllByRole("button", { name: "Use this starter" }).every((button) => !(button as HTMLButtonElement).disabled)).toBe(true);
+    expect((project.getByRole("combobox", { name: "Saved in" }) as HTMLSelectElement).value).toBe("project");
+    expect(story("New workflow, name taken").getByText(/is there already\. Try pr_digest_2\./)).toBeTruthy();
+    expect(story("New workflow, name refused by the daemon").getByText(/exists already; it was not changed/)).toBeTruthy();
+    expect(story("New workflow, golem could not write").getByRole("alert").textContent).toContain("no model is available");
+    const draft = story("New workflow, a draft, not saved");
+    expect(draft.getByRole("list", { name: "Outline" })).toBeTruthy();
+    expect(draft.getByText(/Nothing has run and nothing is saved/)).toBeTruthy();
+    expect(draft.queryByRole("region", { name: "Run it on a schedule?" })).toBeNull();
+    expect(story("New workflow, saved, run it on a schedule").getByRole("region", { name: "Run it on a schedule?" })).toBeTruthy();
+    const empty = story("New workflow, an empty file");
+    expect(empty.getByRole("button", { name: "Code" }).getAttribute("aria-pressed")).toBe("true");
     unmount();
   }
 });

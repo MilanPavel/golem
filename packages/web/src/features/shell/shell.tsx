@@ -5,7 +5,7 @@ import { MenuBar, SidebarShell } from "../sidebar/index.ts";
 import { RoutineNewScreen, RoutineScreen, RoutinesScreen } from "../routines/index.ts";
 import { RunsScreen, WorkflowRunScreen } from "../runs/index.ts";
 import { DataScreen, DataSourceScreen } from "../data/index.ts";
-import { WorkflowScreen, WorkflowsScreen } from "../workflows/index.ts";
+import { WorkflowNewScreen, WorkflowScreen, WorkflowsScreen } from "../workflows/index.ts";
 import { HelperChat } from "../sessions/index.ts";
 import { SettingsScreen } from "../settings/index.ts";
 import { TraceScreen } from "../trace/index.ts";
@@ -63,6 +63,8 @@ function Content() {
       return <DataSourceScreen name={route.source} tab={route.tab} />;
     case "workflows":
       return <WorkflowsScreen />;
+    case "workflow-new":
+      return <WorkflowNewScreen />;
     case "workflow":
       return <WorkflowScreen id={route.id} />;
     case "runs":

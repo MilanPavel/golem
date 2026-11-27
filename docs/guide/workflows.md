@@ -79,6 +79,17 @@ To try it, copy the file into your workflows folder:
 cp examples/workflows/hello.py ~/.golem/workflows/
 ```
 
+## Start a new workflow in the web app
+
+**+ New workflow** at the top of the Workflows panel opens one page with the ways in. Each asks for a name ("Weekly invoices" becomes the file `weekly_invoices.py`) and where to save it: your own folder, or the `workflows` folder of the project you are in (it must be trusted). A name already in use is said beside the field with a free one to use; an existing file is never overwritten.
+
+- **Describe it**: a few sentences, and golem writes the steps. They open in the editor as a draft: the steps in words, the code beside, the checks run, nothing run and nothing saved until you press Save. golem's default model writes it, unless you pick another in the model picker beside it; a picked model is also written in the file as `@workflow(model=...)`, and no model is written otherwise.
+- **A starter**: the starter cards are on this page.
+- **Empty file**: a two-step skeleton, created at once and opened in Code view.
+- **From a chat** is not here yet.
+
+After the first Save, golem asks "Run it on a schedule?"; Yes opens New routine filled in with the workflow.
+
 ## Start from a starter
 
 ```bash
@@ -87,7 +98,7 @@ golem workflow add morning_briefing
 golem workflow add morning_briefing --routine
 ```
 
-`morning_briefing` goes in `~/.golem/workflows`: it reads your project folders, logs and feeds, and leaves one short briefing (markdown, with a one-line summary) as the run's result, in the Inbox, and as a copy in `~/.golem/briefings`. It reads only the three lists `PROJECTS`, `LOGS` and `FEEDS` at the top of the file, so open the file and fill them in; when a list is empty the briefing says at the end what it could not cover. It names no model: its model step runs on golem's default model. A workflow does not run by itself: a routine schedules it. With `--routine` golem also adds the routine `morning-briefing` (`weekdays 07:30`) that starts it; without it you add a routine yourself in Routines. If the routine cannot be added (its name is taken, say), the workflow is still added and golem says why. The Workflows page offers the same starters, with an "Add and run every weekday at 07:30" button. An existing file is never overwritten.
+`morning_briefing` goes in `~/.golem/workflows`: it reads your project folders, logs and feeds, and leaves one short briefing (markdown, with a one-line summary) as the run's result, in the Inbox, and as a copy in `~/.golem/briefings`. It reads only the three lists `PROJECTS`, `LOGS` and `FEEDS` at the top of the file, so open the file and fill them in; when a list is empty the briefing says at the end what it could not cover. It names no model: its model step runs on golem's default model. A workflow does not run by itself: a routine schedules it. With `--routine` golem also adds the routine `morning-briefing` (`weekdays 07:30`) that starts it; without it you add a routine yourself in Routines. If the routine cannot be added (its name is taken, say), the workflow is still added and golem says why. The New workflow page offers the same starters, with an "Add and run every weekday at 07:30" button. An existing file is never overwritten.
 
 ## Run it
 
