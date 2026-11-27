@@ -203,7 +203,7 @@ function DiffView({ before, after, name }: { before: string; after: string; name
 }
 
 /** The ask box under the editor: chips, one line, and a button. With a proposal on the screen the same box refines it. */
-function AskBox({ value, onChange, onAsk, chips, refining, working, inputRef }: { value: string; onChange: (value: string) => void; onAsk: () => void; chips: readonly string[]; refining: boolean; working: boolean; inputRef: React.RefObject<HTMLInputElement | null> }) {
+function AskBox({ value, onChange, onAsk, chips, refining, working, inputRef }: { value: string; onChange: (value: string) => void; onAsk: (sentence?: string) => void; chips: readonly string[]; refining: boolean; working: boolean; inputRef: React.RefObject<HTMLInputElement | null> }) {
   return (
     <form
       className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-bg p-2"
@@ -216,7 +216,7 @@ function AskBox({ value, onChange, onAsk, chips, refining, working, inputRef }: 
       {refining
         ? null
         : chips.map((chip) => (
-            <button key={chip} type="button" disabled={working} onClick={() => onChange(chip)} className="rounded-full border border-line bg-surface px-2.5 py-1 text-meta text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2">
+            <button key={chip} type="button" disabled={working} onClick={() => onAsk(chip)} className="rounded-full border border-line bg-surface px-2.5 py-1 text-meta text-muted outline-offset-2 outline-clay hover:text-ink focus-visible:outline-2">
               {chip}
             </button>
           ))}
@@ -330,8 +330,8 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
     if (start !== null) setReveal({ line: start[0], nonce: (reveal?.nonce ?? 0) + 1 });
   }
 
-  function askGolem(): void {
-    const sentence = ask.trim();
+  function askGolem(chip?: string): void {
+    const sentence = (chip ?? ask).trim();
     if (onPropose === undefined || sentence === "" || writing) return;
     asking.current += 1;
     const mine = asking.current;

@@ -1,5 +1,5 @@
 import { runGroupHeading, runGroups, runName, runResultLine, runStatusWords } from "@golem/view";
-import { runsPath, sessionPath } from "../../store/router.ts";
+import { runPath, runsPath, sessionPath } from "../../store/router.ts";
 import { useNavigate, useRoute, useRunList } from "../../store/page-context.tsx";
 import type { RunInfo } from "../../store/runs.ts";
 import { cn } from "../../ui/cn.ts";
@@ -16,12 +16,14 @@ export type RunsPanelProps = {
   error?: string | null;
   /** The session in view, when it is a run. */
   selected: string | null;
+  /** The workflow run in view, by its `workflow_run_id`, when the page is a run's page. */
+  selectedRun?: string | null;
   now: number;
   onNavigate: (path: string) => void;
 };
 
 /** The Runs panel's body: the same groups as the page, one line a run, and a link to the page. */
-export function RunsPanel({ runs, error = null, selected, now, onNavigate }: RunsPanelProps) {
+export function RunsPanel({ runs, error = null, selected, selectedRun = null, now, onNavigate }: RunsPanelProps) {
   let note: string | null = null;
   if (runs === null) note = error === null ? "Loading runs." : "Could not load runs.";
   else if (runs.length === 0) note = "Nothing has run yet.";
@@ -40,15 +42,17 @@ export function RunsPanel({ runs, error = null, selected, now, onNavigate }: Run
               <div key={group.label}>
                 <div className="mb-1 px-2.5 text-xs font-medium text-faint">{runGroupHeading(group)}</div>
                 <ul aria-label={group.label} className="flex flex-col gap-px">
-                  {group.items.map((run) => (
+                  {group.items.map((run) => {
+                    const open = run.workflow_run_id != null ? selectedRun === run.workflow_run_id : selected === run.session_id;
+                    return (
                     <li key={run.session_id}>
                       <Link
-                        href={sessionPath(run.session_id)}
+                        href={run.workflow_run_id != null ? runPath(run.workflow_run_id) : sessionPath(run.session_id)}
                         onNavigate={onNavigate}
-                        aria-current={selected === run.session_id ? "page" : undefined}
+                        aria-current={open ? "page" : undefined}
                         className={cn(
                           "flex items-center gap-2 rounded-md py-1.5 pr-2.5 pl-2.5 text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2",
-                          selected === run.session_id && "bg-surface text-ink ring-1 ring-line ring-inset",
+                          open && "bg-surface text-ink ring-1 ring-line ring-inset",
                         )}
                       >
                         <RunDot status={run.status} word={runStatusWords(run.status)} />
@@ -60,7 +64,8 @@ export function RunsPanel({ runs, error = null, selected, now, onNavigate }: Run
                         </span>
                       </Link>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
             ))}
@@ -80,6 +85,7 @@ export function LiveRunsPanel() {
       runs={query.data?.runs ?? null}
       error={query.error?.message ?? null}
       selected={route.name === "session" || route.name === "trace" ? route.id : null}
+      selectedRun={route.name === "run" ? route.id : null}
       now={now}
       onNavigate={navigate}
     />

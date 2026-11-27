@@ -90,6 +90,16 @@ test("the panel shows the same groups in one line a run, with the open run marke
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
+test("in the panel a workflow run opens its run page and is marked on it, and another run opens its session", () => {
+  const workflow: RunInfo = { ...SAMPLE_WAITING_RUN, session_id: "s_wf", kind: "workflow", origin: "workflow:pr_digest", workflow_run_id: "wr/1" };
+  render(<RunsPanel runs={[workflow, SAMPLE_WAITING_RUN]} selected={null} selectedRun="wr/1" now={RUNS_NOW} onNavigate={() => {}} />);
+  const links = screen.getAllByRole("link").filter((link) => link.getAttribute("href") !== "/runs");
+  expect(links[0]?.getAttribute("href")).toBe("/runs/wr%2F1");
+  expect(links[0]?.getAttribute("aria-current")).toBe("page");
+  expect(links[1]?.getAttribute("href")).toBe(`/s/${SAMPLE_WAITING_RUN.session_id}`);
+  expect(links[1]?.getAttribute("aria-current")).toBeNull();
+});
+
 test("the banner says the routine, when, why, and what waits, for each trigger, with links", async () => {
   const onNavigate = vi.fn();
   const kinds: [RunInfo, string][] = [
