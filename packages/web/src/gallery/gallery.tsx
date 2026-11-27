@@ -101,8 +101,8 @@ import { ALL_CLOUD, ALL_LOCAL, askingBatchChat, cloudBatchChat, localBatchChat }
 import { ASKING_HELPER, DONE_HELPER, HELPER_NOW, RUNNING_HELPER, TRIMMED_AT, TRIMMED_HELPER } from "../features/sessions/helper-sample.ts";
 import { RoutineDetail, RoutineEditor, RoutinesEmpty, RoutinesPanel } from "../features/routines/index.ts";
 import { SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE, ROUTINES_NOW, SAMPLE_RUNS } from "../features/routines/sample.ts";
-import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
-import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
+import { LeadRun, ResultView, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../features/runs/index.ts";
+import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RESULTS, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
 import { DataIconsGallery } from "./gallery-data-icons.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
@@ -2579,6 +2579,13 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             />
           </div>
         ))}
+        <div className="mt-4 flex flex-col gap-3" role="region" aria-label={`Step results by kind, ${theme}`}>
+          {SAMPLE_RESULTS.map(([kind, result]) => (
+            <div key={kind} className="rounded-lg border border-line bg-bg p-4">
+              <ResultView result={result} label={`Result, ${kind}`} />
+            </div>
+          ))}
+        </div>
       </section>
       </Only>
 

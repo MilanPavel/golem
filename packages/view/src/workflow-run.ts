@@ -115,11 +115,53 @@ function oneLine(text: string, size: number): string {
 
 const VERDICT_WORDS: Record<string, string> = { approve: "approved", edit: "edited and approved", reject: "rejected" };
 
-/** The one line a step's saved result is: text cut to a line, a summary, a worker's diff, or an answer. Empty when there is none. */
+/** The shapes a step's result comes in, which decide how it is drawn and what its one line says. */
+export type ResultKind = "text" | "record" | "table" | "file" | "link" | "changes" | "empty" | "other";
+
+/** What an empty result says. */
+export const EMPTY_RESULT_WORDS = "Nothing found";
+
+const LINK_PATTERN = /^https?:\/\/\S+$/;
+const FILE_PATTERN = /^(\/|~\/)[^\n]*$/;
+
+/** The shape of a saved result: text, a record, a table (a list of records), a file path, a link, a worker's changes, nothing, or other. */
+export function resultKind(value: unknown): ResultKind {
+  if (value === null || value === undefined) return "empty";
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (text === "") return "empty";
+    if (LINK_PATTERN.test(text)) return "link";
+    return FILE_PATTERN.test(text) ? "file" : "text";
+  }
+  if (Array.isArray(value)) return value.length === 0 ? "empty" : value.every(isRecord) ? "table" : "other";
+  if (isRecord(value)) {
+    if (Object.keys(value).length === 0) return "empty";
+    return workerResult(value) === null ? "record" : "changes";
+  }
+  return "other";
+}
+
+function isScalar(value: unknown): value is string | number | boolean {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
+/** `branch main · files 3`: up to three scalar fields of a record, key then value. Empty when it has none. */
+function recordPairs(record: Record<string, unknown>): string {
+  return Object.entries(record)
+    .filter((entry): entry is [string, string | number | boolean] => isScalar(entry[1]))
+    .slice(0, 3)
+    .map(([key, value]) => `${key} ${oneLine(String(value), 30)}`)
+    .join(" · ");
+}
+
+/** The one line a step's saved result is, in words by its kind. Empty when there is no result at all. */
 export function stepOutputLine(step: Pick<StepLike, "kind" | "result">): string {
   const { result } = step;
   if (result === null || result === undefined) return "";
+  const kind = resultKind(result);
+  if (kind === "empty") return EMPTY_RESULT_WORDS;
   if (typeof result === "string") return oneLine(result, 120);
+  if (Array.isArray(result) && kind === "table") return `${result.length} ${result.length === 1 ? "row" : "rows"}`;
   const worker = workerResult(result);
   if (worker !== null) return workerLine(worker);
   if (isRecord(result)) {
@@ -130,6 +172,10 @@ export function stepOutputLine(step: Pick<StepLike, "kind" | "result">): string 
     }
     const summary = result["summary"];
     if (typeof summary === "string") return oneLine(summary, 120);
+    const pairs = recordPairs(result);
+    if (pairs !== "") return pairs;
+    const count = Object.keys(result).length;
+    return `${count} ${count === 1 ? "field" : "fields"}`;
   }
   return oneLine(JSON.stringify(result), 120);
 }

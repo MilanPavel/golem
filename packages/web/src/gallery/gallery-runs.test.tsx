@@ -5,6 +5,14 @@ import { resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 resetThemeAfterEach();
 
+test("the gallery shows a step result of each kind", () => {
+  showTheme("slip");
+  render(<Gallery />);
+  const results = within(screen.getByRole("region", { name: "Step results by kind, slip" }));
+  for (const kind of ["text", "record", "table", "file", "link", "changes", "empty", "other"]) expect(results.getByRole("group", { name: `Result, ${kind}` })).toBeTruthy();
+  expect(results.getByText("Nothing found")).toBeTruthy();
+});
+
 test("the gallery's Runs section shows the panel, the grouped list, and the banner for each trigger", () => {
   showTheme("slip");
   render(<Gallery />);

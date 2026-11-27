@@ -120,6 +120,25 @@ export const SAMPLE_RUN_CANCELLED: WorkflowRunSample = {
   reviews: [],
 };
 
+/** One result of each kind, as the daemon would save it, for the gallery and the tests. */
+export const SAMPLE_RESULTS: ReadonlyArray<readonly [string, unknown]> = [
+  ["text", "# Morning briefing\n\n**3 things need you.** Device sync is failing.\n\n- Review the typer pull request\n- Look at the sync log"],
+  ["record", { branch: "main", commits: 3, not_committed: 0, not_pushed: 2 }],
+  [
+    "table",
+    [
+      { message: "handler device.sync failed", level: "error", times: 4 },
+      { message: "run r_8c41 failed", level: "error", times: 1 },
+      { message: "GitHub Copilot MCP unreachable", level: "warning", times: 22 },
+    ],
+  ],
+  ["file", "~/.golem/briefings/2026-11-27.md"],
+  ["link", "https://github.com/golem/golem/pull/1921"],
+  ["changes", { worktree: "wf-typer-1", diff: "a_diff_typer", files: [{ path: "typer/main.py" }], added: 6, removed: 2, checks: "passed", checks_failed: [], checks_note: null }],
+  ["empty", []],
+  ["other", [1, 2, 3]],
+];
+
 export const SAMPLE_RUN_DONE: WorkflowRunSample = {
   run: run({}),
   steps: [LIST, SUMMARISE, REVIEWER, WORKER, REVIEW_STEP("done", { finished_at: at(22), result: { verdict: "edit", text: "Hi team, twelve pull requests are open." } })],
