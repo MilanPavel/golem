@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import urllib.request
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -22,6 +23,7 @@ from golem.workflows import starter as starters
 from golem.workflows.check import check
 from golem.workflows.engine import AgentStarted, WorkflowEngine
 from golem.workflows.llm import LlmAnswer
+from golem.workflows.outline import outline
 from golem.workflows.registry import load_file
 from golem.workflows.service import WorkflowService
 from golem.workflows.starter import SOURCE, STARTERS, Starter, StarterError, add_starter
@@ -117,8 +119,10 @@ def engine_of(store: WorkflowRuns, fakes: Fakes) -> WorkflowEngine:
     )
 
 
-async def run_starter(store: WorkflowRuns, fakes: Fakes, name: str, inputs: dict[str, Any]) -> str:
-    rid = await engine_of(store, fakes).start(starter(name), name, inputs)
+async def run_starter(
+    store: WorkflowRuns, fakes: Fakes, name: str, inputs: dict[str, Any], path: Path | None = None
+) -> str:
+    rid = await engine_of(store, fakes).start(path or starter(name), name, inputs)
     run = await store.get_run(rid)
     assert run is not None and run.status == "done", run
     return rid
@@ -134,9 +138,12 @@ def test_each_starter_loads_and_checks_clean(one: Starter) -> None:
     assert error is None
     assert [s.name for s in specs] == [one.id]
     assert specs[0].trigger is None
-    problems = check(path.read_text(encoding="utf-8"), None)
-    assert [p for p in problems if p.severity == "error"] == []
-    assert one.schedule is None
+    assert specs[0].title
+    text = path.read_text(encoding="utf-8")
+    assert check(text, None) == []
+    assert "trigger=" not in text and "model=" not in text
+    for wish in ("cheapest", "stronger", "frontier", "budget"):
+        assert wish not in text
 
 
 def test_the_briefing_comes_with_a_weekday_routine() -> None:
@@ -167,9 +174,10 @@ def test_scan_log_reads_json_lines_in_the_window_and_groups_by_message(tmp_path:
     got = briefing.scan_log(str(log), SINCE)
     assert (got["errors"], got["warnings"]) == (2, 1)
     assert got["top"] == [
-        {"level": "ERROR", "message": "db # failed", "count": 2},
-        {"level": "WARNING", "message": "slow", "count": 1},
+        {"level": "ERROR", "message": "db # failed", "count": 2, "example": "db 345 failed"},
+        {"level": "WARNING", "message": "slow", "count": 1, "example": "slow"},
     ]
+    assert got["lines"] == ["ERROR db 12 failed", "ERROR db 345 failed", "WARNING slow"]
 
 
 def test_scan_log_reads_plain_text_and_skips_a_log_untouched_since(tmp_path: Path) -> None:
@@ -178,7 +186,7 @@ def test_scan_log_reads_plain_text_and_skips_a_log_untouched_since(tmp_path: Pat
     got = briefing.scan_log(str(log), SINCE)
     assert (got["errors"], got["warnings"]) == (2, 1)
     old = briefing.scan_log(str(log), "2999-01-01T00:00:00+00:00")
-    assert old == {"log": str(log), "warnings": 0, "errors": 0, "top": []}
+    assert old == {"log": str(log), "warnings": 0, "errors": 0, "lines": [], "top": []}
 
 
 def test_scan_log_returns_the_error_of_a_log_it_cannot_read(tmp_path: Path) -> None:
@@ -283,37 +291,151 @@ def test_scan_project_names_a_folder_that_is_not_git(tmp_path: Path) -> None:
 # morning_briefing: the whole workflow
 
 
-async def test_the_briefing_is_saved_and_notified_and_a_failing_feed_does_not_fail_it(
+def with_lists(tmp_path: Path, projects: list[str], logs: list[str], feeds: list[str]) -> Path:
+    """A copy of the briefing with its three lists filled in (the file is the only config)."""
+    text = starter("morning_briefing").read_text(encoding="utf-8")
+    for name, value in (("PROJECTS", projects), ("LOGS", logs), ("FEEDS", feeds)):
+        text, n = re.subn(
+            rf"^{name}(: list\[str\])? = .*$", f"{name} = {value!r}", text, flags=re.M
+        )
+        assert n == 1
+    path = tmp_path / "morning_briefing.py"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def outputs_of(rows: list[Any]) -> list[tuple[str | None, Any, str | None]]:
+    return [(r.title, json.loads(r.value_json), r.summary) for r in rows]
+
+
+async def test_the_briefing_is_a_text_result_with_a_summary_and_a_saved_copy(
     store: WorkflowRuns, fakes: Fakes, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "home"
-    (home / ".golem" / "logs").mkdir(parents=True)
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    log = tmp_path / "app.jsonl"
     now = datetime.now(UTC).isoformat()
-    (home / ".golem" / "logs" / "golem.jsonl").write_text(
-        json.dumps({"ts": now, "level": "error", "message": "boom"}) + "\n", encoding="utf-8"
+    log.write_text(
+        json.dumps({"ts": now, "level": "error", "message": "boom 42"}) + "\n", encoding="utf-8"
     )
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
-    (home / ".golem" / "config.toml").write_text(f'trusted_projects = ["{repo}"]\n')
-    monkeypatch.setenv("HOME", str(home))
+    (repo / "a.txt").write_text("a")
+
+    def feed(request: Any, timeout: float) -> Answer:
+        del timeout
+        assert request.full_url == "https://a.example/rss"
+        return Answer(
+            b"<rss><channel><item><title>Fresh</title><link>https://a.example/1</link>"
+            b"</item></channel></rss>"
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", feed)
+    path = with_lists(tmp_path, [str(repo)], [str(log)], ["https://a.example/rss"])
+    fakes.llm_out = "## Needs you\n- boom in the log"
+    rid = await run_starter(store, fakes, "morning_briefing", {}, path)
+    [(prompt, wish)] = fakes.prompts
+    assert wish is None
+    assert "boom 42" in prompt and "boom #" in prompt and str(repo) in prompt
+    assert "markdown" in prompt and "Fresh" in prompt
+    saved = sorted((home / ".golem" / "briefings").glob("*.md"))
+    assert len(saved) == 1
+    assert saved[0].read_text(encoding="utf-8") == "## Needs you\n- boom in the log\n"
+    run = await store.get_run(rid)
+    assert run is not None and run.result_json == json.dumps("## Needs you\n- boom in the log")
+    out = outputs_of(await store.list_outputs(rid))
+    day = datetime.now().astimezone().date().isoformat()
+    assert out == [
+        (
+            f"Morning briefing, {day}",
+            "## Needs you\n- boom in the log",
+            "1 error in the logs, 1 project with work to save, 1 new item to read",
+        ),
+        ("Saved copy", str(saved[0]), None),
+    ]
+    [(title, text, run_id)] = fakes.sent
+    assert title == "Morning briefing" and run_id == rid and str(saved[0]) in text
+
+
+async def test_a_failing_feed_does_not_fail_the_briefing(
+    store: WorkflowRuns, fakes: Fakes, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
 
     def down(request: Any, timeout: float) -> Answer:
         del request, timeout
         raise OSError("network is down")
 
     monkeypatch.setattr(urllib.request, "urlopen", down)
-    fakes.llm_out = "Needs you: boom in the log."
-    rid = await run_starter(store, fakes, "morning_briefing", {})
-    [(prompt, wish)] = fakes.prompts
-    assert wish == "cheapest"
-    assert "boom" in prompt and "network is down" in prompt and str(repo) in prompt
-    saved = sorted((home / ".golem" / "briefings").glob("*.md"))
-    assert len(saved) == 1
-    assert saved[0].read_text(encoding="utf-8") == "Needs you: boom in the log.\n"
-    [(title, text, run_id)] = fakes.sent
-    assert title is not None and title.startswith("Morning briefing, ") and run_id == rid
-    assert text.startswith("Needs you: boom") and str(saved[0]) in text
+    path = with_lists(tmp_path, [str(tmp_path)], [], ["https://a.example/rss"])
+    fakes.llm_out = "Needs you: the feed."
+    await run_starter(store, fakes, "morning_briefing", {}, path)
+    [(prompt, _)] = fakes.prompts
+    assert "network is down" in prompt and "not a git folder" in prompt
+
+
+async def test_empty_lists_are_named_in_the_step_and_at_the_end_of_the_briefing(
+    store: WorkflowRuns, fakes: Fakes, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = with_lists(tmp_path, [], [], [])
+    fakes.llm_out = "## Needs you\nNothing"
+    rid = await run_starter(store, fakes, "morning_briefing", {}, path)
+    steps = {
+        s.title: json.loads(s.result_json) for s in await store.list_steps(rid) if s.result_json
+    }
+    assert steps["List your project folders"] == "No project folders listed"
+    assert steps["List your log files"] == "No log files listed"
+    assert steps["List your feeds"] == "No feeds listed"
+    [(title, text, summary)] = outputs_of(await store.list_outputs(rid))[:1]
+    assert title is not None and summary == (
+        "0 errors in the logs, 0 projects with work to save, 0 new items to read"
+    )
+    last = text.splitlines()[-1]
+    assert last == (
+        "Not covered: no project folders listed, no log files listed, no feeds listed. "
+        "Fill in the lists at the top of the file."
+    )
+
+
+async def test_the_briefing_does_not_read_trusted_projects(
+    store: WorkflowRuns, fakes: Fakes, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    (home / ".golem").mkdir(parents=True)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    (home / ".golem" / "config.toml").write_text(f'trusted_projects = ["{repo}"]\n')
+    monkeypatch.setenv("HOME", str(home))
+    path = with_lists(tmp_path, [], [], [])
+    assert "trusted_projects" not in path.read_text(encoding="utf-8")
+    fakes.llm_out = "ok"
+    await run_starter(store, fakes, "morning_briefing", {}, path)
+    [(prompt, _)] = fakes.prompts
+    assert str(repo) not in prompt
+
+
+def test_the_briefing_outline_reads_in_words() -> None:
+    [flow] = outline(starter("morning_briefing").read_text(encoding="utf-8"))
+    assert [s for s in flow.steps if s.kind == "code"] == []
+    shown = [(s.group_title, s.title, s.item) for s in flow.steps]
+    assert shown == [
+        (None, "Work out the time window", None),
+        (None, "List your project folders", None),
+        (None, "List your log files", None),
+        (None, "List your feeds", None),
+        ("Gather the facts", "Scan a project", "f"),
+        ("Gather the facts", "Scan a log", "p"),
+        ("Gather the facts", "Read a feed", "u"),
+        (None, "Write the briefing", None),
+        (None, "Say what could not be covered", None),
+        (None, "Count what was found", None),
+        (None, "Save it as a file", None),
+        (None, "Morning briefing", None),
+    ]
 
 
 # add_starter

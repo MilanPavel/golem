@@ -1,13 +1,15 @@
-# A golem starter. It reads your project folders, your logs and your feeds, and leaves one
-# short briefing in the Inbox and in ~/.golem/briefings.
-# Everything is gathered by plain Python steps; one model call writes the briefing.
-# It runs when you press Run; a routine can schedule it, for example every weekday morning.
-# Edit the three lists below.
-import contextlib
+# A golem starter: your morning briefing.
+# It reads the project folders, log files and feeds you list below, and leaves one short
+# briefing in the Inbox and a copy in ~/.golem/briefings. It reads only what you list.
+#
+# BEFORE YOU RUN IT, fill in the three lists below: PROJECTS (git folders), LOGS (log files)
+# and FEEDS (RSS or Atom addresses). A list you leave empty is skipped, and the briefing says
+# at the end what it could not cover.
+# To run it every morning, add a routine for it in Routines.
 import json
+import os
 import re
 import subprocess
-import tomllib
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
@@ -18,7 +20,7 @@ from typing import Any
 from golem.workflow import Run, workflow
 
 PROJECTS: list[str] = []
-"""Git folders to report on. The trusted_projects of ~/.golem/config.toml are added."""
+"""Git folders to report on, for example ["~/code/app"]. Fill this in."""
 LOGS = ["~/.golem/logs/golem.jsonl"]
 """Log files: JSON lines with ts/level/message, or plain text. Only warnings and errors count."""
 FEEDS = ["https://hnrss.org/frontpage?points=200"]
@@ -28,6 +30,8 @@ TAIL_BYTES = 5_000_000
 """How much of the end of each log is read."""
 ITEMS = 8
 """Items kept from each feed."""
+LOG_LINES = 8
+"""Real lines kept from each log, errors first."""
 
 
 def window_now() -> dict[str, str]:
@@ -38,12 +42,17 @@ def window_now() -> dict[str, str]:
     return {"since": since.astimezone(UTC).isoformat(), "day": now.date().isoformat()}
 
 
-def projects() -> list[str]:
-    folders = list(PROJECTS)
-    config = Path("~/.golem/config.toml").expanduser()
-    with contextlib.suppress(OSError, tomllib.TOMLDecodeError):
-        folders += tomllib.loads(config.read_text()).get("trusted_projects", [])
-    return list(dict.fromkeys(str(Path(f).expanduser()) for f in folders))
+def listed(entries: list[str], what: str) -> list[str] | str:
+    """The entries of one list at the top of the file, ~ opened, without repeats. An empty list
+    gives the note "No <what> listed" instead of an empty list."""
+    found = [os.path.expanduser(e) if e.startswith("~") else e for e in entries if e.strip()]
+    found = list(dict.fromkeys(found))
+    return found if found else f"No {what} listed"
+
+
+def rows(found: list[str] | str) -> list[str]:
+    """The entries of a listed() result: none when it is the note."""
+    return [] if isinstance(found, str) else found
 
 
 def git(folder: str, *args: str) -> str:
@@ -75,17 +84,19 @@ def _shape(message: str) -> str:
 
 
 def scan_log(path: str, since: str) -> dict[str, Any]:
-    """Warnings and errors in the window, grouped by message, most frequent first."""
+    """Warnings and errors in the window: the last real lines (errors first), and the messages
+    grouped by shape with one real example each, most frequent first."""
     file = Path(path).expanduser()
     try:
         if datetime.fromtimestamp(file.stat().st_mtime, UTC).isoformat() < since:
-            return {"log": path, "warnings": 0, "errors": 0, "top": []}
+            return {"log": path, "warnings": 0, "errors": 0, "lines": [], "top": []}
         with file.open("rb") as f:
             f.seek(max(0, file.stat().st_size - TAIL_BYTES))
             lines = f.read().decode("utf-8", "replace").splitlines()
     except OSError as exc:
         return {"log": path, "error": str(exc)}
-    seen: dict[tuple[str, str], int] = {}
+    seen: dict[tuple[str, str], list[Any]] = {}
+    last: dict[str, list[str]] = {"ERROR": [], "WARNING": []}
     for line in lines:
         try:
             row = json.loads(line)
@@ -103,13 +114,21 @@ def scan_log(path: str, since: str) -> dict[str, Any]:
             if level not in ("ERROR", "CRITICAL", "FATAL", "TRACEBACK"):
                 continue
             level = "ERROR"
-        seen[(level, _shape(message))] = seen.get((level, _shape(message)), 0) + 1
-    top = sorted(seen.items(), key=lambda kv: (kv[0][0] != "ERROR", -kv[1]))[:10]
+        entry = seen.setdefault((level, _shape(message)), [0, ""])
+        entry[0] += 1
+        entry[1] = message[:300]
+        last[level].append(f"{level} {message[:300]}")
+    errors = last["ERROR"][-LOG_LINES:]
+    warnings = last["WARNING"][-(LOG_LINES - len(errors)) :] if len(errors) < LOG_LINES else []
+    top = sorted(seen.items(), key=lambda kv: (kv[0][0] != "ERROR", -kv[1][0]))[:10]
     return {
         "log": path,
-        "errors": sum(n for (lvl, _), n in seen.items() if lvl == "ERROR"),
-        "warnings": sum(n for (lvl, _), n in seen.items() if lvl == "WARNING"),
-        "top": [{"level": lvl, "message": msg, "count": n} for (lvl, msg), n in top],
+        "errors": sum(e[0] for (lvl, _), e in seen.items() if lvl == "ERROR"),
+        "warnings": sum(e[0] for (lvl, _), e in seen.items() if lvl == "WARNING"),
+        "lines": errors + warnings,
+        "top": [
+            {"level": lvl, "message": msg, "count": e[0], "example": e[1]} for (lvl, msg), e in top
+        ],
     }
 
 
@@ -151,6 +170,26 @@ def read_feed(url: str, since: str) -> dict[str, Any]:
     return {"feed": url, "items": items[:ITEMS]}
 
 
+def count_up(found: list[dict[str, Any]]) -> str:
+    """One line for the run's list: what the facts add up to."""
+    errors = sum(f.get("errors", 0) for f in found)
+    saving = sum(1 for f in found if f.get("unpushed") or f.get("uncommitted"))
+    reading = sum(len(f.get("items", [])) for f in found)
+    return (
+        f"{errors} error{'s' if errors != 1 else ''} in the logs, "
+        f"{saving} project{'s' if saving != 1 else ''} with work to save, "
+        f"{reading} new item{'s' if reading != 1 else ''} to read"
+    )
+
+
+def add_not_covered(brief: str, missing: list[str]) -> str:
+    """The briefing with a closing line that says which parts had nothing listed."""
+    if not missing:
+        return brief.strip()
+    what = ", ".join(missing)
+    return f"{brief.strip()}\n\nNot covered: {what}. Fill in the lists at the top of the file."
+
+
 def save(day: str, text: str) -> str:
     folder = Path("~/.golem/briefings").expanduser()
     folder.mkdir(parents=True, exist_ok=True)
@@ -159,33 +198,52 @@ def save(day: str, text: str) -> str:
     return str(path)
 
 
+BRIEF = (
+    "Write my morning briefing as markdown from the facts below. Start with a '## Needs you' "
+    "section: at most three bullets about things to act on, such as errors in a log, work not "
+    "committed or not pushed, a feed or folder that could not be read; write 'Nothing' if "
+    "there are none. Then short sections '## Projects', '## Logs' and '## Reading'. In Logs, "
+    "name the real errors, using the example and the last lines. In Reading, give each item as "
+    "a markdown link. Skip a section with nothing in it. Short lines, no filler, only the "
+    "facts below.\n\n"
+)
+
+
 @workflow(
+    title="Morning briefing",
     description=(
-        "Reads your project folders, logs and feeds since yesterday and leaves one short "
-        "briefing in the Inbox."
+        "Reads the project folders, logs and feeds you list since yesterday and leaves one "
+        "short briefing in the Inbox."
     ),
 )
 async def morning_briefing(run: Run) -> str:
-    window = await run.step("window", window_now)
+    window = await run.step("Work out the time window", window_now)
     since, day = window["since"], window["day"]
-    folders = await run.step("projects", projects)
+    folders = await run.step("List your project folders", listed, PROJECTS, "project folders")
+    logs = await run.step("List your log files", listed, LOGS, "log files")
+    feeds = await run.step("List your feeds", listed, FEEDS, "feeds")
+    missing = [
+        f"no {what} listed"
+        for found, what in ((folders, "project folders"), (logs, "log files"), (feeds, "feeds"))
+        if isinstance(found, str)
+    ]
     found = await run.parallel(
-        [run.step(f"project {f}", scan_project, f, since) for f in folders]
-        + [run.step(f"log {p}", scan_log, p, since) for p in LOGS]
-        + [run.step(f"feed {u}", read_feed, u, since) for u in FEEDS]
+        [run.step("Scan a project", scan_project, f, since, item=f) for f in rows(folders)]
+        + [run.step("Scan a log", scan_log, p, since, item=p) for p in rows(logs)]
+        + [run.step("Read a feed", read_feed, u, since, item=u) for u in rows(feeds)],
+        title="Gather the facts",
     )
-
     brief = await run.llm(
-        "Write my morning briefing from these facts, gathered since "
-        f"{since[:16].replace('T', ' ')} UTC. Start with 'Needs you': at most three things to "
-        "act on, such as errors in a log, work not committed or not pushed, a feed or folder "
-        "that could not be read. Write 'Nothing' if there are none. Then one short section "
-        "each for Projects, Logs and Reading (feed items as links). Skip a section with "
-        "nothing in it. Short lines, no filler, only the facts below.\n\n"
+        BRIEF
+        + f"Facts gathered since {since[:16].replace('T', ' ')} UTC:\n"
         + json.dumps(found, indent=1)[:40_000],
-        model="cheapest",
         key="brief",
+        title="Write the briefing",
     )
-    path = await run.step("save", save, day, brief, key=f"save {day}")
-    await run.notify(f"{brief}\n\nSaved to {path}", title=f"Morning briefing, {day}")
+    brief = await run.step("Say what could not be covered", add_not_covered, brief, missing)
+    summary = await run.step("Count what was found", count_up, found)
+    path = await run.step("Save it as a file", save, day, brief, key=f"save {day}")
+    await run.output(brief, title=f"Morning briefing, {day}", summary=summary)
+    await run.output(path, title="Saved copy")
+    await run.notify(f"{brief}\n\nSaved to {path}", title="Morning briefing")
     return brief
