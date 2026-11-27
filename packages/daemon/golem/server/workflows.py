@@ -19,6 +19,7 @@ from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestConte
 from golem.server.routines import routine_update
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import CheckEnv, Problem
+from golem.workflows.create import CreateError, file_name
 from golem.workflows.edit import EditError, remove_argument, set_argument
 from golem.workflows.lines import result_line
 from golem.workflows.model_view import step_model, workflow_model
@@ -37,6 +38,10 @@ from golem_protocol.commands import (
     WorkflowCancelResult,
     WorkflowCheckParams,
     WorkflowCheckResult,
+    WorkflowCreateParams,
+    WorkflowCreateResult,
+    WorkflowDraftParams,
+    WorkflowDraftResult,
     WorkflowEditStepParams,
     WorkflowEditStepResult,
     WorkflowEntryInfo,
@@ -272,6 +277,52 @@ async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> Work
         workflow_model=mine,
         problems=[_problem(p) for p in warnings],
         code_hash=digest or hashlib.sha256(params.code.encode("utf-8")).hexdigest(),
+    )
+
+
+async def workflow_create(
+    ctx: RequestContext, params: WorkflowCreateParams
+) -> WorkflowCreateResult:
+    """Write a new workflow file (a proposal's code, or the skeleton), and reload the registry."""
+    service = _service(ctx)
+    folder = None if params.folder is None else _folders([params.folder])[0]
+    try:
+        entry, _ = await service.create(params.name, folder, params.code)
+    except CreateError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    try:
+        code = await asyncio.to_thread(entry.path.read_text, encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RpcCallError(INTERNAL_ERROR, f"the new file cannot be read: {exc}") from exc
+    problems, steps, mine = await asyncio.to_thread(_checked, service, entry, code)
+    digest = await asyncio.to_thread(_hash_of, entry.path)
+    return WorkflowCreateResult(
+        workflow=_info(entry),
+        steps=steps,
+        workflow_model=mine,
+        problems=problems,
+        code_hash=digest or hashlib.sha256(code.encode("utf-8")).hexdigest(),
+        code=code,
+    )
+
+
+async def workflow_draft(ctx: RequestContext, params: WorkflowDraftParams) -> WorkflowDraftResult:
+    """Ask golem for a new workflow from a few sentences. One model call, checked, never saved."""
+    service = _service(ctx)
+    folder = None if params.folder is None else _folders([params.folder])[0]
+    try:
+        made = await service.draft_code(params.name, params.ask, folder, params.model)
+    except ProposeError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    function = file_name(params.name).file
+    steps, _, mine = _outline_all(made.code, function, service.check_env)
+    return WorkflowDraftResult(
+        code=made.code,
+        note=made.note,
+        steps=steps,
+        workflow_model=mine,
+        problems=[_problem(p) for p in made.problems],
+        model=made.model,
     )
 
 

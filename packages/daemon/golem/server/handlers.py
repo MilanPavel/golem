@@ -203,6 +203,8 @@ from golem.server.workflows import (
     workflow_add_starter,
     workflow_cancel,
     workflow_check,
+    workflow_create,
+    workflow_draft,
     workflow_edit_step,
     workflow_get,
     workflow_list,
@@ -534,6 +536,8 @@ from golem_protocol.commands import (
     WorkflowAddStarterParams,
     WorkflowCancelParams,
     WorkflowCheckParams,
+    WorkflowCreateParams,
+    WorkflowDraftParams,
     WorkflowEditStepParams,
     WorkflowGetParams,
     WorkflowListParams,
@@ -2538,6 +2542,8 @@ def standard_methods() -> dict[str, Method]:
             "workflow.edit_step", WorkflowEditStepParams, True, workflow_edit_step
         ),
         "workflow.save": Method("workflow.save", WorkflowSaveParams, True, workflow_save),
+        "workflow.create": Method("workflow.create", WorkflowCreateParams, True, workflow_create),
+        "workflow.draft": Method("workflow.draft", WorkflowDraftParams, True, workflow_draft),
         "workflow.starters": Method(
             "workflow.starters", WorkflowStartersParams, True, workflow_starters
         ),
