@@ -378,3 +378,17 @@ test("/runs/:id says so when the run does not exist", async () => {
   mount("/runs/nope", (fake) => fake.raw.workflowStatus.mockRejectedValue(new Error("no workflow run nope")));
   expect(await screen.findByText("no workflow run nope")).toBeTruthy();
 });
+
+test("a run that stopped at a model step offers Resume with another model, and the pick is sent", async () => {
+  const user = userEvent.setup();
+  const sample: WorkflowRunSample = { ...SAMPLE_RUN_FAILED, steps: SAMPLE_RUN_FAILED.steps.map((step) => ({ ...step, kind: "llm", title: "Write the briefing" })) };
+  const { props } = view(sample, { models: ["qwen3.5:9b", "deepseek/chat"] });
+  await user.click(screen.getAllByRole("button", { name: "Resume with another model…" })[0] as HTMLElement);
+  await user.click(screen.getByRole("button", { name: "deepseek/chat" }));
+  await waitFor(() => expect(props.onResume).toHaveBeenCalledWith("deepseek/chat"));
+});
+
+test("a run that stopped at a tool step does not offer another model", () => {
+  view(SAMPLE_RUN_FAILED, { models: ["qwen3.5:9b"] });
+  expect(screen.queryByRole("button", { name: "Resume with another model…" })).toBeNull();
+});

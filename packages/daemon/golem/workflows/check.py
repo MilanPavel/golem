@@ -8,7 +8,8 @@ What it checks, and nothing more:
 
 * the file parses and the outline reads;
 * ``run.*`` calls: the method exists, its keyword arguments exist, ``budget=`` is money text,
-  ``model=`` is a wish and not a model name;
+  ``model=`` is a model name or an old wish word (a name that is not set up here is a note,
+  never an error);
 * the agent a ``run.agent`` names exists for the folder;
 * a wish resolves in this setup, and a wish that would use a paid model in a local-only folder
   is a warning (a run would stop at that step);
@@ -21,6 +22,7 @@ from __future__ import annotations
 import ast
 import difflib
 import inspect
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import cache
@@ -58,6 +60,10 @@ class CheckEnv:
     tier_of_wish: Callable[[str, bool], str | None] | None = None
     """The tier (``local``, ``cheap``, ...) a wish gets in a folder, ``local_only`` as the
     second argument. May raise when the wish does not resolve. None skips the check."""
+    model_problem: Callable[[str], str | None] | None = None
+    """Why a model name is not set up on this machine, or None when it is. None skips the note."""
+    default_model: Callable[[], str | None] | None = None
+    """The name of golem's default model, which the check suggests instead of a wish word."""
 
 
 @cache
@@ -148,6 +154,16 @@ class _Checker:
             elif name in ("on_file", "OnFile") and first is not None and not first.strip():
                 self.add("error", node.lineno, None, "on_file needs a file or a glob")
 
+    def workflow_model(self, deco: ast.expr) -> None:
+        """The same notes for ``@workflow(model=...)``."""
+        if not isinstance(deco, ast.Call):
+            return
+        for kw in deco.keywords:
+            name = _str(kw.value) if kw.arg == "model" else None
+            if name is not None:
+                self.model(name, kw.value.lineno, None)
+                self.resolve(name, kw.value.lineno, None)
+
     def call(self, node: ast.Call, method: str, steps: list[OutlineStep]) -> None:
         line = node.lineno
         step = self.step_of(line, steps)
@@ -177,19 +193,37 @@ class _Checker:
                     "error", keywords["budget"].lineno, step, f"run.agent {bad}", _DEFAULT_BUDGET
                 )
         wish = _str(keywords.get("model"))
-        if method in ("agent", "llm") and wish is not None and wish not in WISHES:
-            self.add(
-                "error",
-                keywords["model"].lineno,
-                step,
-                f"model= is a wish, one of {', '.join(WISHES)}; got {wish!r}. Workflow files do"
-                " not name models",
-            )
-            wish = None
+        if method in ("agent", "llm", "skill") and wish is not None:
+            self.model(wish, keywords["model"].lineno, step)
         if method == "agent":
             self.agent(node, keywords, step, wish)
-        elif method == "llm" and wish is not None:
+        elif method in ("llm", "skill") and wish is not None:
             self.resolve(wish, keywords["model"].lineno, step)
+
+    def model(self, name: str, line: int, step: str | None) -> None:
+        """A note beside a model name that is not set up, or beside an old wish word."""
+        if name in WISHES:
+            suggest = None if self.env.default_model is None else self.env.default_model()
+            if suggest is not None:
+                self.add(
+                    "warning",
+                    line,
+                    step,
+                    f"{name!r} still works, but a model name says which model runs; for example"
+                    f" {suggest!r}",
+                    json.dumps(suggest),
+                )
+            return
+        if self.env.model_problem is None:
+            return
+        bad = self.env.model_problem(name)
+        if bad is not None:
+            self.add(
+                "warning",
+                line,
+                step,
+                f"{bad}; the step would stop with that reason. The run is not refused up front",
+            )
 
     def agent(
         self, node: ast.Call, keywords: dict[str, ast.expr], step: str | None, wish: str | None
@@ -219,19 +253,25 @@ class _Checker:
     def resolve(self, wish: str, line: int, step: str | None) -> None:
         if self.env.tier_of_wish is None:
             return
+        if (
+            wish not in WISHES
+            and self.env.model_problem is not None
+            and self.env.model_problem(wish) is not None
+        ):
+            return  # already noted as not set up
         try:
             tier = self.env.tier_of_wish(wish, self.local_only)
         except Exception as exc:
-            self.add("warning", line, step, f"the wish {wish!r} does not resolve here: {exc}")
+            self.add("warning", line, step, f"the model {wish!r} does not resolve here: {exc}")
             return
         if self.local_only and tier not in (None, "local"):
             self.add(
                 "warning",
                 line,
                 step,
-                f"the wish {wish!r} would use a paid model, and this folder is local-only:"
+                f"{wish!r} would use a hosted model, and this folder is local-only:"
                 " a run would stop at this step",
-                "local",
+                "local" if wish in WISHES else None,
             )
 
     @staticmethod
@@ -270,6 +310,7 @@ def check(source: str, folder: str | None = None, env: CheckEnv | None = None) -
         if found is None or deco is None or not params:
             continue
         checker.trigger(deco)
+        checker.workflow_model(deco)
         run = params[0].arg
         steps = list(found.steps)
         for node in ast.walk(fn):

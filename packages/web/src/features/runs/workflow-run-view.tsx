@@ -6,6 +6,7 @@ import type { ReviewVerdict, WorkflowReadOutputResult, WorkflowReviewInfo, Workf
 import { Badge, type BadgeProps } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { ResultView } from "./result-view.tsx";
@@ -22,6 +23,41 @@ const STATUS: Record<WorkflowRunInfo["status"], { word: string; tone: NonNullabl
   cancelled: { word: "cancelled", tone: "neutral" },
 };
 
+const MODEL_KINDS: readonly string[] = ["llm", "agent", "skill"];
+
+/** "Resume with another model…": a list of the models you have set up; picking one resumes the run on it. */
+function ResumeWithModel({ models, disabled, onPick }: { models: readonly string[]; disabled: boolean; onPick: (name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger disabled={disabled} className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-line-strong bg-surface px-2.5 py-1 text-xs text-ink outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2 disabled:cursor-default disabled:opacity-60">
+        Resume with another model…
+      </PopoverTrigger>
+      <PopoverContent align="start" aria-label="Resume with another model" className="flex w-72 flex-col gap-1">
+        <p className="px-1 text-meta font-medium text-faint">Every model step of this run uses it from now on</p>
+        <ul className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+          {models.map((name) => (
+            <li key={name}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onPick(name);
+                }}
+                className="flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-sm text-ink outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2"
+              >
+                <Code tone="inherit" className="min-w-0 flex-1 truncate">
+                  {name}
+                </Code>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const LINK = "text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2";
 
 export type WorkflowRunViewProps = {
@@ -34,7 +70,10 @@ export type WorkflowRunViewProps = {
   chatPath: (childSessionId: string) => string;
   onNavigate: (path: string) => void;
   onCancel: () => Promise<unknown>;
-  onResume: () => Promise<unknown>;
+  /** Continues the run. With a model, from now on this run uses it (it beats the steps' and the workflow's). */
+  onResume: (model?: string) => Promise<unknown>;
+  /** The names of the models you have set up. Without them "Resume with another model…" is not offered. */
+  models?: readonly string[];
   onAnswer: (key: string, verdict: ReviewVerdict, text?: string) => Promise<void>;
   /** The text of output `index` when it is a file path the run marked (`workflow.read_output`). Without it a file is shown as its path. */
   onReadOutput?: (index: number) => Promise<WorkflowReadOutputResult>;
@@ -124,7 +163,7 @@ function Progress({ done, total, words, current, status }: { done: number; total
  * (Cancel, Resume, the file's text, the question to golem) come in as callbacks.
  */
 export function WorkflowRunView(props: WorkflowRunViewProps) {
-  const { run, steps, reviews, now, onNavigate, onCancel, onResume, onReadOutput, onAsk, trace, initialTab = "steps" } = props;
+  const { run, steps, reviews, now, onNavigate, onCancel, onResume, models, onReadOutput, onAsk, trace, initialTab = "steps" } = props;
   const [tab, setTab] = useState<"steps" | "trace">(initialTab);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,10 +203,17 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
       (caught: unknown) => mine === asked.current && setAnswer({ status: "error", reason: actionErrorText(caught, "golem could not answer.") }),
     );
   }
+  // A run that stopped at a model step can be resumed on another model.
+  const stoppedAtModel = steps.some((step) => (step.status === "failed" || step.status === "in_doubt") && MODEL_KINDS.includes(step.kind));
+  const another =
+    models === undefined || models.length === 0 || !stoppedAtModel ? null : <ResumeWithModel models={models} disabled={busy} onPick={(name) => void act(() => onResume(name), "The run did not resume.")} />;
   const resume = (
-    <Button size="sm" kind="primary" disabled={busy} onClick={() => void act(onResume, "The run did not resume.")}>
-      Resume from here
-    </Button>
+    <>
+      <Button size="sm" kind="primary" disabled={busy} onClick={() => void act(() => onResume(), "The run did not resume.")}>
+        Resume from here
+      </Button>
+      {another}
+    </>
   );
 
   return (
@@ -193,11 +239,12 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
           {run.status === "failed" ? (
             <>
               {onAsk === undefined ? null : <Button onClick={askWhy}>Why did this fail?</Button>}
-              <Button kind="primary" disabled={busy} onClick={() => void act(onResume, "The run did not resume.")}>
+              <Button kind="primary" disabled={busy} onClick={() => void act(() => onResume(), "The run did not resume.")}>
                 Resume
               </Button>
             </>
           ) : null}
+          {run.status === "failed" ? another : null}
           {live ? (
             <Button kind="danger" disabled={busy} onClick={() => void act(onCancel, "The run did not stop.")}>
               Cancel run

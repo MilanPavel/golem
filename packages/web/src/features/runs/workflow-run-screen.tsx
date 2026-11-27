@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import { useNavigate, usePageActions, useWorkflowReader, useWorkflowStatus } from "../../store/page-context.tsx";
+import { modelNames } from "@golem/view";
+import { useModelList, useNavigate, usePageActions, useWorkflowReader, useWorkflowStatus } from "../../store/page-context.tsx";
 import { helperPath, sessionPath } from "../../store/router.ts";
 import { TraceBody, useTraceData } from "../trace/trace-screen.tsx";
 import { useNow } from "../sessions/use-now.ts";
@@ -26,6 +27,7 @@ export function WorkflowRunScreen({ id }: { id: string }) {
   const query = useWorkflowStatus(id);
   const actions = usePageActions();
   const readWorkflow = useWorkflowReader();
+  const models = useModelList();
   const navigate = useNavigate();
   const status = query.data?.run.status;
   // A run that moves shows its seconds; one that has stopped does not need the tick.
@@ -50,7 +52,8 @@ export function WorkflowRunScreen({ id }: { id: string }) {
         chatPath={(child) => (sessionId === null || sessionId === undefined ? sessionPath(child) : helperPath(child, sessionId))}
         onNavigate={navigate}
         onCancel={() => actions.cancelWorkflow(id)}
-        onResume={() => actions.resumeWorkflow(id)}
+        onResume={(model) => actions.resumeWorkflow(id, model)}
+        models={modelNames(models.data ?? null)}
         onAnswer={(key, verdict, text) => actions.answerWorkflowReview(id, key, verdict, text)}
         onReadOutput={(index) => actions.readWorkflowOutput(id, index)}
         onAsk={async (question) => {

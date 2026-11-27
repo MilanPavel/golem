@@ -206,7 +206,13 @@ class WorkflowService:
         )
 
     async def _skill(
-        self, run_id: str, key: str, name: str, args: str, started: AgentStarted
+        self,
+        run_id: str,
+        key: str,
+        name: str,
+        args: str,
+        model: str | None,
+        started: AgentStarted,
     ) -> dict[str, Any]:
         """Adapt a ``run.skill`` to the seam: the helper belongs to the run's session."""
         record = await self.runs.get_run(run_id)
@@ -219,6 +225,7 @@ class WorkflowService:
             key=key,
             name=name,
             args=args,
+            model=model,
             started=started,
         )
 
@@ -310,8 +317,11 @@ class WorkflowService:
         else:
             self.launch(run_id)
 
-    async def resume(self, run_id: str) -> WorkflowRunRecord:
-        """Continue a ``running`` (orphaned), ``waiting`` or ``failed`` run; done steps are kept."""
+    async def resume(self, run_id: str, model: str | None = None) -> WorkflowRunRecord:
+        """Continue a ``running`` (orphaned), ``waiting`` or ``failed`` run; done steps are kept.
+
+        ``model`` is this run's choice from now on (it beats the file's); None keeps the one the
+        run had."""
         run = await self.runs.get_run(run_id)
         if run is None:
             raise ResumeError(f"no workflow run {run_id}")
@@ -319,6 +329,8 @@ class WorkflowService:
             raise ResumeError(f"workflow run {run_id} is already running")
         if run.status not in RESUMABLE:
             raise ResumeError(f"workflow run {run_id} is {run.status}; only a stopped run resumes")
+        if model is not None:
+            await self.runs.set_run_model(run_id, model.strip() or None)
         self.launch(run_id)
         return run
 
@@ -482,7 +494,7 @@ class WorkflowService:
         return input_problem(entry, inputs)
 
     async def start_run(
-        self, entry: WorkflowEntry, inputs: dict[str, Any], trigger: str
+        self, entry: WorkflowEntry, inputs: dict[str, Any], trigger: str, model: str | None = None
     ) -> tuple[str, str | None]:
         """Write a run and launch it. Returns ``(run id, session id)``; the session id is None
         until a step needs a session, so it is usually None here."""
@@ -496,13 +508,19 @@ class WorkflowService:
             inputs_json=json.dumps(inputs),
             trigger=trigger,
             source_hash=digest,
+            model=None if model is None else model.strip() or None,
         )
         self.launch(run_id)
         record = await self.runs.get_run(run_id)
         return run_id, None if record is None else record.session_id
 
     async def start_named(
-        self, name: str, project: Path | None, inputs: dict[str, Any], trigger: str
+        self,
+        name: str,
+        project: Path | None,
+        inputs: dict[str, Any],
+        trigger: str,
+        model: str | None = None,
     ) -> tuple[str, str | None]:
         """Start the workflow ``name`` (see :meth:`find`). Raises :class:`StartError`."""
         await asyncio.to_thread(self.registry.refresh)
@@ -510,7 +528,7 @@ class WorkflowService:
         entry = self.find(name, project)
         if problem is not None or entry is None:
             raise StartError(problem or f"there is no workflow called {name}")
-        return await self.start_run(entry, inputs, trigger)
+        return await self.start_run(entry, inputs, trigger, model)
 
     def launch(self, run_id: str) -> None:
         if run_id in self._tasks:

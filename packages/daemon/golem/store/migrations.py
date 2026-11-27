@@ -461,4 +461,8 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         )
         """,
     ),
+    (
+        # One run's choice of model (``workflow.start {model}``); it beats the file's.
+        "ALTER TABLE workflow_runs ADD COLUMN model TEXT",
+    ),
 )

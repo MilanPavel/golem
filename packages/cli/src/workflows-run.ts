@@ -15,18 +15,20 @@ export interface WorkflowDeps {
   onInterrupt(handler: () => void): () => void;
 }
 
-export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] [--routine] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
+export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] [--routine] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… [--model NAME] | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> [--model NAME] | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
 
 export type WorkflowParse =
   | { kind: "list" }
   | { kind: "starters" }
   | { kind: "add"; id: string; folder: string | null; routine: boolean }
   | { kind: "check"; name: string }
-  | { kind: "run"; name: string; inputs: Record<string, string> }
+  | { kind: "run"; name: string; inputs: Record<string, string>; model: string | null }
   | { kind: "status"; runId: string }
-  | { kind: "resume"; runId: string }
+  | { kind: "resume"; runId: string; model: string | null }
   | { kind: "answer"; runId: string; key: string | null; verdict: "approve" | "edit" | "reject"; text: string | null }
   | { kind: "error"; message: string };
+
+const MODEL_USAGE = "--model takes the name of a model you have set up, as the model picker shows it, for example --model anthropic/claude-sonnet-4-5";
 
 /** The words after `golem workflow`. */
 export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
@@ -55,9 +57,27 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
     }
     return id === undefined ? fail() : { kind: "add", id, folder, routine };
   }
-  if (sub === "status" || sub === "resume") {
+  if (sub === "status") {
     const [runId, ...extra] = rest;
     return runId === undefined || runId.startsWith("-") || extra.length > 0 ? fail() : { kind: sub, runId };
+  }
+  if (sub === "resume") {
+    let runId: string | undefined;
+    let model: string | null = null;
+    for (let i = 0; i < rest.length; i += 1) {
+      const arg = rest[i] as string;
+      if (arg === "--model" || arg === "-m") {
+        const value = rest[i + 1];
+        if (value === undefined || value === "") return fail(MODEL_USAGE);
+        model = value;
+        i += 1;
+      } else if (arg.startsWith("-") || runId !== undefined) {
+        return fail();
+      } else {
+        runId = arg;
+      }
+    }
+    return runId === undefined ? fail() : { kind: "resume", runId, model };
   }
   if (sub === "answer") {
     let runId: string | undefined;
@@ -97,10 +117,16 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
   }
   if (sub === "run") {
     let name: string | undefined;
+    let model: string | null = null;
     const inputs: Record<string, string> = {};
     for (let i = 0; i < rest.length; i += 1) {
       const arg = rest[i] as string;
-      if (arg === "--input" || arg === "-i") {
+      if (arg === "--model" || arg === "-m") {
+        const value = rest[i + 1];
+        if (value === undefined || value === "") return fail(MODEL_USAGE);
+        model = value;
+        i += 1;
+      } else if (arg === "--input" || arg === "-i") {
         const pair = rest[i + 1] ?? "";
         const at = pair.indexOf("=");
         if (at < 1) return fail("--input takes key=value, for example --input days=7");
@@ -112,7 +138,7 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
         name = arg;
       }
     }
-    return name === undefined ? fail() : { kind: "run", name, inputs };
+    return name === undefined ? fail() : { kind: "run", name, inputs, model };
   }
   return fail();
 }
@@ -328,10 +354,10 @@ async function follow(client: WorkflowClient, label: () => string, begin: () => 
 }
 
 /**
- * `golem workflow run <name|id> [--input k=v]…`: starts the run and prints each step as it starts and ends,
+ * `golem workflow run <name|id> [--input k=v]… [--model NAME]`: starts the run and prints each step as it starts and ends,
  * until the run finishes. 0 when it is done, 1 when it failed or was refused, 130 after Ctrl-C stopped it.
  */
-export async function runWorkflowRun(client: WorkflowClient, args: { name: string; inputs: Record<string, string> }, deps: WorkflowDeps): Promise<number> {
+export async function runWorkflowRun(client: WorkflowClient, args: { name: string; inputs: Record<string, string>; model?: string | null }, deps: WorkflowDeps): Promise<number> {
   let label = args.name;
   return follow(
     client,
@@ -349,20 +375,20 @@ export async function runWorkflowRun(client: WorkflowClient, args: { name: strin
         return null;
       }
       label = picked.name;
-      return (await client.startWorkflow(picked.id, args.inputs)).workflow_run_id;
+      return (await client.startWorkflow(picked.id, args.inputs, args.model ?? undefined)).workflow_run_id;
     },
     deps,
   );
 }
 
 /** `golem workflow resume <workflow_run_id>`: continues a stopped run, printing its steps like `run`. */
-export async function runWorkflowResume(client: WorkflowClient, runId: string, deps: WorkflowDeps): Promise<number> {
+export async function runWorkflowResume(client: WorkflowClient, runId: string, deps: WorkflowDeps, model?: string | null): Promise<number> {
   let label = runId;
   return follow(
     client,
     () => label,
     async () => {
-      const resumed = (await client.resumeWorkflow(runId)).run;
+      const resumed = (await client.resumeWorkflow(runId, model ?? undefined)).run;
       label = resumed.name;
       return resumed.workflow_run_id;
     },

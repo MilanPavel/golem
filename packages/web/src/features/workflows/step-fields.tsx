@@ -5,10 +5,10 @@ import { cn } from "../../ui/cn.ts";
 import { fieldClass } from "../../ui/input.tsx";
 import { suggestedKey } from "./text.ts";
 
-/** The model wishes a step may name (`golem.agents.model.WISHES`). A workflow file never names a model. */
+/** The old wish words (`golem.agents.model.WISHES`). They still work in a file that has them, and are no longer offered. */
 export const WISHES = ["cheapest", "same", "stronger", "local", "budget", "frontier"] as const;
 
-type FieldKind = "text" | "area" | "agent" | "wish" | "money" | "once";
+type FieldKind = "text" | "area" | "agent" | "model" | "money" | "once";
 type FieldSpec = { label: string; arg: string; kind: FieldKind };
 
 /** `key=` is shown as a tick box: "Only once". */
@@ -20,22 +20,25 @@ export function fieldsOf(kind: string): readonly FieldSpec[] {
     return [
       { label: "brief", arg: "brief", kind: "area" },
       { label: "agent", arg: "type", kind: "agent" },
-      { label: "model", arg: "model", kind: "wish" },
+      { label: "model", arg: "model", kind: "model" },
       { label: "budget", arg: "budget", kind: "money" },
       KEY,
     ];
   }
-  if (kind === "llm") return [{ label: "model", arg: "model", kind: "wish" }, KEY];
+  if (kind === "llm") return [{ label: "model", arg: "model", kind: "model" }, KEY];
+  if (kind === "skill") return [{ label: "model", arg: "model", kind: "model" }, KEY];
   if (kind === "code") return [];
   return [KEY];
 }
 
 export type StepFieldsProps = {
   step: WorkflowOutlineStep;
-  /** Sets one argument. Rejects with the reason it was refused. */
-  onEdit: (name: string, value: string) => Promise<void>;
+  /** Sets one argument; a null value takes it out of the call. Rejects with the reason it was refused. */
+  onEdit: (name: string, value: string | null) => Promise<void>;
   /** The agent types to pick from. */
   agents?: readonly string[];
+  /** The names of the models you have set up, as the chat's model picker shows them. */
+  models?: readonly string[];
   /** Opens the agent file of a type. Without it, no link. */
   onOpenAgent?: (name: string) => void;
   /** Puts the caret on a line of the code, for a value the code computes. */
@@ -61,10 +64,23 @@ function Row({ label, id, children }: { label: string; id: string | null; childr
 
 const small = "px-2 py-1 text-xs";
 
-function Control({ spec, step, value, id, busy, agents, onCommit }: { spec: FieldSpec; step: WorkflowOutlineStep; value: string | null; id: string; busy: boolean; agents: readonly string[]; onCommit: (value: string) => void }) {
+/**
+ * What a model field says under it: which model the step would use, and when that model is not set up here, so.
+ * Setting a model adds `model="…"` to the call; the step then uses it whatever the workflow's model is.
+ */
+export function modelNote(step: WorkflowOutlineStep, arg: WorkflowStepArg | undefined, busy: boolean): string {
+  if (busy) return "Writing…";
+  const now = step.model_now ?? null;
+  const where = arg === undefined ? "" : ` Written on line ${arg.line}.`;
+  if (now === null) return `No model is chosen, and golem has no default model yet.${where}`;
+  if (step.model_ready === false) return `${now} is not set up on this machine, so this step would stop.${where}`;
+  return arg === undefined ? `Uses ${now}: the workflow's model, else golem's default. Choosing one here writes it on this step.` : `Uses ${now}.${where}`;
+}
+
+function Control({ spec, step, value, id, busy, agents, models, onCommit }: { spec: FieldSpec; step: WorkflowOutlineStep; value: string | null; id: string; busy: boolean; agents: readonly string[]; models: readonly string[]; onCommit: (value: string | null) => void }) {
   const describedBy = `${id}-note`;
-  if (spec.kind === "agent" || spec.kind === "wish") {
-    const options = spec.kind === "agent" ? agents : WISHES;
+  if (spec.kind === "agent" || spec.kind === "model") {
+    const options = spec.kind === "agent" ? agents : models;
     const extra = value !== null && !options.includes(value);
     return (
       <select
@@ -75,10 +91,11 @@ function Control({ spec, step, value, id, busy, agents, onCommit }: { spec: Fiel
         disabled={busy}
         onChange={(event) => {
           if (event.target.value !== "") onCommit(event.target.value);
+          else if (spec.kind === "model") onCommit(null);
         }}
       >
-        {value === null ? <option value="">{spec.kind === "agent" ? "Choose…" : "its agent's wish"}</option> : null}
-        {extra ? <option value={value}>{value}</option> : null}
+        {spec.kind === "model" ? <option value="">The workflow&apos;s model</option> : value === null ? <option value="">Choose…</option> : null}
+        {extra ? <option value={value}>{spec.kind === "model" && (WISHES as readonly string[]).includes(value) ? `${value} (old word)` : value}</option> : null}
         {options.map((name) => (
           <option key={name} value={name}>
             {name}
@@ -127,12 +144,13 @@ function Control({ spec, step, value, id, busy, agents, onCommit }: { spec: Fiel
 }
 
 /**
- * `key=` as a tick box. Ticking a step with no key writes one made from its title. A key the code already has cannot be
- * taken out from here (the daemon sets arguments, it does not remove them), and a step that repeats needs a key for each
- * round, which only the code can say: both point to the code.
+ * `key=` as a tick box. Ticking a step with no key writes one made from its title; unticking takes the key out of the
+ * call (a null value). A key the code computes cannot be taken out from here (the daemon refuses a computed value), and a
+ * step that repeats needs a key for each round, which only the code can say: both point to the code, with the reason shown.
  */
-function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: WorkflowOutlineStep; arg: WorkflowStepArg | undefined; id: string; busy: boolean; error: string | null; onSet: (value: string) => void; onJump?: (line: number) => void }) {
+function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: WorkflowOutlineStep; arg: WorkflowStepArg | undefined; id: string; busy: boolean; error: string | null; onSet: (value: string | null) => void; onJump?: (line: number) => void }) {
   const on = arg !== undefined;
+  const computed = on && !arg.literal;
   const repeats = !on && Boolean(step.for_each);
   const hint = on ? `key=${arg.source}` : repeats ? "key=f\"…{item}\"" : `key="${suggestedKey(step)}"`;
   return (
@@ -143,8 +161,8 @@ function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: Workflow
           type="checkbox"
           aria-describedby={`${id}-note`}
           checked={on}
-          disabled={busy || on || repeats}
-          onChange={() => onSet(suggestedKey(step))}
+          disabled={busy || computed || repeats}
+          onChange={() => onSet(on ? null : suggestedKey(step))}
           className="mt-1 accent-clay"
         />
         <span className="min-w-0">
@@ -160,9 +178,11 @@ function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: Workflow
             ? "Writing…"
             : repeats
               ? "This step repeats, so each round needs its own key. Write it in the code."
-              : on
-                ? `To turn it off, take key out of line ${arg.line} of the code.`
-                : "Not written in the code. Ticking it adds it.")}
+              : computed
+                ? `The code computes this key, so it is set in code (line ${arg.line}).`
+                : on
+                  ? `Unticking it takes key out of line ${arg.line} of the code.`
+                  : "Not written in the code. Ticking it adds it.")}
         {on && onJump !== undefined ? (
           <>
             {" "}
@@ -180,14 +200,14 @@ function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: Workflow
  * The fields of the selected step (mock § B). Each one is one argument of the step's call: changing it writes exactly
  * that argument in the code, and nothing else. A value the code computes is shown as its source, "set in code".
  */
-export function StepFields({ step, onEdit, agents = [], onOpenAgent, onJump, refused = null }: StepFieldsProps) {
+export function StepFields({ step, onEdit, agents = [], models = [], onOpenAgent, onJump, refused = null }: StepFieldsProps) {
   const base = useId();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<{ name: string; message: string } | null>(refused);
   const specs = fieldsOf(step.kind);
   if (specs.length === 0) return <p className="text-meta text-faint">A code step has no fields to edit here. Its function opens in the code pane.</p>;
 
-  async function commit(name: string, value: string): Promise<void> {
+  async function commit(name: string, value: string | null): Promise<void> {
     setBusy(name);
     setError(null);
     try {
@@ -231,9 +251,9 @@ export function StepFields({ step, onEdit, agents = [], onOpenAgent, onJump, ref
               </>
             ) : (
               <>
-                <Control spec={spec} step={step} id={id} value={arg === undefined ? null : (arg.value ?? arg.source)} busy={busy === spec.arg} agents={agents} onCommit={(value) => void commit(spec.arg, value)} />
+                <Control spec={spec} step={step} id={id} value={arg === undefined ? null : (arg.value ?? arg.source)} busy={busy === spec.arg} agents={agents} models={models} onCommit={(value) => void commit(spec.arg, value)} />
                 <span id={`${id}-note`} className={cn("text-meta wrap-anywhere", mine === null ? "text-faint" : "text-deny")} role={mine === null ? undefined : "alert"}>
-                  {mine ?? (arg === undefined ? "Not written in the code. Setting it adds it." : busy === spec.arg ? "Writing…" : `Writes line ${arg.line} of the code.`)}
+                  {mine ?? (spec.kind === "model" ? modelNote(step, arg, busy === spec.arg) : arg === undefined ? "Not written in the code. Setting it adds it." : busy === spec.arg ? "Writing…" : `Writes line ${arg.line} of the code.`)}
                 </span>
               </>
             )}

@@ -31,6 +31,9 @@ export type Kind = string;
  * @maxItems 2
  */
 export type Lines = [unknown, unknown];
+export type Model = string | null;
+export type ModelNow = string | null;
+export type ModelReady = boolean | null;
 export type Title = string;
 export type Steps = WorkflowOutlineStep[];
 export type Description = string;
@@ -40,6 +43,7 @@ export type Default = string | null;
 export type Name1 = string;
 export type Type = string | null;
 export type Inputs = WorkflowInputInfo[];
+export type Model1 = string | null;
 export type Name2 = string;
 export type Path = string;
 export type Project = string | null;
@@ -48,6 +52,10 @@ export type Title1 = string | null;
 export type Expr = string | null;
 export type Kind1 = 'manual' | 'schedule' | 'on_file';
 export type Path1 = string | null;
+export type Model2 = string | null;
+export type Note = string | null;
+export type Now = string | null;
+export type Ready = boolean;
 
 /**
  * The workflow and its outline steps (empty for a ``broken`` or ``untrusted`` file).
@@ -60,6 +68,7 @@ export interface WorkflowGetResult {
   code_hash?: CodeHash;
   steps?: Steps;
   workflow: WorkflowEntryInfo;
+  workflow_model?: WorkflowModelInfo | null;
 }
 /**
  * One step read from the source, without running it.
@@ -90,6 +99,9 @@ export interface WorkflowOutlineStep {
   key?: Key;
   kind: Kind;
   lines: Lines;
+  model?: Model;
+  model_now?: ModelNow;
+  model_ready?: ModelReady;
   title: Title;
 }
 /**
@@ -128,6 +140,7 @@ export interface WorkflowEntryInfo {
   error?: Error;
   id: Id1;
   inputs?: Inputs;
+  model?: Model1;
   name: Name2;
   path: Path;
   project?: Project;
@@ -156,4 +169,20 @@ export interface WorkflowTriggerInfo {
   expr?: Expr;
   kind: Kind1;
   path?: Path1;
+}
+/**
+ * The workflow's own model (``@workflow(model=)``), for the header of the editor.
+ *
+ * ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+ * ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is false when
+ * ``now`` is not set up on this machine; ``note`` then says so, in words.
+ *
+ * This interface was referenced by `WorkflowGetResult`'s JSON-Schema
+ * via the `definition` "WorkflowModelInfo".
+ */
+export interface WorkflowModelInfo {
+  model?: Model2;
+  note?: Note;
+  now?: Now;
+  ready?: Ready;
 }

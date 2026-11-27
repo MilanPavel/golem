@@ -42,6 +42,8 @@ class WorkflowRunRecord:
     finished_at: str | None
     source_hash: str | None
     result_json: str | None
+    model: str | None = None
+    """The model this one run was started with; it beats the file's."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,16 +123,34 @@ class WorkflowRuns:
         inputs_json: str | None = None,
         trigger: str = "manual",
         source_hash: str | None = None,
+        model: str | None = None,
     ) -> str:
         """Write a ``pending`` run. Returns its id."""
         run_id = new_id("wr")
         await self._write(
             "INSERT INTO workflow_runs (workflow_run_id, workflow_id, name, path, project,"
-            " status, inputs_json, trigger, created_at, source_hash)"
-            " VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)",
-            (run_id, workflow_id, name, path, project, inputs_json, trigger, at, source_hash),
+            " status, inputs_json, trigger, created_at, source_hash, model)"
+            " VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
+            (
+                run_id,
+                workflow_id,
+                name,
+                path,
+                project,
+                inputs_json,
+                trigger,
+                at,
+                source_hash,
+                model,
+            ),
         )
         return run_id
+
+    async def set_run_model(self, run_id: str, model: str | None) -> None:
+        """Set the model one run was started or resumed with (None: the file's choice)."""
+        await self._write(
+            "UPDATE workflow_runs SET model = ? WHERE workflow_run_id = ?", (model, run_id)
+        )
 
     async def get_run(self, run_id: str) -> WorkflowRunRecord | None:
         row = await self._database.fetch_one(

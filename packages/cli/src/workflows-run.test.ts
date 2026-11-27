@@ -139,10 +139,14 @@ function setup(overrides: Partial<WorkflowDeps> = {}) {
 test("the arguments parse, and the ones that do not fit are errors", () => {
   assert.deepEqual(parseWorkflowArgs([]), { kind: "list" });
   assert.deepEqual(parseWorkflowArgs(["list"]), { kind: "list" });
-  assert.deepEqual(parseWorkflowArgs(["run", "adder"]), { kind: "run", name: "adder", inputs: {} });
-  assert.deepEqual(parseWorkflowArgs(["run", "adder", "--input", "n=3", "--input", "tag=a=b"]), { kind: "run", name: "adder", inputs: { n: "3", tag: "a=b" } });
+  assert.deepEqual(parseWorkflowArgs(["run", "adder"]), { kind: "run", name: "adder", inputs: {}, model: null });
+  assert.deepEqual(parseWorkflowArgs(["run", "adder", "--input", "n=3", "--input", "tag=a=b"]), { kind: "run", name: "adder", inputs: { n: "3", tag: "a=b" }, model: null });
+  assert.deepEqual(parseWorkflowArgs(["run", "adder", "--model", "ollama/small", "--input", "n=3"]), { kind: "run", name: "adder", inputs: { n: "3" }, model: "ollama/small" });
+  assert.deepEqual(parseWorkflowArgs(["resume", "wr1", "--model", "ollama/small"]), { kind: "resume", runId: "wr1", model: "ollama/small" });
+  assert.equal(parseWorkflowArgs(["run", "adder", "--model"]).kind, "error");
+  assert.equal(parseWorkflowArgs(["resume", "wr1", "--model", ""]).kind, "error");
   assert.deepEqual(parseWorkflowArgs(["status", "wr1"]), { kind: "status", runId: "wr1" });
-  assert.deepEqual(parseWorkflowArgs(["resume", "wr1"]), { kind: "resume", runId: "wr1" });
+  assert.deepEqual(parseWorkflowArgs(["resume", "wr1"]), { kind: "resume", runId: "wr1", model: null });
   assert.deepEqual(parseWorkflowArgs(["check", "adder"]), { kind: "check", name: "adder" });
   assert.equal(parseWorkflowArgs(["check"]).kind, "error");
   assert.equal(parseWorkflowArgs(["check", "a", "b"]).kind, "error");

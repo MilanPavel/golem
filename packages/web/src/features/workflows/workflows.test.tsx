@@ -491,3 +491,22 @@ test("/workflows hides the Starters section once the starter is among the workfl
   expect(await screen.findByText("5 workflows · 1 broken")).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "Starters" })).toBeNull();
 });
+
+test("the Run… form has a Model row that starts as the workflow's model and is sent with the run when one is picked", async () => {
+  const user = userEvent.setup();
+  const onStart = vi.fn<NonNullable<Parameters<typeof WorkflowDetail>[0]["onStart"]>>(() => Promise.resolve());
+  render(detail({ workflow: { ...SAMPLE_PR_DIGEST, inputs: [] }, onStart, models: ["qwen3.5:9b", "deepseek/chat"] }));
+  await user.click(screen.getByRole("button", { name: "Run…" }));
+  const row = screen.getByLabelText("Model") as HTMLSelectElement;
+  expect(Array.from(row.options).map((option) => option.textContent)).toEqual(["The workflow's model", "qwen3.5:9b", "deepseek/chat"]);
+  expect(row.value).toBe("");
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1));
+  expect(onStart.mock.calls[0]).toHaveLength(1);
+
+  await user.click(screen.getByRole("button", { name: "Run…" }));
+  await user.selectOptions(screen.getByLabelText("Model"), "deepseek/chat");
+  await user.click(screen.getByRole("button", { name: "Run" }));
+  await waitFor(() => expect(onStart).toHaveBeenCalledTimes(2));
+  expect(onStart.mock.calls[1]?.[1]).toBe("deepseek/chat");
+});

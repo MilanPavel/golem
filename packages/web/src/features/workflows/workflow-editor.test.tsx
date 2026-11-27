@@ -377,7 +377,7 @@ test("⌘K focuses the ask box", async () => {
   expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Ask golem to change this workflow" }));
 });
 
-type EditFn = (code: string, stepId: string, name: string, value: string) => Promise<WorkflowEditStepResult>;
+type EditFn = (code: string, stepId: string, name: string, value: string | null) => Promise<WorkflowEditStepResult>;
 
 function fieldsEditor(onEditStep: EditFn, extra: Partial<WorkflowEditorProps> = {}) {
   return <WorkflowEditor workflow={SAMPLE_UPGRADE} steps={SAMPLE_UPGRADE_STEPS} code={SAMPLE_UPGRADE_CODE} codeHash={SAMPLE_PR_DIGEST_HASH} onEditStep={onEditStep} onSave={async () => saved("h2")} agents={SAMPLE_UPGRADE_AGENTS} initial={{ selected: "agent:worker", problems: [] }} {...extra} />;
@@ -406,12 +406,13 @@ test("the agent and the model are selects, and a change is sent at once", async 
   const user = userEvent.setup();
   const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
   const onOpenAgent = vi.fn();
-  render(fieldsEditor(onEditStep, { onOpenAgent }));
+  render(fieldsEditor(onEditStep, { onOpenAgent, models: ["qwen3.5:9b", "deepseek/chat"] }));
   const pane = within(screen.getByRole("group", { name: "Selected step" }));
   expect(within(pane.getByLabelText("agent")).getAllByRole("option").map((option) => option.textContent)).toEqual([...SAMPLE_UPGRADE_AGENTS]);
-  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["cheapest", "same", "stronger", "local", "budget", "frontier"]);
-  await user.selectOptions(pane.getByLabelText("model"), "local");
-  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", "local"));
+  // The models you have set up are offered; the old wish word the file has stays, marked, and no other is offered.
+  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["The workflow's model", "cheapest (old word)", "qwen3.5:9b", "deepseek/chat"]);
+  await user.selectOptions(pane.getByLabelText("model"), "deepseek/chat");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", "deepseek/chat"));
   await user.selectOptions(pane.getByLabelText("agent"), "reviewer");
   await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "type", "reviewer"));
   await user.click(pane.getByRole("button", { name: "agents/worker.md ↗" }));
@@ -429,6 +430,33 @@ test("a field that was not changed writes nothing, and a missing one is added wh
   expect(pane.getByText("Not written in the code. Ticking it adds it.")).toBeTruthy();
   await user.click(pane.getByRole("checkbox", { name: "Only once" }));
   await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", "worker-upgrade-httpx-fix"));
+});
+
+function keyedSteps(literal: boolean) {
+  const key = literal ? { name: "key", source: '"worker-upgrade"', literal: true, value: "worker-upgrade", line: 7, col: 10, end_line: 7, end_col: 26 } : { name: "key", source: 'f"upgrade-{n}"', literal: false, line: 7, col: 10, end_line: 7, end_col: 24 };
+  return SAMPLE_UPGRADE_STEPS.map((step) => (step.id === "agent:worker" ? { ...step, key: key.source, args: [...(step.args ?? []), key] } : step));
+}
+
+test("a written key is a ticked box, and unticking it sends a null value that takes key out", async () => {
+  const user = userEvent.setup();
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
+  render(fieldsEditor(onEditStep, { steps: keyedSteps(true) }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const box = pane.getByRole("checkbox", { name: "Only once" }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  expect(box.disabled).toBe(false);
+  expect(pane.getByText("Unticking it takes key out of line 7 of the code.")).toBeTruthy();
+  await user.click(box);
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", null));
+});
+
+test("a key the code computes stays ticked and says it is set in code", () => {
+  render(fieldsEditor(vi.fn<EditFn>(), { steps: keyedSteps(false) }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const box = pane.getByRole("checkbox", { name: "Only once" }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  expect(box.disabled).toBe(true);
+  expect(pane.getByText("The code computes this key, so it is set in code (line 7).")).toBeTruthy();
 });
 
 test("a value the code computes is shown as source, set in code, and jumps to its line", async () => {
@@ -498,4 +526,44 @@ test("the pane says what a step does, what it repeats and what it uses, and its 
   await user.click(pane.getByRole("button", { name: "Show in the file" }));
   expect(screen.getByRole("textbox", { name: "Code of pr_digest" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Steps and code" }).getAttribute("aria-pressed")).toBe("true");
+});
+
+const MINE = { model: null, now: "qwen3.5:9b", ready: true, note: null } as const;
+
+test("the header says the workflow's model, and picking one writes it into @workflow as an unsaved edit", async () => {
+  const user = userEvent.setup();
+  const edited = SAMPLE_UPGRADE_CODE.replace("@workflow(", '@workflow(model="deepseek/chat", ');
+  const onEditStep = vi.fn<EditFn>(async () => ({ code: edited, steps: SAMPLE_UPGRADE_STEPS, problems: [], workflow_model: { model: "deepseek/chat", now: "deepseek/chat", ready: true, note: null } }));
+  render(fieldsEditor(onEditStep, { models: ["qwen3.5:9b", "deepseek/chat"], workflowModel: MINE }));
+  const pill = screen.getByRole("button", { name: "Model of this workflow" });
+  expect(pill.textContent).toContain("golem's default model · now qwen3.5:9b");
+  await user.click(pill);
+  expect(screen.getByText(/No model is written in the file/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "deepseek/chat" }));
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "@workflow", "model", "deepseek/chat"));
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Code of upgrade" }) as HTMLTextAreaElement).value).toBe(edited));
+  expect(screen.getByRole("button", { name: "Model of this workflow" }).textContent).toContain("deepseek/chat · set in the file");
+  expect(screen.getByText("1 change not saved")).toBeTruthy();
+});
+
+test("a model that is not set up here is said beside the pill and in the step's field", () => {
+  const steps = SAMPLE_UPGRADE_STEPS.map((step) => (step.id === "agent:worker" ? { ...step, model: "gone/model", model_now: "gone/model", model_ready: false } : step));
+  render(fieldsEditor(vi.fn<EditFn>(), { steps, workflowModel: { model: "gone/model", now: "gone/model", ready: false, note: "gone/model is not set up on this machine" } }));
+  expect(screen.getByRole("button", { name: "Model of this workflow" }).textContent).toContain("not set up here");
+  expect(screen.getByText(/gone\/model is not set up on this machine, so this step would stop/)).toBeTruthy();
+});
+
+test("choosing the workflow's model on a step removes its model=, and choosing the default in the header removes the decorator's", async () => {
+  const user = userEvent.setup();
+  const written = { model: "qwen3.5:9b", now: "qwen3.5:9b", ready: true, note: null };
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [], workflow_model: written }));
+  render(fieldsEditor(onEditStep, { models: ["qwen3.5:9b"], workflowModel: written }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const field = pane.getByLabelText("model") as HTMLSelectElement;
+  expect(Array.from(field.options)[0]?.textContent).toBe("The workflow's model");
+  await user.selectOptions(field, "");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", null));
+  await user.click(screen.getByRole("button", { name: "Model of this workflow" }));
+  await user.click(screen.getByRole("button", { name: /golem's default model/ }));
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "@workflow", "model", null));
 });

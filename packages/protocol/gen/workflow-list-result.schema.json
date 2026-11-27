@@ -33,6 +33,18 @@
           "title": "Inputs",
           "type": "array"
         },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
         "name": {
           "title": "Name",
           "type": "string"

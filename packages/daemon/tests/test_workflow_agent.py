@@ -32,6 +32,7 @@ from golem.store.records import RunRecords, SessionRecords
 from golem.store.workflow_runs import WorkflowRuns
 from golem.tools import default_registry
 from golem.workflows.agents import WorkflowAgents
+from golem.workflows.llm import named_model_problem
 from golem.workflows.service import WorkflowService
 from golem_protocol.events import ChatEvent
 
@@ -127,7 +128,11 @@ class World:
             agents=registry,
         )
         self.seam = WorkflowAgents(
-            sessions=self.manager, agents=registry, bus=self.bus, settings=router.agent_settings
+            sessions=self.manager,
+            agents=registry,
+            bus=self.bus,
+            settings=router.agent_settings,
+            model_problem=lambda name, folder: named_model_problem(router, name),
         )
         self.store = WorkflowRuns(database)
         self.sent: list[BaseModel] = []
@@ -395,17 +400,17 @@ async def test_an_unknown_agent_type_fails_the_step_with_the_known_ones(
     assert step is not None and step.status == "failed"
 
 
-async def test_a_model_name_is_refused_and_a_wish_is_passed(
+async def test_a_model_not_set_up_stops_the_step_and_a_wish_is_passed(
     world: Callable[..., World], project: Path
 ) -> None:
     w = world(["ok"])
-    named = ONE.replace('"look around"', '"look around", model="anthropic/big"')
+    named = ONE.replace('"look around"', '"look around", model="nowhere/big"')
     run_id = await w.new_run(named, project)
     service = w.service()
     service.launch(run_id)
     await w.until(run_id, "failed")
     run = await w.store.get_run(run_id)
-    assert run is not None and "is a wish" in (run.error or "")
+    assert run is not None and "not set up on this machine" in (run.error or "")
 
     wished = ONE.replace('"look around"', '"look around", model="cheapest", key="one"')
     second = await w.new_run(wished, project)

@@ -51,7 +51,7 @@ PARAMS: dict[str, tuple[str, ...]] = {
     "notify": ("text", "title", "key"),
     "llm": ("prompt", "schema", "model", "key", "title"),
     "tool": ("name",),
-    "skill": ("name", "args", "key", "title"),
+    "skill": ("name", "args", "key", "title", "model"),
 }
 """The positional parameter names of each ``run.*`` method, for naming a positional argument."""
 KEYWORD_ONLY: dict[str, tuple[str, ...]] = {
@@ -163,6 +163,8 @@ class WorkflowOutline:
     trigger: str | None = None
     docstring: str | None = None
     steps: tuple[OutlineStep, ...] = field(default=())
+    model: str | None = None
+    """The text of a literal ``@workflow(model=...)``, else None."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -361,10 +363,13 @@ class Builder:
         fn = self.fn
         deco = _workflow_deco(fn)
         trigger: str | None = None
+        model: str | None = None
         declared: dict[str, str | None] = {}
         if isinstance(deco, ast.Call):
             for kw in deco.keywords:
-                if kw.arg == "trigger" and _literalish(kw.value):
+                if kw.arg == "model":
+                    model = literal_text(kw.value)
+                elif kw.arg == "trigger" and _literalish(kw.value):
                     trigger = self.seg(kw.value)
                 elif kw.arg == "inputs" and isinstance(kw.value, ast.Dict):
                     for k, v in zip(kw.value.keys, kw.value.values, strict=True):
@@ -404,6 +409,7 @@ class Builder:
             trigger=trigger,
             docstring=doc,
             steps=tuple(self.steps),
+            model=model,
         )
 
     # -- statements

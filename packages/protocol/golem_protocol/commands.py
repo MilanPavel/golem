@@ -6110,6 +6110,8 @@ class WorkflowEntryInfo(BaseModel):
     description: str = ""
     title: str | None = None
     """The name from ``@workflow(title=)``; null when the file gives none."""
+    model: str | None = None
+    """The model from ``@workflow(model=)``, as written; null when the file names none."""
 
 
 class WorkflowStepArg(BaseModel):
@@ -6167,6 +6169,31 @@ class WorkflowOutlineStep(BaseModel):
     does: str | None = None
     """The first sentence of the docstring of the function a ``run.step`` calls, when that
     function is in the same file."""
+    model: str | None = None
+    """For a model step (``llm``, ``agent``, ``skill``): the ``model=`` as written, or null."""
+    model_now: str | None = None
+    """For a model step: the model it would use now (the step's, else the workflow's, else golem's
+    default), or null when nothing is chosen and no default is set. An old wish word is shown as
+    written."""
+    model_ready: bool | None = None
+    """For a model step: false when ``model_now`` is not set up on this machine. Null for a step
+    that is not a model step."""
+
+
+class WorkflowModelInfo(BaseModel):
+    """The workflow's own model (``@workflow(model=)``), for the header of the editor.
+
+    ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+    ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is false when
+    ``now`` is not set up on this machine; ``note`` then says so, in words.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model: str | None = None
+    now: str | None = None
+    ready: bool = True
+    note: str | None = None
 
 
 class WorkflowListParams(BaseModel):
@@ -6207,6 +6234,8 @@ class WorkflowGetResult(BaseModel):
 
     workflow: WorkflowEntryInfo
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
     code: str | None = None
     code_hash: str | None = None
     """sha256 of the file's bytes, the ``base_hash`` of a ``workflow.save``."""
@@ -6244,6 +6273,8 @@ class WorkflowCheckResult(BaseModel):
 
     problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
 
 
 class WorkflowProposeParams(BaseModel):
@@ -6272,6 +6303,8 @@ class WorkflowProposeResult(BaseModel):
     code: str
     note: str
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
     problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
     model: str
     kind: Literal["answer", "change"] | None = None
@@ -6282,7 +6315,8 @@ class WorkflowEditStepParams(BaseModel):
     """``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor holds).
 
     ``name`` is the argument (``type``, ``brief``, ``model``, ``budget``, ``key``, ...) and
-    ``value`` its new literal. Only that argument's source span is replaced, or ``name=value`` is
+    ``value`` its new literal. ``step_id`` ``@workflow`` stands for the decorator: only ``model``
+    can be set there. Only that argument's source span is replaced, or ``name=value`` is
     added when the call lacks it. Refused for a code step, an argument the code computes and a
     value that is not valid for it.
     """
@@ -6293,7 +6327,9 @@ class WorkflowEditStepParams(BaseModel):
     code: str
     step_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    value: str | float | bool
+    value: str | float | bool | None = None
+    """The new literal. Null (or left out) takes the argument out of the call: its ``name=`` goes,
+    and so does a line that held only it. An argument the call lacks leaves the text as it is."""
 
 
 class WorkflowEditStepResult(BaseModel):
@@ -6304,6 +6340,8 @@ class WorkflowEditStepResult(BaseModel):
 
     code: str
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
     problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
 
 
@@ -6328,6 +6366,8 @@ class WorkflowSaveResult(BaseModel):
 
     workflow: WorkflowEntryInfo
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
     problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
     code_hash: str = Field(min_length=1)
 
@@ -6411,6 +6451,8 @@ class WorkflowStartParams(BaseModel):
     id: str = Field(min_length=1)
     inputs: dict[str, Any] = Field(default_factory=dict[str, Any])
     trigger: WorkflowStartTrigger = "manual"
+    model: str | None = None
+    """One run's choice of model: it beats the step's and the workflow's. Null keeps the file's."""
 
 
 class WorkflowStartResult(BaseModel):
@@ -6581,6 +6623,8 @@ class WorkflowResumeParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     workflow_run_id: str = Field(min_length=1)
+    model: str | None = None
+    """One run's choice of model from now on; null keeps the one the run had."""
 
 
 class WorkflowResumeResult(BaseModel):

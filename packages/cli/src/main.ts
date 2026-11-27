@@ -108,7 +108,7 @@ const USAGE =
   "       golem config show [--resolved] | golem config edit [--project] | golem skills [list] | golem skills check <path>\n" +
   "       golem skills new <name> [--project] [--description \"…\"] | golem skills edit <name>\n" +
   "       golem routines [list] | golem routines run <name> [--folder <dir>] [--wait] | golem routines pause <name> | golem routines resume <name> | golem routines edit\n" +
-  "       golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] [--routine] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]\n" +
+  "       golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] [--routine] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… [--model NAME] | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> [--model NAME] | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]\n" +
   "       golem coding bench <profile-or-model> [--task <name>]\n" +
   "       golem web [--port N] [--no-open] [--json] (the same as golem) | golem web serve [--port N]\n" +
   "       golem web install [--port N] | golem web uninstall | golem web logout";
@@ -421,7 +421,7 @@ async function runWorkflow(given: string[]): Promise<number> {
       case "status":
         return runWorkflowStatus(client, parsed.runId, deps);
       case "resume":
-        return runWorkflowResume(client, parsed.runId, deps);
+        return runWorkflowResume(client, parsed.runId, deps, parsed.model);
       case "answer":
         return runWorkflowAnswer(client, parsed, deps);
     }

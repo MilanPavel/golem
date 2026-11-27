@@ -113,7 +113,7 @@ from golem.tools import default_registry
 from golem.tools.registry import ToolRegistry, ToolScope
 from golem.workflows.agents import WorkflowAgents
 from golem.workflows.check import CheckEnv
-from golem.workflows.llm import WorkflowLlm
+from golem.workflows.llm import WorkflowLlm, named_model_problem
 from golem.workflows.service import WorkflowService
 from golem.workflows.tools import WorkflowTools
 from golem_protocol.commands import (
@@ -512,9 +512,14 @@ class DaemonApp:
                         bus=bus,
                         settings=router.agent_settings,
                         skills=self.state.skills,
+                        model_problem=lambda name, folder: named_model_problem(
+                            router, name, sessions.local_only(folder)
+                        ),
                     ),
                     llm=wf_llm,
                     check_env=CheckEnv(
+                        model_problem=lambda name: named_model_problem(router, name),
+                        default_model=lambda: router.default,
                         agents=lambda folder: (
                             {}
                             if self.state.agents is None
