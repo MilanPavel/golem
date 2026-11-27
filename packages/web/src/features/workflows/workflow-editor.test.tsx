@@ -187,8 +187,7 @@ test("asking golem shows the proposal as new steps and a diff, and writes nothin
   const onSave = vi.fn<SaveFn>(async () => saved("h2"));
   const onPropose = vi.fn<ProposeFn>(async () => SAMPLE_PR_DIGEST_PROPOSAL);
   render(editor({ onPropose, onSave }));
-  await user.click(screen.getByRole("button", { name: "make it cheaper" }));
-  expect((screen.getByRole("textbox", { name: "Ask golem to change this workflow" }) as HTMLInputElement).value).toBe("make it cheaper");
+  await user.type(screen.getByRole("textbox", { name: "Ask golem to change this workflow" }), "make it cheaper");
   await user.click(screen.getByRole("button", { name: "Ask" }));
   await screen.findByRole("group", { name: "Proposal" });
   expect(onPropose).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_CODE, "make it cheaper", undefined);
@@ -206,6 +205,13 @@ test("asking golem shows the proposal as new steps and a diff, and writes nothin
   expect(screen.queryByRole("textbox", { name: "Code of pr_digest" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   expect(onSave).not.toHaveBeenCalled();
+});
+
+test("a suggested question asks at once", async () => {
+  const onPropose = vi.fn<ProposeFn>(async () => SAMPLE_PR_DIGEST_PROPOSAL);
+  render(editor({ onPropose, onSave: async () => saved("h2") }));
+  await userEvent.setup().click(screen.getByRole("button", { name: "explain this workflow" }));
+  expect(onPropose).toHaveBeenCalledWith(SAMPLE_PR_DIGEST_CODE, "explain this workflow", undefined);
 });
 
 test("Accept puts the proposal into the editor as an unsaved edit, and Save writes it", async () => {
