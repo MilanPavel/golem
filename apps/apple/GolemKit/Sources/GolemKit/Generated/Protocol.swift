@@ -32430,15 +32430,18 @@ public struct WorkflowCheckParams: Codable {
 public struct WorkflowCheckResult: Codable {
     public let problems: [WorkflowCheckResultProblem]?
     public let steps: [WorkflowCheckResultStep]?
+    public let workflowModel: WorkflowCheckResultWorkflowModelInfo?
 
     public enum CodingKeys: String, CodingKey {
         case problems = "problems"
         case steps = "steps"
+        case workflowModel = "workflow_model"
     }
 
-    public init(problems: [WorkflowCheckResultProblem]?, steps: [WorkflowCheckResultStep]?) {
+    public init(problems: [WorkflowCheckResultProblem]?, steps: [WorkflowCheckResultStep]?, workflowModel: WorkflowCheckResultWorkflowModelInfo?) {
         self.problems = problems
         self.steps = steps
+        self.workflowModel = workflowModel
     }
 }
 
@@ -32502,6 +32505,9 @@ public struct WorkflowCheckResultStep: Codable {
     public let key: String?
     public let kind: String
     public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
     public let title: String
 
     public enum CodingKeys: String, CodingKey {
@@ -32522,10 +32528,13 @@ public struct WorkflowCheckResultStep: Codable {
         case key = "key"
         case kind = "kind"
         case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [PurpleWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [PurpleWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -32543,6 +32552,9 @@ public struct WorkflowCheckResultStep: Codable {
         self.key = key
         self.kind = kind
         self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
         self.title = title
     }
 }
@@ -32589,12 +32601,41 @@ public struct PurpleWorkflowStepArg: Codable {
     }
 }
 
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowCheckResultWorkflowModelInfo
+public struct WorkflowCheckResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
+    }
+}
+
 /// ``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor
 /// holds).
 ///
 /// ``name`` is the argument (``type``, ``brief``, ``model``, ``budget``, ``key``, ...) and
-/// ``value`` its new literal. Only that argument's source span is replaced, or
-/// ``name=value`` is
+/// ``value`` its new literal. ``step_id`` ``@workflow`` stands for the decorator: only
+/// ``model``
+/// can be set there. Only that argument's source span is replaced, or ``name=value`` is
 /// added when the call lacks it. Refused for a code step, an argument the code computes and
 /// a
 /// value that is not valid for it.
@@ -32672,17 +32713,20 @@ public struct WorkflowEditStepResult: Codable {
     public let code: String
     public let problems: [WorkflowEditStepResultProblem]?
     public let steps: [WorkflowEditStepResultStep]?
+    public let workflowModel: WorkflowEditStepResultWorkflowModelInfo?
 
     public enum CodingKeys: String, CodingKey {
         case code = "code"
         case problems = "problems"
         case steps = "steps"
+        case workflowModel = "workflow_model"
     }
 
-    public init(code: String, problems: [WorkflowEditStepResultProblem]?, steps: [WorkflowEditStepResultStep]?) {
+    public init(code: String, problems: [WorkflowEditStepResultProblem]?, steps: [WorkflowEditStepResultStep]?, workflowModel: WorkflowEditStepResultWorkflowModelInfo?) {
         self.code = code
         self.problems = problems
         self.steps = steps
+        self.workflowModel = workflowModel
     }
 }
 
@@ -32741,6 +32785,9 @@ public struct WorkflowEditStepResultStep: Codable {
     public let key: String?
     public let kind: String
     public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
     public let title: String
 
     public enum CodingKeys: String, CodingKey {
@@ -32761,10 +32808,13 @@ public struct WorkflowEditStepResultStep: Codable {
         case key = "key"
         case kind = "kind"
         case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [FluffyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [FluffyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -32782,6 +32832,9 @@ public struct WorkflowEditStepResultStep: Codable {
         self.key = key
         self.kind = kind
         self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
         self.title = title
     }
 }
@@ -32828,6 +32881,34 @@ public struct FluffyWorkflowStepArg: Codable {
     }
 }
 
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowEditStepResultWorkflowModelInfo
+public struct WorkflowEditStepResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
+    }
+}
+
 /// One workflow the daemon found (ADR-062).
 ///
 /// ``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the
@@ -32840,6 +32921,7 @@ public struct WorkflowEntryInfo: Codable {
     public let error: String?
     public let id: String
     public let inputs: [WorkflowEntryInfoInput]?
+    public let model: String?
     public let name: String
     public let path: String
     public let project: String?
@@ -32852,6 +32934,7 @@ public struct WorkflowEntryInfo: Codable {
         case error = "error"
         case id = "id"
         case inputs = "inputs"
+        case model = "model"
         case name = "name"
         case path = "path"
         case project = "project"
@@ -32860,11 +32943,12 @@ public struct WorkflowEntryInfo: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [WorkflowEntryInfoInput]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: WorkflowEntryInfoWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [WorkflowEntryInfoInput]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: WorkflowEntryInfoWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
         self.inputs = inputs
+        self.model = model
         self.name = name
         self.path = path
         self.project = project
@@ -32951,19 +33035,22 @@ public struct WorkflowGetResult: Codable {
     public let codeHash: String?
     public let steps: [WorkflowGetResultStep]?
     public let workflow: WorkflowGetResultWorkflow
+    public let workflowModel: WorkflowGetResultWorkflowModelInfo?
 
     public enum CodingKeys: String, CodingKey {
         case code = "code"
         case codeHash = "code_hash"
         case steps = "steps"
         case workflow = "workflow"
+        case workflowModel = "workflow_model"
     }
 
-    public init(code: String?, codeHash: String?, steps: [WorkflowGetResultStep]?, workflow: WorkflowGetResultWorkflow) {
+    public init(code: String?, codeHash: String?, steps: [WorkflowGetResultStep]?, workflow: WorkflowGetResultWorkflow, workflowModel: WorkflowGetResultWorkflowModelInfo?) {
         self.code = code
         self.codeHash = codeHash
         self.steps = steps
         self.workflow = workflow
+        self.workflowModel = workflowModel
     }
 }
 
@@ -32993,6 +33080,9 @@ public struct WorkflowGetResultStep: Codable {
     public let key: String?
     public let kind: String
     public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
     public let title: String
 
     public enum CodingKeys: String, CodingKey {
@@ -33013,10 +33103,13 @@ public struct WorkflowGetResultStep: Codable {
         case key = "key"
         case kind = "kind"
         case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [TentacledWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [TentacledWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -33034,6 +33127,9 @@ public struct WorkflowGetResultStep: Codable {
         self.key = key
         self.kind = kind
         self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
         self.title = title
     }
 }
@@ -33092,6 +33188,7 @@ public struct WorkflowGetResultWorkflow: Codable {
     public let error: String?
     public let id: String
     public let inputs: [PurpleWorkflowInputInfo]?
+    public let model: String?
     public let name: String
     public let path: String
     public let project: String?
@@ -33104,6 +33201,7 @@ public struct WorkflowGetResultWorkflow: Codable {
         case error = "error"
         case id = "id"
         case inputs = "inputs"
+        case model = "model"
         case name = "name"
         case path = "path"
         case project = "project"
@@ -33112,11 +33210,12 @@ public struct WorkflowGetResultWorkflow: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [PurpleWorkflowInputInfo]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: PurpleWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [PurpleWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: PurpleWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
         self.inputs = inputs
+        self.model = model
         self.name = name
         self.path = path
         self.project = project
@@ -33163,6 +33262,34 @@ public struct PurpleWorkflowTriggerInfo: Codable {
         self.expr = expr
         self.kind = kind
         self.path = path
+    }
+}
+
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowGetResultWorkflowModelInfo
+public struct WorkflowGetResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
     }
 }
 
@@ -33229,6 +33356,7 @@ public struct WorkflowElement: Codable {
     public let error: String?
     public let id: String
     public let inputs: [FluffyWorkflowInputInfo]?
+    public let model: String?
     public let name: String
     public let path: String
     public let project: String?
@@ -33241,6 +33369,7 @@ public struct WorkflowElement: Codable {
         case error = "error"
         case id = "id"
         case inputs = "inputs"
+        case model = "model"
         case name = "name"
         case path = "path"
         case project = "project"
@@ -33249,11 +33378,12 @@ public struct WorkflowElement: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [FluffyWorkflowInputInfo]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: FluffyWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [FluffyWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: FluffyWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
         self.inputs = inputs
+        self.model = model
         self.name = name
         self.path = path
         self.project = project
@@ -33303,6 +33433,34 @@ public struct FluffyWorkflowTriggerInfo: Codable {
     }
 }
 
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowModelInfo
+public struct WorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
+    }
+}
+
 /// One step read from the source, without running it.
 ///
 /// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
@@ -33329,6 +33487,9 @@ public struct WorkflowOutlineStep: Codable {
     public let key: String?
     public let kind: String
     public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
     public let title: String
 
     public enum CodingKeys: String, CodingKey {
@@ -33349,10 +33510,13 @@ public struct WorkflowOutlineStep: Codable {
         case key = "key"
         case kind = "kind"
         case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [WorkflowOutlineStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [WorkflowOutlineStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -33370,6 +33534,9 @@ public struct WorkflowOutlineStep: Codable {
         self.key = key
         self.kind = kind
         self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
         self.title = title
     }
 }
@@ -33511,6 +33678,7 @@ public struct WorkflowProposeResult: Codable {
     public let note: String
     public let problems: [WorkflowProposeResultProblem]?
     public let steps: [WorkflowProposeResultStep]?
+    public let workflowModel: WorkflowProposeResultWorkflowModelInfo?
 
     public enum CodingKeys: String, CodingKey {
         case answer = "answer"
@@ -33520,9 +33688,10 @@ public struct WorkflowProposeResult: Codable {
         case note = "note"
         case problems = "problems"
         case steps = "steps"
+        case workflowModel = "workflow_model"
     }
 
-    public init(answer: String?, code: String, kind: FluffyKind?, model: String, note: String, problems: [WorkflowProposeResultProblem]?, steps: [WorkflowProposeResultStep]?) {
+    public init(answer: String?, code: String, kind: FluffyKind?, model: String, note: String, problems: [WorkflowProposeResultProblem]?, steps: [WorkflowProposeResultStep]?, workflowModel: WorkflowProposeResultWorkflowModelInfo?) {
         self.answer = answer
         self.code = code
         self.kind = kind
@@ -33530,6 +33699,7 @@ public struct WorkflowProposeResult: Codable {
         self.note = note
         self.problems = problems
         self.steps = steps
+        self.workflowModel = workflowModel
     }
 }
 
@@ -33593,6 +33763,9 @@ public struct WorkflowProposeResultStep: Codable {
     public let key: String?
     public let kind: String
     public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
     public let title: String
 
     public enum CodingKeys: String, CodingKey {
@@ -33613,10 +33786,13 @@ public struct WorkflowProposeResultStep: Codable {
         case key = "key"
         case kind = "kind"
         case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -33634,6 +33810,9 @@ public struct WorkflowProposeResultStep: Codable {
         self.key = key
         self.kind = kind
         self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
         self.title = title
     }
 }
@@ -33677,6 +33856,34 @@ public struct StickyWorkflowStepArg: Codable {
         self.name = name
         self.source = source
         self.value = value
+    }
+}
+
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowProposeResultWorkflowModelInfo
+public struct WorkflowProposeResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
     }
 }
 
@@ -33725,13 +33932,16 @@ public struct WorkflowReadOutputResult: Codable {
 /// ``waiting`` (``on_restart="ask"``) or ``failed``. Finished steps are not run again.
 // MARK: - WorkflowResumeParams
 public struct WorkflowResumeParams: Codable {
+    public let model: String?
     public let workflowRunID: String
 
     public enum CodingKeys: String, CodingKey {
+        case model = "model"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(workflowRunID: String) {
+    public init(model: String?, workflowRunID: String) {
+        self.model = model
         self.workflowRunID = workflowRunID
     }
 }
@@ -34612,19 +34822,22 @@ public struct WorkflowSaveResult: Codable {
     public let problems: [WorkflowSaveResultProblem]?
     public let steps: [WorkflowSaveResultStep]?
     public let workflow: WorkflowSaveResultWorkflow
+    public let workflowModel: WorkflowSaveResultWorkflowModelInfo?
 
     public enum CodingKeys: String, CodingKey {
         case codeHash = "code_hash"
         case problems = "problems"
         case steps = "steps"
         case workflow = "workflow"
+        case workflowModel = "workflow_model"
     }
 
-    public init(codeHash: String, problems: [WorkflowSaveResultProblem]?, steps: [WorkflowSaveResultStep]?, workflow: WorkflowSaveResultWorkflow) {
+    public init(codeHash: String, problems: [WorkflowSaveResultProblem]?, steps: [WorkflowSaveResultStep]?, workflow: WorkflowSaveResultWorkflow, workflowModel: WorkflowSaveResultWorkflowModelInfo?) {
         self.codeHash = codeHash
         self.problems = problems
         self.steps = steps
         self.workflow = workflow
+        self.workflowModel = workflowModel
     }
 }
 
@@ -34683,6 +34896,9 @@ public struct WorkflowSaveResultStep: Codable {
     public let key: String?
     public let kind: String
     public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
     public let title: String
 
     public enum CodingKeys: String, CodingKey {
@@ -34703,10 +34919,13 @@ public struct WorkflowSaveResultStep: Codable {
         case key = "key"
         case kind = "kind"
         case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [IndigoWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], title: String) {
+    public init(after: [String]?, agent: String?, args: [IndigoWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -34724,6 +34943,9 @@ public struct WorkflowSaveResultStep: Codable {
         self.key = key
         self.kind = kind
         self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
         self.title = title
     }
 }
@@ -34782,6 +35004,7 @@ public struct WorkflowSaveResultWorkflow: Codable {
     public let error: String?
     public let id: String
     public let inputs: [TentacledWorkflowInputInfo]?
+    public let model: String?
     public let name: String
     public let path: String
     public let project: String?
@@ -34794,6 +35017,7 @@ public struct WorkflowSaveResultWorkflow: Codable {
         case error = "error"
         case id = "id"
         case inputs = "inputs"
+        case model = "model"
         case name = "name"
         case path = "path"
         case project = "project"
@@ -34802,11 +35026,12 @@ public struct WorkflowSaveResultWorkflow: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [TentacledWorkflowInputInfo]?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: TentacledWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [TentacledWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: TentacledWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
         self.inputs = inputs
+        self.model = model
         self.name = name
         self.path = path
         self.project = project
@@ -34856,6 +35081,34 @@ public struct TentacledWorkflowTriggerInfo: Codable {
     }
 }
 
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowSaveResultWorkflowModelInfo
+public struct WorkflowSaveResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
+    }
+}
+
 /// ``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.
 ///
 /// ``trigger`` says what asked for it. A person pressing Run is ``manual``.
@@ -34863,17 +35116,20 @@ public struct TentacledWorkflowTriggerInfo: Codable {
 public struct WorkflowStartParams: Codable {
     public let id: String
     public let inputs: [String: JSONAny]?
+    public let model: String?
     public let trigger: WorkflowStartParamsTrigger?
 
     public enum CodingKeys: String, CodingKey {
         case id = "id"
         case inputs = "inputs"
+        case model = "model"
         case trigger = "trigger"
     }
 
-    public init(id: String, inputs: [String: JSONAny]?, trigger: WorkflowStartParamsTrigger?) {
+    public init(id: String, inputs: [String: JSONAny]?, model: String?, trigger: WorkflowStartParamsTrigger?) {
         self.id = id
         self.inputs = inputs
+        self.model = model
         self.trigger = trigger
     }
 }
