@@ -337,7 +337,7 @@ export function isRoutineListResult(value: unknown): value is RoutineListResult 
   return isRecord(value) && Array.isArray(value["routines"]) && value["routines"].every(isRoutineInfo);
 }
 
-const RUN_KINDS = ["routine", "ask"];
+const RUN_KINDS = ["routine", "ask", "workflow"];
 const RUN_STATUSES = ["queued", "running", "waiting", "succeeded", "failed", "skipped", "cancelled"];
 
 function isRunInfo(value: unknown): boolean {

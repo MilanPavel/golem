@@ -31,6 +31,18 @@ function useTokens(text: string, language: Language): readonly (readonly Token[]
   return tokens !== null && tokens.text === text ? tokens.lines : null;
 }
 
+
+/** Moves the highlighted text, the gutter and the bands to the textarea's scroll. The bands are placed by line, so they move with the text. */
+function followScroll(box: HTMLTextAreaElement, under: HTMLElement | null, gutter: HTMLElement | null, bands: HTMLElement | null): void {
+  const { scrollTop, scrollLeft } = box;
+  if (under !== null) {
+    under.scrollTop = scrollTop;
+    under.scrollLeft = scrollLeft;
+  }
+  if (gutter !== null) gutter.scrollTop = scrollTop;
+  if (bands !== null) bands.style.transform = `translateY(${-scrollTop}px)`;
+}
+
 /**
  * A text box for TOML or Markdown: line numbers, colours, and a mark on the lines with a problem. The colours
  * are a copy of the text drawn under a transparent textarea, which keeps the browser's own editing,
@@ -76,6 +88,7 @@ export function CodeEditor({
   const tokens = useTokens(value, language);
   const under = useRef<HTMLPreElement>(null);
   const gutter = useRef<HTMLDivElement>(null);
+  const bandLayer = useRef<HTMLDivElement>(null);
   const count = value.split("\n").length;
   const area = useRef<HTMLTextAreaElement>(null);
   const nonce = reveal?.nonce;
@@ -88,6 +101,8 @@ export function CodeEditor({
     const pad = Number.parseFloat(style.paddingTop) || 0;
     // The line goes to the middle of the box. Only the scroll moves: the caret and the focus stay where they are.
     box.scrollTop = Math.max(0, pad + (revealLine - 1) * height - (box.clientHeight - height) / 2);
+    // A scroll set here may not fire a scroll event (jsdom never does), so the layers follow now.
+    followScroll(box, under.current, gutter.current, bandLayer.current);
   }, [nonce, revealLine]);
 
   function cursor(event: { currentTarget: HTMLTextAreaElement }): void {
@@ -97,12 +112,7 @@ export function CodeEditor({
   }
 
   function follow(event: React.UIEvent<HTMLTextAreaElement>): void {
-    const { scrollTop, scrollLeft } = event.currentTarget;
-    if (under.current !== null) {
-      under.current.scrollTop = scrollTop;
-      under.current.scrollLeft = scrollLeft;
-    }
-    if (gutter.current !== null) gutter.current.scrollTop = scrollTop;
+    followScroll(event.currentTarget, under.current, gutter.current, bandLayer.current);
   }
 
   return (
@@ -120,15 +130,13 @@ export function CodeEditor({
         ))}
       </div>
       <div className="relative min-w-0 flex-1">
-        {(bands ?? []).map((band, at) => (
-          <div
-            key={at}
-            aria-hidden="true"
-            className="code-editor-band"
-            data-kind={band.kind}
-            style={{ top: `${0.5 + (band.from - 1) * 1.25}rem`, height: `${(band.to - band.from + 1) * 1.25}rem` }}
-          />
-        ))}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div ref={bandLayer} data-testid="code-editor-bands" className="relative h-full">
+            {(bands ?? []).map((band, at) => (
+              <div key={at} className="code-editor-band" data-kind={band.kind} style={{ top: `${0.5 + (band.from - 1) * 1.25}rem`, height: `${(band.to - band.from + 1) * 1.25}rem` }} />
+            ))}
+          </div>
+        </div>
         <pre ref={under} aria-hidden="true" className="code-editor-layer absolute inset-0 overflow-hidden text-ink">
           {tokens === null
             ? value

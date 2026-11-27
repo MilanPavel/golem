@@ -43,7 +43,7 @@ test("a step in the outline selects it, shows its fields and marks its lines", a
 
 test("picking a step scrolls the code to its first line, and the focus stays on the step", async () => {
   const user = userEvent.setup();
-  render(editor());
+  const { container } = render(editor());
   const box = screen.getByRole("textbox", { name: "Code of pr_digest" }) as HTMLTextAreaElement;
   const card = screen.getByRole("button", { name: /Summarise each pull request/ });
   expect(box.scrollTop).toBe(0);
@@ -52,6 +52,8 @@ test("picking a step scrolls the code to its first line, and the focus stays on 
   expect(first).toBeGreaterThan(0);
   expect(document.activeElement).toBe(card);
   expect(box.selectionStart).toBe(0);
+  // The selected step's band moves with the text, so it stays on the step's lines.
+  expect(container.querySelector<HTMLElement>("[data-testid='code-editor-bands']")?.style.transform).toBe(`translateY(${-first}px)`);
   // A later step is further down.
   await user.click(screen.getByRole("button", { name: /Tell you/ }));
   expect(box.scrollTop).toBeGreaterThan(first);
