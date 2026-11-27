@@ -21,6 +21,7 @@ import { cn } from "../../ui/cn.ts";
 import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
+import { DataSourceIcon } from "../../ui/data-icons.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { dataErrorText, type DataDescribeResult, type DataExtensionName, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
 import { DATA_TABS, type DataTab } from "../../store/router.ts";
@@ -475,6 +476,7 @@ export function SourcePage({
       <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
           <h1 className="flex flex-wrap items-center gap-2 font-ui text-lg font-semibold">
+            <DataSourceIcon kind={source.kind} location={source.location} className="shrink-0 text-muted" />
             <span className="min-w-0 truncate">{source.name}</span>
             <PrivacyChip privacy={source.privacy} />
             <Badge>{kindWord(source.kind)}</Badge>

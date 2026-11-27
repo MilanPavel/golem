@@ -14,6 +14,7 @@ import {
 } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
+import { AddKindIcon } from "../../ui/data-icons.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { Input } from "../../ui/input.tsx";
 import { dataErrorText, type DataAddParams, type DataExtensionName, type DataInspectResult, type DataSource } from "../../store/data.ts";
@@ -243,7 +244,10 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
           <div role="radiogroup" aria-label="What kind of source" className="grid grid-cols-2 gap-2">
             {ADD_KINDS.map((option) => (
               <Choice key={option.kind} on={kind === option.kind} onClick={() => setKind(option.kind)}>
-                <span className="block text-sm font-medium">{option.title}</span>
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <AddKindIcon kind={option.kind} className="shrink-0 text-muted" />
+                  {option.title}
+                </span>
                 <span className="mt-1 block text-meta text-muted">{option.detail}</span>
               </Choice>
             ))}

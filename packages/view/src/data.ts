@@ -107,7 +107,36 @@ export function kindGlyph(kind: DataKind): string {
   if (kind === "builtin") return "◆";
   if (kind === "files") return "▤";
   if (kind === "url") return "⌁";
-  return "db";
+  return "▣";
+}
+
+/** What the files a source's `location` names are, for its icon. `folder` is a directory or a pattern with no extension; `sheet` is a file of a kind golem has no picture for. */
+export type SourceFileType = "csv" | "excel" | "parquet" | "json" | "folder" | "sheet";
+
+const FILE_TYPE_OF_EXTENSION: Record<string, SourceFileType> = {
+  csv: "csv",
+  tsv: "csv",
+  tab: "csv",
+  txt: "csv",
+  xlsx: "excel",
+  xlsm: "excel",
+  xls: "excel",
+  parquet: "parquet",
+  pq: "parquet",
+  json: "json",
+  jsonl: "json",
+  ndjson: "json",
+};
+
+/** The type of the files a `location` names: `bank/*.csv` is csv, `a.xlsx` is excel, `logs/` is a folder. A web address is read by its path, so a query string does not hide the extension. */
+export function sourceFileType(location: string): SourceFileType {
+  const path = location.trim().replace(/[?#].*$/, "");
+  if (path === "") return "sheet";
+  if (path.endsWith("/")) return "folder";
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  const dot = name.lastIndexOf(".");
+  if (dot < 0) return "folder";
+  return FILE_TYPE_OF_EXTENSION[name.slice(dot + 1).toLowerCase()] ?? "sheet";
 }
 
 export interface DataGroups<T> {

@@ -26,6 +26,7 @@ export {
   SAMPLE_SCHEMA_NOTE,
   savedInText,
   sourceDetail,
+  sourceFileType,
   stepName,
   type AddKind,
   type AddKindOption,
@@ -36,6 +37,7 @@ export {
   type DataScope,
   type DataSourceLike,
   type DataStatus,
+  type SourceFileType,
 } from "./data.ts";
 export {
   defaultExportPath,
