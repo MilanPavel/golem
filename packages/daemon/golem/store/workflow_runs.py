@@ -45,6 +45,12 @@ class WorkflowRunRecord:
     result_json: str | None
     model: str | None = None
     """The model this one run was started with; it beats the file's."""
+    from_run_id: str | None = None
+    """The run this one was started again from (``workflow.start {from_run}``)."""
+    from_key: str | None = None
+    """The step of ``from_run_id`` it started again from."""
+    source_text: str | None = None
+    """The text of the workflow file as the run started."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +81,8 @@ class WorkflowStepRecord:
     seq: int
     item: str | None
     group_title: str | None
+    reused_from: str | None = None
+    """The run this step's saved result was taken from, when the run started again from a step."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,13 +133,16 @@ class WorkflowRuns:
         trigger: str = "manual",
         source_hash: str | None = None,
         model: str | None = None,
+        from_run_id: str | None = None,
+        from_key: str | None = None,
+        source_text: str | None = None,
     ) -> str:
         """Write a ``pending`` run. Returns its id."""
         run_id = new_id("wr")
         await self._write(
             "INSERT INTO workflow_runs (workflow_run_id, workflow_id, name, path, project,"
-            " status, inputs_json, trigger, created_at, source_hash, model)"
-            " VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
+            " status, inputs_json, trigger, created_at, source_hash, model, from_run_id, from_key,"
+            " source_text) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 workflow_id,
@@ -143,9 +154,46 @@ class WorkflowRuns:
                 at,
                 source_hash,
                 model,
+                from_run_id,
+                from_key,
+                source_text,
             ),
         )
         return run_id
+
+    async def copy_steps(self, run_id: str, steps: list[WorkflowStepRecord]) -> None:
+        """Write ``steps`` (of another run) into ``run_id`` as they are, marked as taken over.
+
+        Each keeps its position, result, times, model, cost and helper session; ``reused_from``
+        names the run it came from."""
+        async with self._database.transaction() as tx:
+            for step in steps:
+                await tx.execute(
+                    "INSERT INTO workflow_steps (workflow_run_id, step_key, kind, title,"
+                    " group_key, status, attempts, result_json, error, child_session_id,"
+                    " cost_usd, model, started_at, finished_at, seq, item, group_title,"
+                    " reused_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        run_id,
+                        step.step_key,
+                        step.kind,
+                        step.title,
+                        step.group_key,
+                        step.status,
+                        step.attempts,
+                        step.result_json,
+                        step.error,
+                        step.child_session_id,
+                        step.cost_usd,
+                        step.model,
+                        step.started_at,
+                        step.finished_at,
+                        step.seq,
+                        step.item,
+                        step.group_title,
+                        step.workflow_run_id,
+                    ),
+                )
 
     async def set_run_model(self, run_id: str, model: str | None) -> None:
         """Set the model one run was started or resumed with (None: the file's choice)."""

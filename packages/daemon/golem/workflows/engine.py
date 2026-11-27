@@ -313,7 +313,8 @@ class WorkflowEngine:
     ) -> str:
         """Create the run row and run it to its end. Returns the run id."""
         path = Path(entry_path)
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        data = path.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
         run_id = await self._store.create_run(
             f"{path}::{workflow_name}",
             workflow_name,
@@ -323,6 +324,7 @@ class WorkflowEngine:
             trigger=trigger,
             source_hash=digest,
             model=model,
+            source_text=data.decode("utf-8", errors="replace"),
         )
         await self.execute(run_id)
         return run_id

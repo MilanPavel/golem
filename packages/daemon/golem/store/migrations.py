@@ -484,4 +484,13 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         """,
         "CREATE INDEX inbox_posts_open ON inbox_posts (at) WHERE done_at IS NULL",
     ),
+    (
+        # "Run again from here": a run says which run and step it came from, keeps the text of
+        # the file it ran (to tell later whether the code before a step changed), and a step
+        # taken over from the old run says which run it came from.
+        "ALTER TABLE workflow_runs ADD COLUMN from_run_id TEXT",
+        "ALTER TABLE workflow_runs ADD COLUMN from_key TEXT",
+        "ALTER TABLE workflow_runs ADD COLUMN source_text TEXT",
+        "ALTER TABLE workflow_steps ADD COLUMN reused_from TEXT",
+    ),
 )
