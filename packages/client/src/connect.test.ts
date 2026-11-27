@@ -2856,11 +2856,13 @@ test("the repo info and the folder dialog send their arguments, localUi follows 
     assert.deepEqual(await client.chooseFolder("/home/me"), { path: "/home/me/x" });
     await client.chooseFolder();
     assert.deepEqual(await client.reveal("/home/me/x"), {});
+    assert.deepEqual(await client.reveal("/home/me/x/b.md", { workflowRunId: "wr_1", outputIndex: 2 }), {});
     assert.deepEqual(seen, [
       ["git.info", { path: "/r" }],
       ["fs.choose_folder", { start: "/home/me" }],
       ["fs.choose_folder", {}],
       ["fs.reveal", { path: "/home/me/x" }],
+      ["fs.reveal", { path: "/home/me/x/b.md", workflow_run_id: "wr_1", output_index: 2 }],
     ]);
   } finally {
     client.close();

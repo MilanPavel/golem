@@ -2492,7 +2492,6 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
               onNavigate={() => {}}
               lastRun={lastRun}
               initialEditor={initialEditor}
-              initialTab="code"
             />
           </div>
         ))}

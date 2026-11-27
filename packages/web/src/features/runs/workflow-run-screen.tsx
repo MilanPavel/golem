@@ -65,6 +65,7 @@ export function WorkflowRunScreen({ id }: { id: string }) {
           return reply.answer ?? reply.note;
         }}
         onAskAbout={startChat}
+        onReveal={(path, index) => actions.reveal(path, { workflowRunId: id, outputIndex: index })}
         onSeeStep={(step) => {
           // The step's place in the workflow's outline, read when asked. When it cannot be found the workflow opens with no step picked.
           readWorkflow(run.workflow_id).then(

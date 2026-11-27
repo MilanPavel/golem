@@ -76,9 +76,28 @@ test("a clipboard that refuses is said, and nothing else breaks", async () => {
   expect(await screen.findByText(/clipboard is not available/)).toBeTruthy();
 });
 
-test("Show in Finder is not offered, not even for a file: fs.reveal refuses the path of a run's output", () => {
-  view(SAMPLE_RUN_FILE, { onAskAbout: vi.fn() });
+test("Show in Finder is offered for a file result only", () => {
+  const { unmount } = view(SAMPLE_RUN_FILE, { onReveal: vi.fn(async () => {}) });
+  expect(actions("Briefing file").getByRole("button", { name: "Show in Finder" })).toBeTruthy();
+  unmount();
+  view(SAMPLE_RUN_TEXT, { onReveal: vi.fn(async () => {}) });
   expect(screen.queryByRole("button", { name: /Finder/ })).toBeNull();
+});
+
+test("Show in Finder reveals the file with the run and the place of the result", async () => {
+  const user = userEvent.setup();
+  const onReveal = vi.fn(async () => {});
+  view(SAMPLE_RUN_FILE, { onReveal });
+  await user.click(actions("Briefing file").getByRole("button", { name: "Show in Finder" }));
+  expect(onReveal).toHaveBeenCalledWith(SAMPLE_BRIEFING_PATH, 0);
+});
+
+test("a refusal of Show in Finder is said beside the button, which stays", async () => {
+  const user = userEvent.setup();
+  view(SAMPLE_RUN_FILE, { onReveal: vi.fn(async () => Promise.reject(new Error("That file is not a result of this run."))) });
+  await user.click(actions("Briefing file").getByRole("button", { name: "Show in Finder" }));
+  expect(await screen.findByText("That file is not a result of this run.")).toBeTruthy();
+  expect(actions("Briefing file").getByRole("button", { name: "Show in Finder" })).toBeTruthy();
 });
 
 test("Ask about this hands over the text quoted, and a file as its path", async () => {
@@ -165,4 +184,14 @@ test("/runs/:id: See this step opens the workflow with that step selected, found
   await waitFor(() => expect(window.location.search).toBe("?step=s2"));
   expect(window.location.pathname).toContain("/workflows/");
   expect(fake.raw.getWorkflow).toHaveBeenCalledWith(SAMPLE_RUN_DONE.run.workflow_id);
+});
+
+test("/runs/:id: Show in Finder reveals the file with the run id and the index", async () => {
+  const user = userEvent.setup();
+  const fake = mount("/runs/wr_1", (one) => {
+    one.raw.workflowStatus.mockResolvedValue({ ...SAMPLE_RUN_FILE, run: { ...SAMPLE_RUN_FILE.run, workflow_run_id: "wr_1" } });
+    one.raw.readWorkflowOutput.mockResolvedValue({ path: SAMPLE_BRIEFING_PATH, text: "# Briefing", size: 10, truncated: false });
+  });
+  await user.click(await screen.findByRole("button", { name: "Show in Finder" }));
+  await waitFor(() => expect(fake.raw.reveal).toHaveBeenCalledWith(SAMPLE_BRIEFING_PATH, { workflowRunId: "wr_1", outputIndex: 0 }));
 });

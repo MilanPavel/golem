@@ -121,7 +121,7 @@ test("/workflows/:id with no run asks for no status and says nothing of a last r
   expect(await screen.findByRole("heading", { name: /pr_digest/ })).toBeTruthy();
   await waitFor(() => expect(fake.raw.listRuns).toHaveBeenCalled());
   expect(fake.raw.workflowStatus).not.toHaveBeenCalled();
-  expect(screen.queryByText(/Last run/)).toBeNull();
+  expect(screen.queryByRole("region", { name: "What it gave in the last run" })).toBeNull();
 });
 
 test("Open that run goes to the run's page", async () => {

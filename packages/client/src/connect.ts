@@ -814,9 +814,10 @@ export interface GolemClient {
   chooseFolder(start?: string | null): Promise<FsChooseFolderResult>;
   /**
    * Opens `path` in Finder on the daemon's Mac. Refused when this page is not on that Mac
-   * (see {@link GolemClient.localUi}).
+   * (see {@link GolemClient.localUi}). With `output`, `path` is the file a workflow run marked as its
+   * result number `output_index`, which the daemon checks against the run.
    */
-  reveal(path: string): Promise<FsRevealResult>;
+  reveal(path: string, output?: { workflowRunId: string; outputIndex: number }): Promise<FsRevealResult>;
   /** Every part of golem's setup, as `golem doctor` checks it. */
   setupStatus(): Promise<SetupStatusResult>;
   /** Install Ollama with Homebrew, run by the daemon. Output reaches {@link GolemClient.onOllamaInstall}. */
@@ -2828,9 +2829,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async reveal(path: string): Promise<FsRevealResult> {
+    async reveal(path: string, output?: { workflowRunId: string; outputIndex: number }): Promise<FsRevealResult> {
       await ready;
-      const result = await call("fs.reveal", { path });
+      const result = await call("fs.reveal", output === undefined ? { path } : { path, workflow_run_id: output.workflowRunId, output_index: output.outputIndex });
       if (!isFsRevealResult(result)) {
         throw new Error("invalid fs.reveal result");
       }

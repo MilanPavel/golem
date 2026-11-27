@@ -97,8 +97,8 @@ test("parseRoute reads the workflows page and one workflow, and workflowPath rou
     expect(parseRoute(bad)).toEqual({ name: "not-found" });
   }
   // The old tab paths land on the page.
-  expect(parseRoute(`${workflowPath(id)}/runs`)).toEqual({ name: "workflow", id });
-  expect(parseRoute(`${workflowPath(id)}/triggers`)).toEqual({ name: "workflow", id });
+  expect(parseRoute(`${workflowPath(id)}/runs`)).toEqual({ name: "workflow", id, step: null });
+  expect(parseRoute(`${workflowPath(id)}/triggers`)).toEqual({ name: "workflow", id, step: null });
 });
 
 test("parseRoute reads the page that makes a new workflow, and workflowNewPath round-trips", () => {

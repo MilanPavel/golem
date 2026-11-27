@@ -80,6 +80,8 @@ export type WorkflowRunViewProps = {
   onReadOutput?: (index: number) => Promise<WorkflowReadOutputResult>;
   /** Asks golem a question about the run (the Ask golem path of the workflow page) and resolves with its answer. Without it "Why did this fail?" is not offered. */
   onAsk?: (question: string) => Promise<string>;
+  /** Shows the file of result `index` in Finder. Without it "Show in Finder" is not offered. */
+  onReveal?: (path: string, index: number) => Promise<void>;
   /** Starts a new chat with this text in its box ("Ask about this" on a result). Without it the action is not offered. */
   onAskAbout?: (text: string) => void;
   /** Opens the workflow page with this step of the run selected. Without it the link is not offered. */
@@ -340,7 +342,7 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
               />
             </div>
             <div className="min-w-0 flex-1 rounded-lg border border-line bg-bg p-4">
-              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} onAskAbout={props.onAskAbout} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
+              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} onAskAbout={props.onAskAbout} onReveal={props.onReveal} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
             </div>
           </div>
         </TabsContent>
