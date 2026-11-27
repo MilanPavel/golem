@@ -7,51 +7,48 @@ import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./
 
 resetThemeAfterEach();
 
-// Every state in both themes: the page is drawn the same in both, only the tokens change.
-for (const theme of ["slip", "kiln"] as const) {
-  // One test per case: axe is slow in jsdom, and a loop of every case in one test outgrew the timeout on CI.
-  // A timed-out test leaves axe running, so the tests after it failed with "Axe is already running".
-  for (const { label } of WELCOME_CASES) {
-    test(`the gallery's welcome page shows "${label}" in ${theme}, and passes axe`, async () => {
-      showTheme(theme);
-      render(<Gallery />);
-      const group = screen.getByRole("region", { name: `Welcome, ${label}` });
-      expect(within(group).getByRole("list", { name: "Setup steps" })).toBeTruthy();
-      if (label === "Engine, installing Ollama") expect(group.textContent).toContain("==> Fetching ollama");
-      if (label === "Model, default gone") expect(group.textContent).toContain("is no longer installed");
-      if (label === "Ready, model downloading") expect(within(group).getByRole("heading", { name: "Almost ready." })).toBeTruthy();
-      if (label === "Ready, install in Chrome") expect(within(group).getByRole("button", { name: "Install golem as an app" })).toBeTruthy();
-      if (label === "Ready, install in Safari") expect(group.textContent).toContain("File → Add to Dock…");
-      if (label === "Ready, install from the Chrome menu") expect(group.textContent).toContain("⋮ → Cast, save and share → Install page as app");
-      if (label === "Ready, install in another browser") expect(group.textContent).toContain("Bookmark 127.0.0.1:7480");
-      if (label === "Ready, app installed") expect(group.textContent).toContain("golem is installed as an app.");
-      await expectAxeClean(group, DIALOG_RULES);
-    });
-  }
-
-  for (const { label } of TOOLS_CASES) {
-    test(`the gallery's Tools panel shows "${label}" in ${theme}, and passes axe`, async () => {
-      showTheme(theme);
-      render(<Gallery />);
-      const group = screen.getByRole("region", { name: label });
-      if (label === "Tools, the offer") expect(within(group).getByRole("button", { name: "Add 3" })).toBeTruthy();
-      if (label === "Tools, GitHub ticked") expect((within(group).getByLabelText("GitHub token") as HTMLInputElement).type).toBe("password");
-      if (label === "Tools, adding") {
-        expect(group.textContent).toContain("installing Node");
-        expect(within(group).getByRole("progressbar", { name: "Installing Node" }).getAttribute("aria-valuenow")).toBe("41");
-        expect(group.textContent).toContain("failed · The token was refused (401)");
-      }
-      if (label === "Tools, Settings card") expect(group.textContent).toContain("Tools · 1 server");
-      await expectAxeClean(group, DIALOG_RULES);
-    });
-  }
-
-  test(`the gallery's empty screen with the setup strip in ${theme} passes axe`, async () => {
-    showTheme(theme);
-    render(<Gallery />);
-    const group = screen.getByRole("group", { name: "Empty screen, setup left" });
-    expect(group.textContent).toContain("Setup isn't finished.");
-    expect(within(group).getByRole("button", { name: "Finish setup" })).toBeTruthy();
+// One test per case: axe is slow in jsdom, and a loop of every case in one test outgrew the timeout on CI.
+// A timed-out test leaves axe running, so the tests after it failed with "Axe is already running".
+for (const { label } of WELCOME_CASES) {
+  test(`the gallery's welcome page shows "${label}", and passes axe`, async () => {
+    showTheme("slip");
+    render(<Gallery only="welcome-page" />);
+    const group = screen.getByRole("region", { name: `Welcome, ${label}` });
+    expect(within(group).getByRole("list", { name: "Setup steps" })).toBeTruthy();
+    if (label === "Engine, installing Ollama") expect(group.textContent).toContain("==> Fetching ollama");
+    if (label === "Model, default gone") expect(group.textContent).toContain("is no longer installed");
+    if (label === "Ready, model downloading") expect(within(group).getByRole("heading", { name: "Almost ready." })).toBeTruthy();
+    if (label === "Ready, install in Chrome") expect(within(group).getByRole("button", { name: "Install golem as an app" })).toBeTruthy();
+    if (label === "Ready, install in Safari") expect(group.textContent).toContain("File → Add to Dock…");
+    if (label === "Ready, install from the Chrome menu") expect(group.textContent).toContain("⋮ → Cast, save and share → Install page as app");
+    if (label === "Ready, install in another browser") expect(group.textContent).toContain("Bookmark 127.0.0.1:7480");
+    if (label === "Ready, app installed") expect(group.textContent).toContain("golem is installed as an app.");
     await expectAxeClean(group, DIALOG_RULES);
   });
 }
+
+for (const { label } of TOOLS_CASES) {
+  test(`the gallery's Tools panel shows "${label}", and passes axe`, async () => {
+    showTheme("slip");
+    render(<Gallery only="tools-panel" />);
+    const group = screen.getByRole("region", { name: label });
+    if (label === "Tools, the offer") expect(within(group).getByRole("button", { name: "Add 3" })).toBeTruthy();
+    if (label === "Tools, GitHub ticked") expect((within(group).getByLabelText("GitHub token") as HTMLInputElement).type).toBe("password");
+    if (label === "Tools, adding") {
+      expect(group.textContent).toContain("installing Node");
+      expect(within(group).getByRole("progressbar", { name: "Installing Node" }).getAttribute("aria-valuenow")).toBe("41");
+      expect(group.textContent).toContain("failed · The token was refused (401)");
+    }
+    if (label === "Tools, Settings card") expect(group.textContent).toContain("Tools · 1 server");
+    await expectAxeClean(group, DIALOG_RULES);
+  });
+}
+
+test(`the gallery's empty screen with the setup strip passes axe`, async () => {
+  showTheme("slip");
+  render(<Gallery only="empty-screen" />);
+  const group = screen.getByRole("group", { name: "Empty screen, setup left" });
+  expect(group.textContent).toContain("Setup isn't finished.");
+  expect(within(group).getByRole("button", { name: "Finish setup" })).toBeTruthy();
+  await expectAxeClean(group, DIALOG_RULES);
+});

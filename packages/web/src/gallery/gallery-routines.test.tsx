@@ -7,7 +7,7 @@ resetThemeAfterEach();
 
 test("the gallery's Routines section shows the panel, a detail with History, and the empty state", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="routines" />);
   const panel = within(screen.getByRole("complementary", { name: "Routines, slip" }));
   expect(panel.getByRole("link", { name: /morning-brief/ })).toBeTruthy();
   expect(within(screen.getByRole("complementary", { name: "Routines, empty, slip" })).getByText(/No routines yet/)).toBeTruthy();

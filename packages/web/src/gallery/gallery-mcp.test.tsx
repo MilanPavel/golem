@@ -7,7 +7,7 @@ resetThemeAfterEach();
 
 test("the gallery's MCP servers section shows the catalog cards and the import list, nothing picked to start", () => {
   showTheme("slip");
-  render(<Gallery />);
+  render(<Gallery only="mcp-servers" />);
   const catalog = within(screen.getByRole("region", { name: "MCP servers, Catalog" }));
   expect(catalog.getByRole("heading", { name: "GitHub" })).toBeTruthy();
   expect(catalog.getByRole("heading", { name: "Another server" })).toBeTruthy();

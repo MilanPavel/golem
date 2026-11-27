@@ -100,8 +100,8 @@ export const GALLERY_SECTIONS = [
  * time and the jsdom memory of a test follow the section, not the 78 of them. The theme attribute, the
  * providers and the `main` landmark are the same as on the page.
  */
-export function sectionAxeTests(theme: "slip" | "kiln"): void {
-  for (const id of GALLERY_SECTIONS) {
+export function sectionAxeTests(theme: "slip" | "kiln", ids: readonly (typeof GALLERY_SECTIONS)[number][] = GALLERY_SECTIONS): void {
+  for (const id of ids) {
     test(`the gallery's ${id} section in ${theme} passes axe`, async () => {
       showTheme(theme);
       const { container } = render(<Gallery only={id} />);
