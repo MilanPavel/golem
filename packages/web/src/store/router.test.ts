@@ -65,8 +65,17 @@ test("parseRoute reads the routines page and one routine", () => {
 });
 
 test("parseRoute reads the Runs page", () => {
-  expect(parseRoute("/runs")).toEqual({ name: "runs" });
-  expect(parseRoute(runsPath())).toEqual({ name: "runs" });
+  expect(parseRoute("/runs")).toEqual({ name: "runs", workflow: null });
+  expect(parseRoute(runsPath())).toEqual({ name: "runs", workflow: null });
+});
+
+test("the Runs page carries a workflow filter in the URL, and runsPath round-trips it", () => {
+  const id = "/Users/you/.golem/workflows/pr_digest.py::pr_digest";
+  expect(runsPath(id)).toBe(`/runs?workflow=${encodeURIComponent(id)}`);
+  const [pathname, search] = runsPath(id).split("?");
+  expect(parseRoute(pathname!, `?${search}`)).toEqual({ name: "runs", workflow: id });
+  expect(parseRoute("/runs", "?workflow=")).toEqual({ name: "runs", workflow: null });
+  expect(runsPath(null)).toBe("/runs");
 });
 
 test("parseRoute reads one workflow run by its id, and runPath round-trips", () => {

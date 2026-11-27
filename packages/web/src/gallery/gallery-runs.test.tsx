@@ -29,3 +29,17 @@ test("the gallery's Runs section shows the panel, the grouped list, and the bann
   expect(text[1]).toContain("by you");
   expect(text[2]).toContain("by new file receipt-0412.pdf");
 });
+
+test("the gallery's Runs page shows the filter chip with its result beside the list, a failed run open, and an empty filter", () => {
+  showTheme("slip");
+  render(<Gallery />);
+  const filtered = within(screen.getByRole("region", { name: "Runs page, filtered to a workflow, slip" }));
+  expect(filtered.getByText("Workflow: pr_digest")).toBeTruthy();
+  expect(filtered.getByText("3 things need you")).toBeTruthy();
+  expect(filtered.queryByText("sentry-triage")).toBeNull();
+  expect(within(screen.getByRole("region", { name: "Runs page, a failed run open, slip" })).getByRole("group", { name: "Why it stopped" })).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "Runs page, nothing for the filter, slip" })).getByText("pr_digest has not run yet.")).toBeTruthy();
+  const every = within(screen.getByRole("region", { name: "Runs page, every run, slip" }));
+  expect(every.queryByText("Workflow: pr_digest")).toBeNull();
+  expect(every.getAllByText("sentry-triage").length).toBeGreaterThan(0);
+});

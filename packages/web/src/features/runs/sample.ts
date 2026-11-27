@@ -27,6 +27,29 @@ export const SAMPLE_WAITING_RUN: RunInfo = row("s_wait", {
   summary: "Allow mcp__linear__create_issue: TypeError in router.matchRoute",
 });
 
+/** The id of the workflow the filtered Runs page samples are for. */
+export const SAMPLE_FILTER_WORKFLOW = "/Users/you/.golem/workflows/pr_digest.py::pr_digest";
+
+const flow = (id: string, extra: Partial<RunInfo>): RunInfo => ({
+  session_id: null,
+  kind: "workflow",
+  origin: "workflow:pr_digest",
+  status: "succeeded",
+  approvals: 0,
+  steps: 5,
+  workflow_run_id: id,
+  ...extra,
+});
+
+/** Runs of one workflow as the list gets them: a result in a line, nothing found, a failure, a run that goes, and an older run. */
+export const SAMPLE_FILTER_RUNS: RunInfo[] = [
+  flow("wr_today", { started_at: at(0, 8, 30), ended_at: at(0, 8, 31, 12), summary: "3 things need you" }),
+  flow("wr_empty", { started_at: at(0, 7, 30), ended_at: at(0, 7, 30, 40), summary: "Nothing found" }),
+  flow("wr_fail", { started_at: at(0, 6, 30), ended_at: at(0, 6, 30, 30), status: "failed", steps: 1, reason: "tool mcp__github__list_pull_requests: needs sign-in", summary: "tool mcp__github__list_pull_requests: needs sign-in" }),
+  flow("wr_run", { started_at: at(0, 18, 25), status: "running", steps: 3 }),
+  flow("wr_old", { started_at: at(1, 8, 30), ended_at: at(1, 8, 31, 2), summary: "Saved as 2026-11-16.md" }),
+];
+
 /** One run of each kind and state the list shows: waiting, running, today, earlier, a watch firing, and a detached ask. */
 export const SAMPLE_RUN_LIST: RunInfo[] = [
   row("s_old", { started_at: at(1, 8, 30), ended_at: at(1, 8, 31, 51), summary: "10 PRs, 0 failing checks" }),
@@ -53,3 +76,6 @@ export const SAMPLE_RUN_LIST: RunInfo[] = [
     approvals: 0,
   },
 ];
+
+/** Every run, with those of the workflow among them: the page the filter narrows. */
+export const SAMPLE_MIXED_RUNS: RunInfo[] = [...SAMPLE_RUN_LIST, ...SAMPLE_FILTER_RUNS];
