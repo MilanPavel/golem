@@ -128,7 +128,7 @@ async def test_start_sends_the_steps_in_order_and_the_run_is_done(short_home: Pa
         await stop_daemon(app, task)
 
 
-async def test_each_run_gets_its_headless_session_before_the_first_event(
+async def test_a_run_of_plain_steps_makes_no_session_and_is_still_in_runs(
     short_home: Path,
 ) -> None:
     path = _write(short_home / "workflows", "adder.py", TWO_STEPS)
@@ -140,18 +140,19 @@ async def test_each_run_gets_its_headless_session_before_the_first_event(
         started = rpc_result(await client.call("workflow.start", {"id": f"{path}::adder"}))
         run_id = str(started["workflow_run_id"])
         got = await _until(client, run_id, "done")
-        session_id = cast(dict[str, object], got["run"])["session_id"]
-        assert isinstance(session_id, str) and session_id
+        assert cast(dict[str, object], got["run"])["session_id"] is None
 
         await client.take_events()
         first = next(n for n in client.notices if n["method"] == "workflow.run.started")
-        assert cast(dict[str, object], first["params"])["session_id"] == session_id
+        assert cast(dict[str, object], first["params"])["session_id"] is None
 
         runs = cast(Rows, rpc_result(await client.call("run.list", {}))["runs"])
-        row = next(r for r in runs if r["session_id"] == session_id)
-        assert row["origin"] == "workflow:adder"
+        row = next(r for r in runs if r["workflow_run_id"] == run_id)
+        assert row["session_id"] is None and row["origin"] == "workflow:adder"
         assert (row["kind"], row["status"], row["steps"]) == ("workflow", "succeeded", 2)
         assert row["ended_at"] is not None and row["routine"] is None
+        sessions = cast(Rows, rpc_result(await client.call("session.list", {}))["sessions"])
+        assert sessions == []
     finally:
         await client.close()
         await stop_daemon(app, task)

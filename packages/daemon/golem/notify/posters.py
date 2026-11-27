@@ -22,7 +22,7 @@ _TIMEOUT_SECONDS = 10.0
 def with_open_hint(notice: Notice) -> str:
     """The body, plus the command that opens the session. A click on this banner opens
     Script Editor, not golem, so the way in is written on it (ADR-050's fallback)."""
-    if notice.session_id == "test":
+    if notice.session_id == "test" or notice.session_id.startswith("run:"):
         return notice.body
     return f"{notice.body}\ngolem open {notice.session_id}"
 

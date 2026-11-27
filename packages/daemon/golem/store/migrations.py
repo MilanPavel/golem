@@ -8,6 +8,18 @@ too old for the file, so its columns never change.
 
 from __future__ import annotations
 
+_EMPTY_WORKFLOW = (
+    "SELECT s.session_id FROM sessions s WHERE s.origin LIKE 'workflow:%'"
+    " AND s.parent_session_id IS NULL"
+    " AND NOT EXISTS (SELECT 1 FROM events e WHERE e.session_id = s.session_id"
+    " AND e.type LIKE 'message.%')"
+    " AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.session_id = s.session_id)"
+    " AND NOT EXISTS (SELECT 1 FROM sessions c WHERE c.parent_session_id = s.session_id)"
+    " AND NOT EXISTS (SELECT 1 FROM artifacts a WHERE a.session_id = s.session_id)"
+    " AND NOT EXISTS (SELECT 1 FROM file_changes f WHERE f.session_id = s.session_id)"
+)
+"""The sessions the migration after ``routine_runs.workflow_run_id`` removes."""
+
 MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
         """
@@ -424,5 +436,14 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         # A step may carry the part that changes in a loop, and the title of its parallel group.
         "ALTER TABLE workflow_steps ADD COLUMN item TEXT",
         "ALTER TABLE workflow_steps ADD COLUMN group_title TEXT",
+    ),
+    (
+        # A workflow run gets a session only when a step needs one. The empty sessions the old
+        # code made for every run (no message, no run, no helper, no artifact, no file change)
+        # are removed, and their workflow runs lose the id.
+        f"UPDATE workflow_runs SET session_id = NULL WHERE session_id IN ({_EMPTY_WORKFLOW})",
+        f"UPDATE routine_runs SET session_id = NULL WHERE session_id IN ({_EMPTY_WORKFLOW})",
+        f"DELETE FROM events WHERE session_id IN ({_EMPTY_WORKFLOW})",
+        f"DELETE FROM sessions WHERE session_id IN ({_EMPTY_WORKFLOW})",
     ),
 )

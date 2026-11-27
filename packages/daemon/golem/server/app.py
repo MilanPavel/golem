@@ -10,7 +10,7 @@ import os
 import signal
 import sys
 import time
-from collections.abc import AsyncGenerator, Callable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -497,9 +497,7 @@ class DaemonApp:
                     user_file=self.paths.config_file,
                     trusted=policy.trusted,
                     broadcast=self._broadcast,
-                    create_session=lambda origin, cwd: sessions.create(
-                        None, cwd=cwd, origin=origin
-                    ),
+                    create_session=_workflow_session(sessions),
                     notify=self.state.notifier.tell,
                     touch_session=sessions.touch,
                     tools=WorkflowTools(
@@ -910,6 +908,17 @@ class DaemonApp:
         exc = task.exception()
         if exc is not None:
             log.error("client task failed", exc_info=exc)
+
+
+def _workflow_session(sessions: SessionManager) -> Callable[[str, str | None, str], Awaitable[str]]:
+    """Makes the headless session of a workflow run, with its title."""
+
+    async def create(origin: str, cwd: str | None, title: str) -> str:
+        session_id = await sessions.create(None, cwd=cwd, origin=origin)
+        await sessions.rename(session_id, title)
+        return session_id
+
+    return create
 
 
 def _price_of(router: ModelRouter, models: ModelDiscovery, profile: str) -> ModelPrice | None:

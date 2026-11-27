@@ -246,11 +246,18 @@ class Notifier:
         except Exception:
             log.exception("notifying about %s failed", kind)
 
-    async def tell(self, title: str, body: str, session_id: str | None = None) -> None:
+    async def tell(
+        self,
+        title: str,
+        body: str,
+        session_id: str | None = None,
+        workflow_run_id: str | None = None,
+    ) -> None:
         """Post a notice a workflow asked for (``run.notify``). It always shows: the workflow
         said it on purpose. The click opens ``session_id``; with none, the banner has no
-        open hint."""
-        await self._poster.post(Notice("finished", session_id or "test", title, _cut(body)))
+        open hint and ``workflow_run_id`` keys it, so a run's banners replace each other."""
+        key = session_id or (None if workflow_run_id is None else f"run:{workflow_run_id}")
+        await self._poster.post(Notice("finished", key or "test", title, _cut(body)))
 
     async def test(self) -> bool:
         """Post a sample banner, as ``notify.test`` does. True when it was shown."""

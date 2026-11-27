@@ -591,7 +591,7 @@ async def test_a_waiting_firing_is_a_run_that_asks_its_question(
     (headless,) = await live.runs.headless(10)
     assert (headless.status, headless.routine, headless.trigger) == ("waiting", "brief", "schedule")
     assert headless.session_id == row.session_id
-    info = run_info(headless, await live.manager.pending_of(headless.session_id))
+    info = run_info(headless, await live.manager.pending_of(str(headless.session_id)))
     assert (info.status, info.approvals, info.ended_at) == ("waiting", 1, None)
     assert info.summary == "Allow ask_tool"
     assert await live.manager.pending_of("s_missing") is None

@@ -127,7 +127,7 @@ class WorkflowStarter(Protocol):
     async def start_named(
         self, name: str, project: Path | None, inputs: dict[str, Any], trigger: str
     ) -> tuple[str, str | None]:
-        """Start a run. Returns the workflow run id and its session id."""
+        """Start a run. Returns the workflow run id and its session id, None while it has none."""
         ...
 
     async def run_status(self, workflow_run_id: str) -> tuple[str, str | None] | None:
@@ -267,8 +267,10 @@ class RoutineScheduler:
                 if plan.next_at <= now:
                     await self._due(routine, plan, now)
 
-    async def run(self, name: str, folder: Path | None = None) -> tuple[str, str]:
+    async def run(self, name: str, folder: Path | None = None) -> tuple[str, str | None]:
         """Fire a routine now (``routine.run``). Returns ``(routine_run_id, session_id)``.
+
+        The session id is None for a workflow whose run has no session yet.
 
         Raises :class:`RoutineNotFoundError`, :class:`RoutineBlockedError` and
         :class:`RoutineBusyError`.
@@ -443,7 +445,7 @@ class RoutineScheduler:
         watched: WatchedFile | None = None,
         read_folders: tuple[str, ...] = (),
         path: Path | None = None,
-    ) -> tuple[str, str] | None:
+    ) -> tuple[str, str | None] | None:
         """Start a run. Returns the row and session ids, or None when the firing was skipped."""
         if await self._runs.active(routine.name, routine.scope) is not None:
             if manual:
@@ -464,7 +466,8 @@ class RoutineScheduler:
                 session_id = await self._start_workflow(run_id, routine, trigger, path)
             else:
                 session_id = await self._launcher.create(routine)
-            await self._runs.attach(run_id, session_id)
+            if session_id is not None:
+                await self._runs.attach(run_id, session_id)
         except Exception as exc:
             await self._failed(run_id, routine, exc)
             if manual:
@@ -488,7 +491,7 @@ class RoutineScheduler:
                 )
             )
         )
-        if routine.settings.workflow is not None:
+        if routine.settings.workflow is not None or session_id is None:
             return run_id, session_id
         try:
             if read_folders:
@@ -501,8 +504,9 @@ class RoutineScheduler:
 
     async def _start_workflow(
         self, run_id: str, routine: Planned, trigger: Trigger, path: Path | None
-    ) -> str:
-        """Start the routine's workflow through the service. Returns the run's session id."""
+    ) -> str | None:
+        """Start the routine's workflow through the service. Returns the run's session id,
+        None while the run has none (a step makes one when it needs it)."""
         settings = routine.settings
         assert settings.workflow is not None
         if self._workflows is None:
@@ -517,8 +521,6 @@ class RoutineScheduler:
         found = await self._workflows.run_status(workflow_run_id)
         if found is not None and found[0] in _WORKFLOW_OUTCOMES:
             await self._workflow_ended(workflow_run_id, found[0], found[1])  # ended already
-        if session_id is None:
-            raise RuntimeError(f"the run of {settings.workflow} got no session")
         return session_id
 
     async def _workflow_ended(self, workflow_run_id: str, status: str, error: str | None) -> None:

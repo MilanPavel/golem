@@ -174,8 +174,14 @@ def tools(tmp_path: Path, calls: Any, server: Server, artifacts: Artifacts) -> W
     )
 
 
-def service(tmp_path: Path, store: WorkflowRuns, tools: WorkflowTools) -> WorkflowService:
+def service(
+    tmp_path: Path,
+    store: WorkflowRuns,
+    tools: WorkflowTools,
+    create: Any = None,
+) -> WorkflowService:
     return WorkflowService(
+        create_session=create,
         runs=store,
         user_dir=tmp_path / "user-workflows",
         user_file=tmp_path / "config.toml",
@@ -185,11 +191,12 @@ def service(tmp_path: Path, store: WorkflowRuns, tools: WorkflowTools) -> Workfl
     )
 
 
-async def new_run(store: WorkflowRuns, tmp_path: Path, body: str) -> str:
+async def new_run(store: WorkflowRuns, tmp_path: Path, body: str, session: bool = True) -> str:
     path = tmp_path / "wf.py"
     path.write_text(HEADER + textwrap.dedent(body))
     run_id = await store.create_run(f"{path}::flow", "flow", str(path), "2026-11-25T10:00:00Z")
-    await store.set_run_session(run_id, "s_wf")
+    if session:
+        await store.set_run_session(run_id, "s_wf")
     return run_id
 
 
@@ -305,6 +312,32 @@ async def test_big_output_lands_in_an_artifact_and_the_step_keeps_a_summary(
         assert await second.engine.tool_output(run_id, saved) == "x" * BIG_SIZE
     finally:
         await second.aclose()
+
+
+async def test_a_big_output_makes_the_runs_session_and_a_small_one_does_not(
+    tmp_path: Path, store: WorkflowRuns, calls: Any, tools: WorkflowTools
+) -> None:
+    made: list[tuple[str, str | None, str]] = []
+
+    async def create(origin: str, cwd: str | None, title: str) -> str:
+        made.append((origin, cwd, title))
+        return "s_lazy"
+
+    for body, count in ((BIG, 1), (ALLOW, 0)):
+        made.clear()
+        svc = service(tmp_path, store, tools, create)
+        run_id = await new_run(store, tmp_path, body, session=False)
+        svc.launch(run_id)
+        try:
+            await until(store, run_id, "done")
+        finally:
+            await svc.aclose()
+        run = await store.get_run(run_id)
+        assert run is not None
+        assert len(made) == count
+        assert run.session_id == ("s_lazy" if count else None)
+        if count:
+            assert made[0][0] == "workflow:flow" and made[0][2] == "flow \u00b7 run of 2026-11-25"
 
 
 async def test_the_default_key_is_used_once_per_run(
