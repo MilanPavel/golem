@@ -6253,7 +6253,10 @@ class WorkflowProposeParams(BaseModel):
 
 class WorkflowProposeResult(BaseModel):
     """The proposed file, one or two sentences on what changed and why, its outline steps, the
-    problems the check found in it and the model that wrote it. The proposal is never saved."""
+    problems the check found in it and the model that wrote it. The proposal is never saved.
+
+    ``kind`` is ``change`` (a new file) or ``answer`` (a reply to a question: ``answer`` holds the
+    text and ``code`` is the file as it was). Without ``kind`` the reply is a change."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -6262,6 +6265,8 @@ class WorkflowProposeResult(BaseModel):
     steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
     problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
     model: str
+    kind: Literal["answer", "change"] | None = None
+    answer: str | None = None
 
 
 class WorkflowEditStepParams(BaseModel):
