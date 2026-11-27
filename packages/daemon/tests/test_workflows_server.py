@@ -260,7 +260,7 @@ async def test_starters_are_listed_and_added(short_home: Path, tmp_path: Path) -
         await client.call("hello", HELLO)
         listed = cast(Rows, rpc_result(await client.call("workflow.starters", {}))["starters"])
         assert [(s["id"], s["needs_folder"], s["schedule"]) for s in listed] == [
-            ("morning_briefing", False, "Runs every weekday at 07:30")
+            ("morning_briefing", False, None)
         ]
         added = rpc_result(await client.call("workflow.add_starter", {"id": "morning_briefing"}))
         path = short_home / "workflows" / "morning_briefing.py"
@@ -269,7 +269,7 @@ async def test_starters_are_listed_and_added(short_home: Path, tmp_path: Path) -
         got = rpc_result(await client.call("workflow.get", {"id": added["id"]}, timeout=20))
         info = cast(dict[str, object], got["workflow"])
         assert info["state"] == "ok"
-        assert cast(dict[str, object], info["trigger"])["kind"] == "schedule"
+        assert info["trigger"] is None
 
         for params in (
             {"id": "morning_briefing"},

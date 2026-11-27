@@ -132,10 +132,10 @@ def test_each_starter_loads_and_checks_clean(one: Starter) -> None:
     specs, error = load_file(path)
     assert error is None
     assert [s.name for s in specs] == [one.id]
-    assert specs[0].trigger is not None and specs[0].trigger.kind == "schedule"
+    assert specs[0].trigger is None
     problems = check(path.read_text(encoding="utf-8"), None)
     assert [p for p in problems if p.severity == "error"] == []
-    assert one.schedule == "Runs every weekday at 07:30"
+    assert one.schedule is None
 
 
 # morning_briefing: the gather functions

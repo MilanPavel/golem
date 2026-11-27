@@ -319,14 +319,14 @@ test("/workflows/:id: Run starts the workflow and opens the run by its id", asyn
 const BOTH = [SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER];
 const cardOf = (title: string) => within(screen.getAllByRole("listitem").find((item) => item.textContent?.includes(title))!);
 
-test("the empty state shows a starter card whose line says when it runs, and adds it through the daemon", async () => {
+test("the empty state shows a starter card whose line says what it leaves, and adds it through the daemon", async () => {
   const user = userEvent.setup();
   const onAdd = vi.fn(async () => {});
   const { container } = render(<WorkflowsEmpty starters={SAMPLE_STARTERS} folder={null} onAdd={onAdd} />);
   expect(screen.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
   const card = cardOf("Morning briefing");
   expect(card.getByRole("heading").textContent).toBe("Morning briefing");
-  expect(card.getByText(/Every weekday at 07:30/)).toBeTruthy();
+  expect(card.getByText(/leave one short briefing/)).toBeTruthy();
   await user.click(card.getByRole("button", { name: "Use this starter" }));
   expect(onAdd).toHaveBeenCalledWith(SAMPLE_BRIEFING);
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
@@ -385,7 +385,7 @@ test("/workflows with none lists the starter, adds it in your own folder and ope
   });
   act(() => fake.emitSummary(summary("x", "2026-11-01T11:59:00Z", SAMPLE_STARTER_FOLDER)));
   expect(await screen.findByRole("heading", { name: "No workflows yet" })).toBeTruthy();
-  expect(screen.getByText(/Every weekday at 07:30/)).toBeTruthy();
+  expect(screen.getByText(/leave one short briefing/)).toBeTruthy();
   await user.click(await screen.findByRole("button", { name: "Use this starter" }));
   await waitFor(() => expect(location.pathname).toBe(`/workflows/${encodeURIComponent(id)}`));
   expect(fake.raw.addWorkflowStarter).toHaveBeenCalledWith("morning_briefing");

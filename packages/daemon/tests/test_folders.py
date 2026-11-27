@@ -362,8 +362,8 @@ async def test_the_method_serves_this_mac_and_refuses_a_phone(
 def _stub_open(monkeypatch: pytest.MonkeyPatch, code: int = 0) -> list[str]:
     opened: list[str] = []
 
-    async def fake(path: str) -> int:
-        opened.append(path)
+    async def fake(path: str, *, select: bool = False) -> int:
+        opened.append(f"-R {path}" if select else path)
         return code
 
     monkeypatch.setattr("golem.folders._run_open", fake)
@@ -378,6 +378,39 @@ async def test_a_folder_is_handed_to_open(home: Path, monkeypatch: pytest.Monkey
     await reveal_folder(str(home / "code"), home)
     await reveal_folder(str(home / ".config"), home)
     assert opened == [str(home / "code"), str(home / ".config")]
+
+
+async def test_a_listed_workflow_file_is_selected_and_its_folder_opened(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    opened = _stub_open(monkeypatch)
+    folder = home / ".golem" / "workflows"
+    folder.mkdir(parents=True)
+    listed = folder / "briefing.py"
+    listed.write_text("x")
+    (folder / "other.py").write_text("x")
+    await reveal_folder(str(listed), home, [listed])
+    await reveal_folder(str(folder), home, [listed])
+    assert opened == [f"-R {listed.resolve()}", str(folder.resolve())]
+    with pytest.raises(FolderError, match="private"):
+        await reveal_folder(str(folder / "other.py"), home, [listed])
+    with pytest.raises(FolderError, match="private"):
+        await reveal_folder(str(home / ".golem"), home, [listed])
+    assert len(opened) == 2
+
+
+async def test_a_secret_folder_is_refused_with_its_own_reason(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _as_platform(monkeypatch, "darwin")
+    opened = _stub_open(monkeypatch)
+    (home / ".golem" / "workflows").mkdir(parents=True)
+    with pytest.raises(FolderError, match="private"):
+        await reveal_folder(str(home / ".golem" / "workflows"), home)
+    with pytest.raises(FolderError, match="outside your home"):
+        await reveal_folder(str(home.parent), home)
+    assert opened == []
 
 
 async def test_a_path_that_is_not_a_folder_under_home_is_refused(

@@ -835,7 +835,9 @@ async def _fs_reveal(ctx: RequestContext, params: FsRevealParams) -> FsRevealRes
             {"reason": "not_local"},
         )
     try:
-        await reveal_folder(params.path, Path.home())
+        workflows = ctx.state.workflows
+        listed = [] if workflows is None else [e.path for e in workflows.registry.entries()]
+        await reveal_folder(params.path, Path.home(), listed)
     except DialogUnsupportedError as exc:
         raise RpcCallError(UNSUPPORTED, str(exc), {"reason": "unsupported"}) from exc
     except RevealFailedError as exc:
