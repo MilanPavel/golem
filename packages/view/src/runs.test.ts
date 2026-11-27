@@ -9,6 +9,7 @@ import {
   runDuration,
   runGroupHeading,
   runGroups,
+  runKey,
   runName,
   runResultLine,
   runRowLine,
@@ -162,7 +163,15 @@ test("waiting elsewhere is empty when nothing waits", () => {
 
 test("waiting elsewhere finds a waiting run, and leaves out the session you are in", () => {
   assert.deepEqual(needsYouElsewhere([RUNNING, WAITING], "s_other"), [WAITING]);
-  assert.deepEqual(needsYouElsewhere([RUNNING, WAITING], WAITING.session_id), []);
+  assert.deepEqual(needsYouElsewhere([RUNNING, WAITING], WAITING.session_id ?? null), []);
+});
+
+test("a run is keyed by its workflow run id, else its session id, and one with no session still counts", () => {
+  assert.equal(runKey({ session_id: "s_1", status: "running" }), "s_1");
+  assert.equal(runKey({ workflow_run_id: "wr_1", status: "running" }), "wr_1");
+  assert.equal(runKey({ session_id: null, workflow_run_id: "wr_1", status: "running" }), "wr_1");
+  const bare = { kind: "workflow", workflow_run_id: "wr_2", status: "waiting" as const };
+  assert.deepEqual(needsYouElsewhere([bare], "s_other"), [bare]);
 });
 
 test("waiting elsewhere puts the newest start first", () => {

@@ -17,7 +17,10 @@ import { lastResultText, runWhenText, type RoutineRunLike } from "./routines.ts"
 
 /** The parts of a `RunInfo` these words read. Missing and null mean the same: not known. */
 export type RunLike = {
-  session_id: string;
+  /** Null for a workflow run that has no session (a run gets one only when a step needs it). */
+  session_id?: string | null;
+  /** The workflow run's id, set for a workflow run. It is the row's key when `session_id` is not. */
+  workflow_run_id?: string | null;
   /** `routine`, `ask` or `workflow`. */
   kind?: string;
   /** `workflow:<name>` for a workflow run. */
@@ -37,6 +40,13 @@ export type RunLike = {
   /** The steps of a workflow run. Null or missing for the other kinds. */
   steps?: number | null;
 };
+
+/** The row's stable key: a workflow run's id, else its session id. Never assume `session_id` is set. */
+export function runKey(run: RunLike): string {
+  const workflow = run.workflow_run_id;
+  if (workflow !== undefined && workflow !== null && workflow !== "") return workflow;
+  return run.session_id ?? "";
+}
 
 /** The groups, in the order the page shows them. */
 export type RunGroupLabel = "Needs you" | "Running" | "Today" | "Earlier";
