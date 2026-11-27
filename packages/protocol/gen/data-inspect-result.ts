@@ -9,6 +9,7 @@ export type ServerVersion = string | null;
 export type SuggestedName = string;
 export type SuggestedPrivacy = 'open' | 'local' | 'schema';
 export type Distinct = number | null;
+export type DistinctEstimate = boolean;
 export type Max = string | null;
 export type Min = string | null;
 export type Name = string;
@@ -60,6 +61,7 @@ export interface DataTable {
  */
 export interface DataColumn {
   distinct?: Distinct;
+  distinct_estimate?: DistinctEstimate;
   max?: Max;
   min?: Min;
   name: Name;

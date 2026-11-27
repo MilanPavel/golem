@@ -1,5 +1,5 @@
 import type { DataColumn, DataDescribeResult, DataListResult } from "@golem/client";
-import { countText, kindWord, PRIVACY_CHIP } from "@golem/view";
+import { countText, kindWord, PRIVACY_CHIP, withoutSingleFile } from "@golem/view";
 
 type Source = DataListResult["sources"][number];
 export type Cell = string | number | boolean | null;
@@ -67,7 +67,7 @@ export function formatDataList(sources: readonly Source[]): string {
 function stats(column: DataColumn): string {
   const parts: string[] = [];
   if (column.min !== null && column.min !== undefined && column.max !== null && column.max !== undefined) parts.push(`${column.min} to ${column.max}`);
-  if (column.distinct !== null && column.distinct !== undefined) parts.push(`${countText(column.distinct)} distinct`);
+  if (column.distinct !== null && column.distinct !== undefined) parts.push(`${column.distinct_estimate === true ? "~" : ""}${countText(column.distinct)} distinct`);
   if (column.null_fraction !== null && column.null_fraction !== undefined) parts.push(`${Math.round(column.null_fraction * 100)}% empty`);
   return parts.join(" · ");
 }
@@ -83,12 +83,13 @@ export function formatDataDescribe(result: DataDescribeResult): string {
   if (source.privacy_reason) lines.push(`  ${source.privacy_reason}`);
   for (const each of result.tables) {
     lines.push("", `${each.name}${each.rows === null || each.rows === undefined ? "" : `  ${countText(each.rows)} rows`}`);
-    const columns = (each.columns ?? []).map((column) => [column.name, column.type, stats(column)]);
+    const shown = withoutSingleFile(each.columns ?? [], result.sample[each.name] ?? []);
+    const columns = shown.columns.map((column) => [column.name, column.type, stats(column)]);
     if (columns.length > 0) lines.push(...table(columns).split("\n").map((line) => `  ${line}`));
     const sample = result.sample[each.name];
     if (sample !== undefined && sample.length > 0) {
       lines.push("", `  sample, ${sample.length === 1 ? "1 row" : `${sample.length} rows`}`);
-      lines.push(...formatRows(each.columns ?? [], sample).split("\n").map((line) => `  ${line}`));
+      lines.push(...formatRows(shown.columns, shown.rows as Cell[][]).split("\n").map((line) => `  ${line}`));
     }
   }
   const notes = result.notes?.trim();

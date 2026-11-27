@@ -24,6 +24,7 @@ export type TimeoutS = number | null;
 export type Warning = string | null;
 export type Watch = boolean;
 export type Distinct = number | null;
+export type DistinctEstimate = boolean;
 export type Max = string | null;
 export type Min = string | null;
 export type Name2 = string;
@@ -103,6 +104,7 @@ export interface DataTable {
  */
 export interface DataColumn {
   distinct?: Distinct;
+  distinct_estimate?: DistinctEstimate;
   max?: Max;
   min?: Min;
   name: Name2;

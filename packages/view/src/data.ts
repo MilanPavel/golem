@@ -65,7 +65,10 @@ export const DATA_NOT_AVAILABLE = "Data sources are not available yet in this ve
 /** The notes tab, while the notes methods are missing. */
 export const NOTES_NOT_AVAILABLE = "Notes come in a later version of golem.";
 
-export const QUERIES_EMPTY = "Save a query from a chat result and it shows here.";
+export const QUERIES_EMPTY = "A saved query is a named question you ask often, like spending by month.";
+
+/** The second line of the empty Queries tab. */
+export const QUERIES_EMPTY_MORE = "Run it again in one click, use it in a routine, or let golem reuse it.";
 
 export const REMOVE_SENTENCE = "golem forgets it. The files and the database stay as they are.";
 
@@ -196,13 +199,26 @@ export const ADD_KINDS: readonly AddKindOption[] = [
 
 export const FILES_PATH_EXAMPLE = "~/Documents/bank/*.csv";
 
-/** The stats of a column in one line: its range, how many values differ, how many are empty. Empty when none is known. */
-export function columnStats(column: { min?: string | null | undefined; max?: string | null | undefined; distinct?: number | null | undefined; null_fraction?: number | null | undefined }): string {
+/** The stats of a column in one line: its range, how many values differ, how many are empty. Empty when none is known. A count that is an estimate starts with `~`. */
+export function columnStats(column: { min?: string | null | undefined; max?: string | null | undefined; distinct?: number | null | undefined; distinct_estimate?: boolean | null | undefined; null_fraction?: number | null | undefined }): string {
   const parts: string[] = [];
   if (column.min !== null && column.min !== undefined && column.max !== null && column.max !== undefined) parts.push(`${column.min} … ${column.max}`);
-  if (column.distinct !== null && column.distinct !== undefined) parts.push(`${countText(column.distinct)} distinct`);
+  if (column.distinct !== null && column.distinct !== undefined) parts.push(`${column.distinct_estimate === true ? "~" : ""}${countText(column.distinct)} distinct`);
   if (column.null_fraction !== null && column.null_fraction !== undefined && column.null_fraction > 0) parts.push(`${Math.round(column.null_fraction * 100)}% empty`);
   return parts.join(" · ");
+}
+
+/**
+ * The columns and rows of a table without its `file` column when every row comes from the same file: it would
+ * repeat one path. The column is still in SQL. With stats hidden there is nothing to compare, so it stays.
+ */
+export function withoutSingleFile<C extends { name: string; min?: string | null | undefined; max?: string | null | undefined }, R extends readonly unknown[]>(
+  columns: readonly C[],
+  rows: readonly R[],
+): { columns: C[]; rows: unknown[][] } {
+  const at = columns.findIndex((column) => column.name === "file" && column.min !== null && column.min !== undefined && column.min === column.max);
+  if (at < 0) return { columns: [...columns], rows: rows.map((row) => [...row]) };
+  return { columns: columns.filter((_, index) => index !== at), rows: rows.map((row) => row.filter((_, index) => index !== at)) };
 }
 
 /** What a check of a location found. */

@@ -137,6 +137,7 @@ def wire_table(table: TableInfo) -> DataTable:
                 min=c.min,
                 max=c.max,
                 distinct=c.distinct,
+                distinct_estimate=c.distinct_estimate,
                 null_fraction=c.null_fraction,
             )
             for c in table.columns

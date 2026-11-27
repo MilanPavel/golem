@@ -189,7 +189,7 @@ def _stats(column: ColumnInfo, detail_level: Detail) -> str:
         if column.min is not None and column.max is not None:
             parts.append(f"{_cell(column.min)} … {_cell(column.max)}")
         if column.distinct is not None:
-            detail.append(f"{column.distinct} distinct")
+            detail.append(f"{'~' if column.distinct_estimate else ''}{column.distinct} distinct")
     if column.null_fraction:
         detail.append(f"{round(column.null_fraction * 100)}% empty")
     if detail:

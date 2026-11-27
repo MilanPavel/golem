@@ -13,6 +13,8 @@ import {
   PASSWORD_NOTE,
   PRIVACY_SENTENCE,
   QUERIES_EMPTY,
+  QUERIES_EMPTY_MORE,
+  withoutSingleFile,
   REMOVE_SENTENCE,
   sampleCaption,
   SAMPLE_SCHEMA_NOTE,
@@ -68,6 +70,7 @@ function TablesTab({
     return <p className="text-sm text-muted">{source.status === "ready" ? "No tables found." : sourceDetail(source)}</p>;
   }
   const columns = table.columns ?? [];
+  const listed = withoutSingleFile(columns, []).columns;
   const schemaOnly = source.privacy === "schema";
   const loaded = samples[table.name];
   const rows: Rows | null = schemaOnly ? (loaded?.state === "ready" ? loaded.rows : null) : (described.sample[table.name] ?? []);
@@ -125,7 +128,7 @@ function TablesTab({
               </tr>
             </thead>
             <tbody>
-              {columns.map((column) => (
+              {listed.map((column) => (
                 <tr key={column.name} className="border-b border-line">
                   <td className="px-2 py-1"><Code>{column.name}</Code></td>
                   <td className="px-2 py-1"><Code tone="muted">{column.type}</Code></td>
@@ -302,7 +305,14 @@ function NotesEditor({ source, initial, path, onSave, onDraft }: { source: DataS
 }
 
 function QueriesTab({ queries, onRun }: { queries: readonly DataSavedQuery[]; onRun: (query: DataSavedQuery) => void }) {
-  if (queries.length === 0) return <p className="text-sm text-muted">{QUERIES_EMPTY}</p>;
+  if (queries.length === 0) {
+    return (
+      <div className="flex max-w-xl flex-col gap-1 text-sm text-muted">
+        <p>{QUERIES_EMPTY}</p>
+        <p>{QUERIES_EMPTY_MORE}</p>
+      </div>
+    );
+  }
   return (
     <ul aria-label="Saved queries" className="flex max-w-3xl flex-col gap-2">
       {queries.map((query) => (
@@ -554,32 +564,33 @@ export function SourcePage({
 }: SourcePageProps) {
   const detail = sourceDetail(source);
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
-          <h1 className="flex flex-wrap items-center gap-2 font-ui text-lg font-semibold">
-            <DataSourceIcon kind={source.kind} location={source.location} className="shrink-0 text-muted" />
-            <span className="min-w-0 truncate">{source.name}</span>
-            <PrivacyChip privacy={source.privacy} />
-            <Badge>{kindWord(source.kind)}</Badge>
-          </h1>
-          <p className="break-all text-meta text-muted"><Code tone="muted">{source.location}</Code></p>
-          {source.status === "ready" ? null : (
-            <p role={source.status === "error" ? "alert" : undefined} className={cn("text-meta", source.status === "error" ? "text-deny" : source.status === "untrusted" ? "text-wait" : "text-muted")}>
-              {detail}
-            </p>
-          )}
-        </div>
-        <Button kind="primary" size="sm" onClick={onAsk}>
-          Ask in a chat
-        </Button>
-        {source.needs_extension != null && onInstallExtension !== undefined ? (
-          <div className="basis-full">
-            <ExtensionRow name={source.needs_extension} onInstall={onInstallExtension} />
+    <Tabs value={tab} onValueChange={(next) => onTab(next as DataTab)} className="flex min-w-0 flex-col gap-4">
+      {/* Stays at the top of the page while the rest scrolls. The negative margins and offset cancel the page's padding, so nothing shows above or beside it. */}
+      <div data-sticky="source-header" className="sticky -top-5 z-30 -mx-7 -mt-5 flex flex-col gap-4 bg-bg px-7 pt-5">
+        <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 flex-1 basis-64 flex-col gap-1">
+            <h1 className="flex flex-wrap items-center gap-2 font-ui text-lg font-semibold">
+              <DataSourceIcon kind={source.kind} location={source.location} className="shrink-0 text-muted" />
+              <span className="min-w-0 truncate">{source.name}</span>
+              <PrivacyChip privacy={source.privacy} />
+              <Badge>{kindWord(source.kind)}</Badge>
+            </h1>
+            <p className="break-all text-meta text-muted"><Code tone="muted">{source.location}</Code></p>
+            {source.status === "ready" ? null : (
+              <p role={source.status === "error" ? "alert" : undefined} className={cn("text-meta", source.status === "error" ? "text-deny" : source.status === "untrusted" ? "text-wait" : "text-muted")}>
+                {detail}
+              </p>
+            )}
           </div>
-        ) : null}
-      </header>
-      <Tabs value={tab} onValueChange={(next) => onTab(next as DataTab)} className="flex flex-col gap-4">
+          <Button kind="primary" size="sm" onClick={onAsk}>
+            Ask in a chat
+          </Button>
+          {source.needs_extension != null && onInstallExtension !== undefined ? (
+            <div className="basis-full">
+              <ExtensionRow name={source.needs_extension} onInstall={onInstallExtension} />
+            </div>
+          ) : null}
+        </header>
         <TabsList aria-label={`${source.name} details`}>
           {DATA_TABS.map((each) => (
             <TabsTrigger key={each} value={each}>
@@ -587,27 +598,27 @@ export function SourcePage({
             </TabsTrigger>
           ))}
         </TabsList>
-        <TabsContent value="tables">
-          {describeMissing ? (
-            <p className="text-sm text-muted">{DATA_NOT_AVAILABLE}</p>
-          ) : describeError !== null ? (
-            <p role="alert" className="text-sm text-deny">
-              {describeError}
-            </p>
-          ) : (
-            <TablesTab key={source.name} source={source} described={described} onLoadSample={onLoadSample} />
-          )}
-        </TabsContent>
-        <TabsContent value="notes">
-          <NotesTab source={source} notes={notes} onSave={onSaveNotes} onDraft={onDraftNotes} />
-        </TabsContent>
-        <TabsContent value="queries">
-          {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab queries={described.queries ?? []} onRun={onRun} />}
-        </TabsContent>
-        <TabsContent value="settings">
-          <SettingsTab source={source} onPrivacy={onPrivacy} onWatch={onWatch} onRemove={onRemove} {...(onChangePassword === undefined ? {} : { onChangePassword })} />
-        </TabsContent>
-      </Tabs>
-    </div>
+      </div>
+      <TabsContent value="tables">
+        {describeMissing ? (
+          <p className="text-sm text-muted">{DATA_NOT_AVAILABLE}</p>
+        ) : describeError !== null ? (
+          <p role="alert" className="text-sm text-deny">
+            {describeError}
+          </p>
+        ) : (
+          <TablesTab key={source.name} source={source} described={described} onLoadSample={onLoadSample} />
+        )}
+      </TabsContent>
+      <TabsContent value="notes">
+        <NotesTab source={source} notes={notes} onSave={onSaveNotes} onDraft={onDraftNotes} />
+      </TabsContent>
+      <TabsContent value="queries">
+        {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab queries={described.queries ?? []} onRun={onRun} />}
+      </TabsContent>
+      <TabsContent value="settings">
+        <SettingsTab source={source} onPrivacy={onPrivacy} onWatch={onWatch} onRemove={onRemove} {...(onChangePassword === undefined ? {} : { onChangePassword })} />
+      </TabsContent>
+    </Tabs>
   );
 }

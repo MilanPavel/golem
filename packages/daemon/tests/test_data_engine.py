@@ -122,6 +122,24 @@ def test_describe_gives_columns_types_and_stats(folder: Path) -> None:
         source.describe("nope")
 
 
+def test_distinct_counts_are_exact_for_a_small_table(tmp_path: Path) -> None:
+    (tmp_path / "t.csv").write_text("id,kind\n1,a\n2,a\n3,b\n")
+    info = _source(tmp_path / "t.csv").describe("t")
+    by_name = {c["name"]: c for c in info["columns"]}
+    assert (by_name["id"]["distinct"], by_name["kind"]["distinct"]) == (3, 2)
+    assert by_name["file"]["distinct"] == 1
+    assert not any(c["distinct_estimate"] for c in info["columns"])
+
+
+def test_distinct_counts_above_the_limit_are_marked_as_estimates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "t.csv").write_text("id\n1\n2\n3\n")
+    monkeypatch.setattr("golem.data.engine.EXACT_DISTINCT_ROWS", 2)
+    info = _source(tmp_path / "t.csv").describe("t")
+    assert all(c["distinct_estimate"] for c in info["columns"])
+
+
 def test_a_query_over_the_limit_is_cut_and_says_so(folder: Path) -> None:
     source = _source(folder / "*.csv")
     cut = source.query("select * from sales", 3)

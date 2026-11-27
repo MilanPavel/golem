@@ -5,6 +5,8 @@ export {
   askText,
   BUILTIN_PRIVACY_NOTE,
   columnStats,
+  QUERIES_EMPTY_MORE,
+  withoutSingleFile,
   COLUMNS_CAPTION,
   countText,
   DATA_NOT_AVAILABLE,

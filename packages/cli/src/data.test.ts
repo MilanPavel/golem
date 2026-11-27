@@ -74,6 +74,30 @@ test("describe shows tables, columns with stats, sample rows and the notes", () 
   assert.match(text, /saved queries\n {2}subscriptions/);
 });
 
+test("describe marks an estimated count with a tilde and leaves out the file column of one file", () => {
+  const result: DataDescribeResult = {
+    source: BANK,
+    tables: [
+      {
+        name: "t",
+        rows: 2,
+        columns: [
+          { name: "id", type: "BIGINT", distinct: 2, distinct_estimate: false },
+          { name: "name", type: "VARCHAR", distinct: 1045, distinct_estimate: true },
+          { name: "file", type: "VARCHAR", min: "/d/a.csv", max: "/d/a.csv", distinct: 1 },
+        ],
+      },
+    ],
+    sample: { t: [[1, "x", "/d/a.csv"]] },
+  };
+  const text = formatDataDescribe(result);
+  assert.match(text, /id +BIGINT +2 distinct/);
+  assert.match(text, /name +VARCHAR +~1\s045 distinct/);
+  assert.doesNotMatch(text, /a\.csv|\bfile\b/);
+  const many = formatDataDescribe({ ...result, tables: [{ name: "t", rows: 2, columns: [...(result.tables[0]?.columns ?? []).slice(0, 2), { name: "file", type: "VARCHAR", min: "/d/a.csv", max: "/d/b.csv" }] }] });
+  assert.match(many, /\bfile\b/);
+});
+
 test("a query prints an aligned table with numbers to the right, then the count and time", () => {
   const lines = formatQueryTable(SPEND).split("\n");
   assert.equal(lines[0], "model       cost");

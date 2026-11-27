@@ -4829,6 +4829,7 @@ public struct DataChanged: Codable {
 // MARK: - DataColumn
 public struct DataColumn: Codable {
     public let distinct: Int?
+    public let distinctEstimate: Bool?
     public let max: String?
     public let min: String?
     public let name: String
@@ -4837,6 +4838,7 @@ public struct DataColumn: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
         case max = "max"
         case min = "min"
         case name = "name"
@@ -4844,8 +4846,9 @@ public struct DataColumn: Codable {
         case type = "type"
     }
 
-    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+    public init(distinct: Int?, distinctEstimate: Bool?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
         self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
         self.max = max
         self.min = min
         self.name = name
@@ -5058,6 +5061,7 @@ public struct DataDescribeResultTable: Codable {
 // MARK: - PurpleDataColumn
 public struct PurpleDataColumn: Codable {
     public let distinct: Int?
+    public let distinctEstimate: Bool?
     public let max: String?
     public let min: String?
     public let name: String
@@ -5066,6 +5070,7 @@ public struct PurpleDataColumn: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
         case max = "max"
         case min = "min"
         case name = "name"
@@ -5073,8 +5078,9 @@ public struct PurpleDataColumn: Codable {
         case type = "type"
     }
 
-    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+    public init(distinct: Int?, distinctEstimate: Bool?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
         self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
         self.max = max
         self.min = min
         self.name = name
@@ -5275,6 +5281,7 @@ public struct DataInspectResultTable: Codable {
 // MARK: - FluffyDataColumn
 public struct FluffyDataColumn: Codable {
     public let distinct: Int?
+    public let distinctEstimate: Bool?
     public let max: String?
     public let min: String?
     public let name: String
@@ -5283,6 +5290,7 @@ public struct FluffyDataColumn: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
         case max = "max"
         case min = "min"
         case name = "name"
@@ -5290,8 +5298,9 @@ public struct FluffyDataColumn: Codable {
         case type = "type"
     }
 
-    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+    public init(distinct: Int?, distinctEstimate: Bool?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
         self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
         self.max = max
         self.min = min
         self.name = name
@@ -5693,6 +5702,7 @@ public struct DataResult: Codable {
 // MARK: - DataResultColumn
 public struct DataResultColumn: Codable {
     public let distinct: Int?
+    public let distinctEstimate: Bool?
     public let max: String?
     public let min: String?
     public let name: String
@@ -5701,6 +5711,7 @@ public struct DataResultColumn: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
         case max = "max"
         case min = "min"
         case name = "name"
@@ -5708,8 +5719,9 @@ public struct DataResultColumn: Codable {
         case type = "type"
     }
 
-    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+    public init(distinct: Int?, distinctEstimate: Bool?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
         self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
         self.max = max
         self.min = min
         self.name = name
@@ -5827,6 +5839,7 @@ public struct DataTable: Codable {
 // MARK: - DataTableColumn
 public struct DataTableColumn: Codable {
     public let distinct: Int?
+    public let distinctEstimate: Bool?
     public let max: String?
     public let min: String?
     public let name: String
@@ -5835,6 +5848,7 @@ public struct DataTableColumn: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case distinct = "distinct"
+        case distinctEstimate = "distinct_estimate"
         case max = "max"
         case min = "min"
         case name = "name"
@@ -5842,8 +5856,9 @@ public struct DataTableColumn: Codable {
         case type = "type"
     }
 
-    public init(distinct: Int?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
+    public init(distinct: Int?, distinctEstimate: Bool?, max: String?, min: String?, name: String, nullFraction: Double?, type: String) {
         self.distinct = distinct
+        self.distinctEstimate = distinctEstimate
         self.max = max
         self.min = min
         self.name = name
