@@ -85,6 +85,16 @@ async def test_run_step_title_is_its_name_and_item_is_not_passed_on() -> None:
     assert one["kwargs"] == {}
 
 
+async def test_an_item_is_part_of_the_key_and_no_item_keeps_the_name() -> None:
+    seen = Seen()
+    run = Run(seen, "wr_1")  # type: ignore[arg-type]
+    await run.step("Count lines", print, item="a.md")
+    await run.step("Count lines", print, item="b.md")
+    await run.step("add up", print)
+    assert [s["key"] for s in seen.steps] == ["Count lines: a.md", "Count lines: b.md", "add up"]
+    assert {s["title"] for s in seen.steps[:2]} == {"Count lines"}
+
+
 async def test_item_is_text_cut_to_a_sensible_length() -> None:
     seen = Seen()
     run = Run(seen, "wr_1")  # type: ignore[arg-type]

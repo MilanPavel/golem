@@ -51,11 +51,19 @@ def add_up(counts: list[int]) -> int:
     return sum(counts)
 
 
-@workflow(trigger=manual(), inputs={"folder": str}, description="Count lines in three Markdown files.")
+@workflow(
+    trigger=manual(),
+    inputs={"folder": str},
+    title="Count the lines",
+    description="Count lines in three Markdown files.",
+)
 async def hello(run: Run) -> None:
-    files = await run.step("find files", find_files, run.inputs["folder"])
-    counts = await run.parallel([run.step(f"count {Path(f).name}", count_lines, f) for f in files])
-    await run.step("add up", add_up, counts)
+    files = await run.step("Find the files", find_files, run.inputs["folder"])
+    counts = await run.parallel(
+        [run.step("Count lines", count_lines, f, item=Path(f).name) for f in files],
+        title="Each file",
+    )
+    await run.step("Add up", add_up, counts)
 ```
 
 | Part | What it does |
@@ -64,6 +72,7 @@ async def hello(run: Run) -> None:
 | `run.inputs` | The values you pass with `--input` |
 | `run.step(name, fn, *args)` | Runs `fn` once and saves its result under `name` |
 | `run.parallel([...])` | Runs the steps at the same time and returns their results in order |
+| `title=`, `item=` | Words for the page and the terminal (see [Titles and items](#titles-and-items)) |
 
 To try it, copy the file into your workflows folder:
 
@@ -153,6 +162,23 @@ def open_pull_request(pkg):
 ```
 
 `idempotency_key()` is the step's `key=` (None outside a keyed step). `may_have_run()` is true only on the run after a crash. A receiver that understands the key drops the second copy.
+
+### Titles and items
+
+A step is listed under a title, in words. You can set it with `title=` on `run.llm`, `run.agent`, `run.skill`, `run.review` and `run.parallel` (the group), and on `@workflow` (the name of the workflow). `run.notify` already has `title=`. `run.tool` has none, because its keyword arguments belong to the tool; it is listed under the tool's name.
+
+Without a `title=` the title is the step's name for `run.step`, the key in words for `run.llm` (`key="read-invoice"` reads "Read-invoice", no key reads "Ask the model"), "Worker agent" for `run.agent("worker", ...)`, and the skill's name for `run.skill`. A title is never a prompt, a brief or the text of a notice.
+
+`run.step` also takes `item=`, the part that changes in a loop:
+
+```python
+await run.parallel(
+    [run.step("Count lines", count_lines, f, item=Path(f).name) for f in files],
+    title="Each file",
+)
+```
+
+The page shows "Count lines" and the item after it. `item=` is kept as text (cut at 80 characters) and is never passed to the function. Without `key=`, the item is part of the step key (`Count lines: a.md`), so the steps of a loop need no names that change. Titles and items are only labels: a file that uses none of them runs, and resumes a run made before, exactly as it did.
 
 ### Retries
 

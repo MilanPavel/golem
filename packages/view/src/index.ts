@@ -374,6 +374,7 @@ export {
   reviewTitle,
   stepMetaLine,
   stepOutputLine,
+  stepLabel,
   stepOutputText,
   stepWords,
   toolAsk,
@@ -408,10 +409,12 @@ export {
   type WorkflowGroup,
 } from "./workflow-list.ts";
 export {
+  groupWords,
   lastRunLine,
   outlineLine,
   outlineNotes,
   outlineRows,
+  repeatWords,
   stepRanTimes,
   type OutlineRow,
   type OutlineStepLike,

@@ -269,7 +269,8 @@ class Run:
         """Run ``fn(*args, **kwargs)`` once and keep its JSON result under ``key or name``.
 
         ``item=`` is the part that changes in a loop (a folder, a file); it is shown after the
-        title and is never passed to ``fn``.
+        title and is never passed to ``fn``. Without ``key=``, an ``item`` is part of the step key
+        (``"count: a.md"``), so a loop needs no name that changes.
 
         Each key may be used once per run; inside a loop pass distinct names or keys.
         An explicit ``key=`` marks a step that changes something outside golem: if golem
@@ -277,7 +278,8 @@ class Run:
         ``retries=N`` runs the function up to N more times after an exception, waiting
         ``backoff`` seconds before each.
         """
-        step_key = key or name
+        shown = _item_text(item)
+        step_key = key or (name if item is None else f"{name}: {item}")
         self._use_key(step_key, name)
         return await self._backend.run_step(
             self.workflow_run_id,
@@ -291,7 +293,7 @@ class Run:
             keyed=key is not None,
             retries=max(0, retries),
             backoff=max(0.0, backoff),
-            item=_item_text(item),
+            item=shown,
             group_title=_group_title.get(),
         )
 

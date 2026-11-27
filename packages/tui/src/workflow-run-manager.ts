@@ -2,6 +2,7 @@ import type { WorkflowStatusResult } from "@golem/client";
 import {
   reviewDraftText,
   reviewTitle,
+  stepLabel,
   stepMetaLine,
   stepOutputLine,
   stepOutputText,
@@ -252,14 +253,14 @@ export function layoutWorkflowRun(input: { state: WorkflowRunManagerState; data:
     if (run.status === "failed" && run.error !== null && run.error !== undefined) head.push({ text: run.error.split("\n").find((row) => row.trim() !== "") ?? run.error, mark: { text: "✘", tone: "bad" } });
     head.push({ text: "" });
     const chosen = clamp(state.selected, steps.length);
-    const titleWidth = Math.max(0, ...steps.map((step) => step.title.length));
+    const titleWidth = Math.max(0, ...steps.map((step) => stepLabel(step).length));
     const tookWidth = Math.max(0, ...steps.map((step) => workflowRunTook(step, input.now).length));
     if (steps.length === 0) body.push({ text: "No step has started yet.", dim: true });
     for (const [index, step] of steps.entries()) {
       body.push({
         prefix: index === chosen ? "❯ " : "  ",
         mark: stepMark(step.status),
-        text: `${step.title.padEnd(titleWidth)}  ${workflowRunTook(step, input.now).padEnd(tookWidth)}  ${stepRight(step)}`.trimEnd(),
+        text: `${stepLabel(step).padEnd(titleWidth)}${workflowRunTook(step, input.now).padEnd(tookWidth)}  ${stepRight(step)}`.trimEnd(),
         selected: index === chosen,
       });
       if (index === chosen) body.push(...stepDetail(step, width));

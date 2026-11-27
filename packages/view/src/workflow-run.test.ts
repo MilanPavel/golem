@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { resultKind, reviewDraftText, reviewTitle, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
+import { resultKind, reviewDraftText, reviewTitle, stepLabel, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
 
 const T = (s: number) => new Date(Date.UTC(2026, 10, 26, 8, 0, s)).toISOString();
 const step = (key: string, extra: Record<string, unknown> = {}) => ({ key, kind: "step", title: key, status: "done", started_at: T(0), finished_at: T(10), ...extra });
@@ -17,6 +17,14 @@ test("steps become rows with their taken time, running ones run to now and a rev
     ["c", "waiting for you", "wait", "0m 20s"],
   ]);
   assert.equal(list.rows[2]?.segments[0]?.kind, "you");
+});
+
+test("a step reads as its title, then its item", () => {
+  assert.equal(stepLabel({ title: "Check folder", item: "golem" }), "Check folder \u00b7 golem");
+  assert.equal(stepLabel({ title: "Check folder", item: null }), "Check folder");
+  assert.equal(stepLabel({ title: "Check folder" }), "Check folder");
+  const list = workflowStepsList([step("a", { title: "Check folder", item: "golem" })], Date.UTC(2026, 10, 26, 8, 0, 30));
+  assert.equal(list.rows[0]?.label, "Check folder \u00b7 golem");
 });
 
 test("a step that has not started begins now", () => {
