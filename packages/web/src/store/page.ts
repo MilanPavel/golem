@@ -99,6 +99,7 @@ export type PageClient = Pick<
   | "draftWorkflow"
   | "editWorkflowStep"
   | "startWorkflow"
+  | "startWorkflowAgain"
   | "listWorkflowStarters"
   | "addWorkflowStarter"
   | "workflowStatus"
@@ -465,6 +466,8 @@ export type PageActions = {
   dataRemoveQuery(source: string, name: string, project?: string | null): Promise<void>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>, model?: string): Promise<string>;
+  /** Starts a new run of the same workflow from step `fromKey` of the finished run `fromRun`, with the saved results of the steps before it. Resolves with the new workflow run id. Rejects with the daemon's reason (the step is in a group, the code before it changed). */
+  startWorkflowAgain(fromRun: string, fromKey: string): Promise<string>;
   /** Writes a starter as a workflow file: in `folder` for a starter that reads a project, in the user's folder when `folder` is null. With `routine` it also makes the starter's routine, and the routine list is read again too. The workflow list is read again. Resolves with the result: its `id` is the new workflow's, which `/workflows/:id` opens it by, and `routine_problem` says why the routine was not made. Rejects with the daemon's reason: the folder is not trusted, the file exists. */
   addWorkflowStarter(id: string, folder: string | null, routine?: boolean): Promise<WorkflowAddStarterResult>;
   /** Checks `code` as the file of the workflow `id`, without writing it: the problems with their lines and steps, and the outline of that text. */
@@ -1098,6 +1101,11 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       async startWorkflow(id, inputs, model) {
         const started = await (model === undefined ? client.startWorkflow(id, inputs) : client.startWorkflow(id, inputs, model));
+        void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
+        return started.workflow_run_id;
+      },
+      async startWorkflowAgain(fromRun, fromKey) {
+        const started = await client.startWorkflowAgain(fromRun, fromKey);
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
         return started.workflow_run_id;
       },

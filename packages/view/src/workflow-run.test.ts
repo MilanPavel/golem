@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { askAboutResult, resultCopyText, resultKind, reviewDraftText, reviewTitle, stepLabel, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
+import { askAboutResult, resultCopyText, resultKind, reviewDraftText, reviewTitle, stepLabel, stepMetaLine, stepOutputLine, toolAsk, reuseNote, reusedWords, runAgainFromWords, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
 
 const T = (s: number) => new Date(Date.UTC(2026, 10, 26, 8, 0, s)).toISOString();
 const step = (key: string, extra: Record<string, unknown> = {}) => ({ key, kind: "step", title: key, status: "done", started_at: T(0), finished_at: T(10), ...extra });
@@ -100,4 +100,12 @@ test("Ask about this quotes text, names a file by its path and fences data", () 
   assert.equal(askAboutResult("Briefing", "One\n\nTwo"), 'About this from the result "Briefing":\n\n> One\n>\n> Two\n\n');
   assert.equal(askAboutResult("Briefing", "/Users/me/b.md"), 'About the file from the result "Briefing":\n\n/Users/me/b.md\n\n');
   assert.ok(askAboutResult("Rows", [{ a: 1 }]).includes("```json\n"));
+});
+
+test("a run started again says where it came from and what it reused", () => {
+  assert.equal(runAgainFromWords({ step_title: "Summarise", step_number: 3 }, "26 Nov, 08:00"), "Run again from step 3 of the run of 26 Nov, 08:00");
+  assert.equal(reusedWords("26 Nov, 08:00"), "from the run of 26 Nov, 08:00");
+  const steps = [{ reused_from: "wr_1" }, { reused_from: "wr_1" }, { reused_from: null }, {}];
+  assert.equal(reuseNote({ step_title: "Summarise" }, steps, "26 Nov"), "2 steps were taken from the run of 26 Nov; Summarise and 1 step after it ran again.");
+  assert.equal(reuseNote({ step_title: "Summarise" }, [{ reused_from: "wr_1" }, {}], "26 Nov"), "1 step was taken from the run of 26 Nov; Summarise ran again.");
 });

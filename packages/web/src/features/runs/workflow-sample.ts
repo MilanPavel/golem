@@ -181,6 +181,16 @@ export const SAMPLE_RUN_DONE: WorkflowRunSample = {
   reviews: [],
 };
 
+/** A run started again from the summarise step of the run of ten minutes earlier: the list step is taken from it. */
+export const SAMPLE_RUN_AGAIN: WorkflowRunSample = {
+  run: run({
+    workflow_run_id: "wr_digest_2",
+    from_run: { workflow_run_id: "wr_digest", started_at: at(10), step_key: "summarise", step_title: "summarise", step_number: 2 },
+  }),
+  steps: [{ ...LIST, reused_from: "wr_digest" }, { ...SUMMARISE, started_at: at(20, 4), finished_at: at(20, 30) }],
+  reviews: [],
+};
+
 const BRIEFING = "# Morning briefing\n\n**3 things need you.** Device sync is failing.\n\n- Review the typer pull request\n- Look at the sync log";
 
 /** A finished run that marked one text result: the briefing, drawn as Markdown. */

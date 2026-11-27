@@ -29,6 +29,8 @@ export type StepLike = {
   of?: number | null;
   /** The text so far of a running step that sends progress. */
   progress?: string | null;
+  /** The run this step's result was taken from, when its run started again from a step. */
+  reused_from?: string | null;
 };
 
 const STEP_WORDS: Record<string, string> = {
@@ -413,4 +415,29 @@ export function liveTexts(steps: readonly StepLike[]): LiveText[] {
   return steps
     .filter((step) => step.status === "running" && step.progress !== null && step.progress !== undefined && step.progress !== "")
     .map((step) => ({ key: step.key, label: stepLabel(step), text: step.progress ?? "" }));
+}
+
+/** The action on a step of a run that is over. */
+export const RUN_AGAIN_WORDS = "Run again from here";
+
+/** Where a run started again from a step came from, as `workflow.status` sends it. */
+export type RunOrigin = { started_at?: string | null; step_title: string; step_number: number };
+
+/** The line a run started again says about where it came from: `Run again from step 2 of the run of 26 Nov, 08:00`. */
+export function runAgainFromWords(origin: RunOrigin, when: string): string {
+  return `Run again from step ${origin.step_number} of the run of ${when}`;
+}
+
+/** The mark of a step whose result was taken from the older run. */
+export function reusedWords(when: string): string {
+  return `from the run of ${when}`;
+}
+
+/** The one line of what a run started again reused and what ran again; the reused steps carry `reused_from`. */
+export function reuseNote(origin: Pick<RunOrigin, "step_title">, steps: readonly { reused_from?: string | null }[], when: string): string {
+  const reused = steps.filter((step) => step.reused_from !== null && step.reused_from !== undefined).length;
+  const again = steps.length - reused;
+  const kept = reused === 0 ? "No step was taken from" : `${reused} ${reused === 1 ? "step was" : "steps were"} taken from`;
+  const ran = again <= 1 ? `${origin.step_title} ran again` : `${origin.step_title} and ${again - 1} ${again - 1 === 1 ? "step" : "steps"} after it ran again`;
+  return `${kept} the run of ${when}; ${ran}.`;
 }

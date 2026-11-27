@@ -11,7 +11,7 @@ import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { SAMPLE_PR_DIGEST_GET } from "../workflows/sample.ts";
 import { WorkflowRunView, type WorkflowRunViewProps } from "./workflow-run-view.tsx";
-import { SAMPLE_BRIEFING_PATH, SAMPLE_RUN_DONE, SAMPLE_RUN_FILE, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_TEXT, SAMPLE_RESULTS, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
+import { SAMPLE_BRIEFING_PATH, SAMPLE_RUN_DONE, SAMPLE_RUN_AGAIN, SAMPLE_RUN_FILE, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_TEXT, SAMPLE_RESULTS, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -136,6 +136,47 @@ test("a step pane links to the step in the workflow", async () => {
   expect(onSeeStep).toHaveBeenCalledWith(expect.objectContaining({ key: "summarise" }));
 });
 
+test("a step of a finished run can start a new run from it", async () => {
+  const user = userEvent.setup();
+  const onRunAgain = vi.fn(async () => {});
+  view(SAMPLE_RUN_DONE, { onRunAgain });
+  await user.click(screen.getByRole("button", { name: /summarise/ }));
+  await user.click(screen.getByRole("button", { name: "Run again from here" }));
+  expect(onRunAgain).toHaveBeenCalledWith(expect.objectContaining({ key: "summarise" }));
+});
+
+test("Run again from here is not offered without a way to start it, or while the run goes on", async () => {
+  const user = userEvent.setup();
+  const { unmount } = view(SAMPLE_RUN_DONE);
+  await user.click(screen.getByRole("button", { name: /summarise/ }));
+  expect(screen.queryByRole("button", { name: "Run again from here" })).toBeNull();
+  unmount();
+  view({ ...SAMPLE_RUN_DONE, run: { ...SAMPLE_RUN_DONE.run, status: "running" } }, { onRunAgain: vi.fn(async () => {}) });
+  await user.click(screen.getByRole("button", { name: /summarise/ }));
+  expect(screen.queryByRole("button", { name: "Run again from here" })).toBeNull();
+});
+
+test("the reason a run could not start again is shown", async () => {
+  const user = userEvent.setup();
+  view(SAMPLE_RUN_DONE, { onRunAgain: vi.fn(async () => Promise.reject(new Error("the code before summarise changed since that run"))) });
+  await user.click(screen.getByRole("button", { name: /summarise/ }));
+  await user.click(screen.getByRole("button", { name: "Run again from here" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("the code before summarise changed");
+});
+
+test("a run started again says where it came from, links back, and marks the steps it took", async () => {
+  const user = userEvent.setup();
+  const { props } = view(SAMPLE_RUN_AGAIN, { onRunAgain: vi.fn(async () => {}) });
+  const link = screen.getByRole("link", { name: /^Run again from step 2 of the run of / });
+  expect(link.getAttribute("href")).toBe("/runs/wr_digest");
+  expect(screen.getByText(/1 step was taken from the run of .*; summarise ran again\./)).toBeTruthy();
+  expect(screen.getByRole("button", { name: /list_pull_requests/ }).textContent).toMatch(/from the run of /);
+  expect(screen.getByRole("button", { name: /summarise/ }).textContent).not.toMatch(/from the run of /);
+  await user.click(screen.getByRole("button", { name: /list_pull_requests/ }));
+  expect(screen.getByRole("group", { name: "Step list_pull_requests" }).textContent).toMatch(/from the run of /);
+  expect(props.onNavigate).not.toHaveBeenCalled();
+});
+
 test("the result with its actions passes axe", async () => {
   const { container } = view(SAMPLE_RUN_TEXT, { onAskAbout: vi.fn(), onSeeStep: vi.fn() });
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
@@ -168,6 +209,22 @@ test("/runs/:id: Ask about this opens a new chat with the result in the box, and
   await waitFor(() => expect(window.location.pathname).toBe("/"));
   expect((box as HTMLTextAreaElement).value).toContain("> # Morning briefing");
   expect(document.activeElement).toBe(box);
+});
+
+test("/runs/:id: Run again from here starts the run from that step and opens the new run", async () => {
+  const user = userEvent.setup();
+  const fake = mount("/runs/wr_1", (made) => {
+    made.raw.workflowStatus.mockImplementation(async (id: string) => ({ ...SAMPLE_RUN_DONE, run: { ...SAMPLE_RUN_DONE.run, workflow_run_id: id } }));
+  });
+  await user.click(await screen.findByRole("button", { name: /summarise/ }));
+  await user.click(screen.getByRole("button", { name: "Run again from here" }));
+  await waitFor(() => expect(window.location.pathname).toBe("/runs/wr_2"));
+  expect(fake.raw.startWorkflowAgain).toHaveBeenCalledWith("wr_1", "summarise");
+});
+
+test("a run started again passes axe", async () => {
+  const { container } = view(SAMPLE_RUN_AGAIN, { onRunAgain: vi.fn(async () => {}) });
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
 test("/runs/:id: See this step opens the workflow with that step selected, found by its title", async () => {

@@ -1,7 +1,7 @@
-import { foldSteps, foundSoFar, liveLines, liveTexts, stepMetaLine, stepOutputLine, stepsProgress, stepTook, usualWords, workflowRunTook, type LiveLine } from "@golem/view";
+import { foldSteps, foundSoFar, liveLines, liveTexts, reuseNote, reusedWords, RUN_AGAIN_WORDS, runAgainFromWords, stepMetaLine, stepOutputLine, stepsProgress, stepTook, usualWords, workflowRunTook, type LiveLine } from "@golem/view";
 import { useRef, useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import { runsPath } from "../../store/router.ts";
+import { runPath, runsPath } from "../../store/router.ts";
 import type { ReviewVerdict, WorkflowReadOutputResult, WorkflowReviewInfo, WorkflowRunInfo, WorkflowStepInfo } from "../../store/workflows.ts";
 import { Badge, type BadgeProps } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
@@ -86,6 +86,8 @@ export type WorkflowRunViewProps = {
   onAskAbout?: (text: string) => void;
   /** Opens the workflow page with this step of the run selected. Without it the link is not offered. */
   onSeeStep?: (step: WorkflowStepInfo) => void;
+  /** Starts a new run from this step ("Run again from here") and opens it. Without it, or while the run goes on, the action is not offered. It rejects with the daemon's reason. */
+  onRunAgain?: (step: WorkflowStepInfo) => Promise<unknown>;
   /** The Trace tab's content. Without it the tab is not offered. */
   trace?: ReactNode;
   initialTab?: "steps" | "trace";
@@ -122,7 +124,7 @@ function facts(run: WorkflowRunInfo, steps: readonly WorkflowStepInfo[], now: nu
 }
 
 /** One step shown in the place of the result: what it is, its output with Readable / Raw, its chat and Resume. */
-function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: number; resume: ReactNode; props: Pick<WorkflowRunViewProps, "chatPath" | "onNavigate" | "onSeeStep"> }) {
+function StepPane({ step, now, resume, again, reusedWhen, props }: { step: WorkflowStepInfo; now: number; resume: ReactNode; again: ReactNode; reusedWhen: string | null; props: Pick<WorkflowRunViewProps, "chatPath" | "onNavigate" | "onSeeStep"> }) {
   const took = stepTook(step, now);
   const child = step.child_session_id;
   const failed = step.status === "failed" || step.status === "in_doubt";
@@ -132,7 +134,7 @@ function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: n
         {step.title}
         {step.item ? <Code tone="muted">{step.item}</Code> : null}
       </h3>
-      <p className="m-0 text-meta text-faint">{[stepMetaLine(step), took === "" ? "" : `took ${took}`].filter((part) => part !== "").join(" · ")}</p>
+      <p className="m-0 text-meta text-faint">{[stepMetaLine(step), took === "" ? "" : `took ${took}`, reusedWhen !== null && step.reused_from !== null && step.reused_from !== undefined ? reusedWords(reusedWhen) : ""].filter((part) => part !== "").join(" · ")}</p>
       {failed && step.error !== null && step.error !== undefined ? <p className="m-0 text-sm break-words text-deny">{step.error}</p> : null}
       {step.result === null || step.result === undefined ? <p className="m-0 text-meta text-muted">{step.status === "running" ? "Working. Its result shows here when it is done." : step.status === "pending" ? "Not started yet." : "This step has no result."}</p> : <ResultView result={step.result} label={`Output of ${step.title}`} />}
       <div className="flex flex-wrap items-center gap-3">
@@ -146,6 +148,7 @@ function StepPane({ step, now, resume, props }: { step: WorkflowStepInfo; now: n
             See this step in the workflow
           </button>
         )}
+        {again}
         {step.status === "failed" ? resume : null}
       </div>
     </div>
@@ -216,6 +219,8 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
   const goal = run.description !== null && run.description !== undefined && run.description !== "" ? run.description : null;
   const summary = run.summary !== null && run.summary !== undefined && run.summary !== "" ? run.summary : null;
   const factsLine = facts(run, steps, now);
+  const origin = run.from_run ?? null;
+  const originWhen = origin === null || origin.started_at === null || origin.started_at === undefined ? null : new Date(origin.started_at).toLocaleString();
   const outputs = runOutputs(run);
   const picked = selected === RESULT_KEY ? null : (steps.find((step) => step.key === selected) ?? null);
 
@@ -244,6 +249,12 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
   const stoppedAtModel = steps.some((step) => (step.status === "failed" || step.status === "in_doubt") && MODEL_KINDS.includes(step.kind));
   const another =
     models === undefined || models.length === 0 || !stoppedAtModel ? null : <ResumeWithModel models={models} disabled={busy} onPick={(name) => void act(() => onResume(name), "The run did not resume.")} />;
+  const again =
+    props.onRunAgain === undefined || live || picked === null ? null : (
+      <Button size="sm" disabled={busy} onClick={() => void act(() => props.onRunAgain?.(picked) ?? Promise.resolve(), "The run did not start again.")}>
+        {RUN_AGAIN_WORDS}
+      </Button>
+    );
   const resume = (
     <>
       <Button size="sm" kind="primary" disabled={busy} onClick={() => void act(() => onResume(), "The run did not resume.")}>
@@ -271,6 +282,15 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
           )}
           {summary === null ? null : <p className="m-0 text-sm font-medium break-words">{summary}</p>}
           <p className="m-0 text-meta text-muted">{factsLine}</p>
+          {origin === null ? null : (
+            <p className="m-0 text-meta text-muted">
+              <Link href={runPath(origin.workflow_run_id)} onNavigate={onNavigate} className={LINK}>
+                {runAgainFromWords(origin, originWhen ?? "an earlier day")}
+              </Link>
+              {" · "}
+              {reuseNote(origin, steps, originWhen ?? "an earlier day")}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {run.status === "failed" ? (
@@ -338,11 +358,11 @@ export function WorkflowRunView(props: WorkflowRunViewProps) {
                 selected={selected}
                 onSelect={setSelected}
                 resultWord={live ? "Live" : "Result"}
-                resultLine={outputs[0]?.summary ?? (outputs.length > 0 ? stepOutputLine({ kind: "step", result: outputs[0]!.value }) : live ? "What is happening now" : "What it did")}
+                reusedWhen={originWhen} resultLine={outputs[0]?.summary ?? (outputs.length > 0 ? stepOutputLine({ kind: "step", result: outputs[0]!.value }) : live ? "What is happening now" : "What it did")}
               />
             </div>
             <div className="min-w-0 flex-1 rounded-lg border border-line bg-bg p-4">
-              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} onAskAbout={props.onAskAbout} onReveal={props.onReveal} /> : <StepPane step={picked} now={now} resume={resume} props={props} />}
+              {picked === null && texts.length > 0 ? <LivePane found={foundSoFar(rows)} texts={texts} /> : picked === null ? <RunResult run={run} steps={steps} onReadOutput={onReadOutput ?? (() => Promise.reject(new Error("The file cannot be read here.")))} onAskAbout={props.onAskAbout} onReveal={props.onReveal} /> : <StepPane step={picked} now={now} resume={resume} again={again} reusedWhen={originWhen} props={props} />}
             </div>
           </div>
         </TabsContent>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { modelNames } from "@golem/view";
 import { useModelList, useNavigate, usePageActions, useStartChatWith, useWorkflowReader, useWorkflowStatus } from "../../store/page-context.tsx";
-import { helperPath, sessionPath, workflowPath } from "../../store/router.ts";
+import { helperPath, runPath, sessionPath, workflowPath } from "../../store/router.ts";
 import { outlineStepOf } from "../workflows/last-run.tsx";
 import { TraceBody, useTraceData } from "../trace/trace-screen.tsx";
 import { useNow } from "../sessions/use-now.ts";
@@ -66,6 +66,7 @@ export function WorkflowRunScreen({ id }: { id: string }) {
         }}
         onAskAbout={startChat}
         onReveal={(path, index) => actions.reveal(path, { workflowRunId: id, outputIndex: index })}
+        onRunAgain={async (step) => navigate(runPath(await actions.startWorkflowAgain(id, step.key)))}
         onSeeStep={(step) => {
           // The step's place in the workflow's outline, read when asked. When it cannot be found the workflow opens with no step picked.
           readWorkflow(run.workflow_id).then(
