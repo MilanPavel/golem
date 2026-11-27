@@ -126,11 +126,13 @@ import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts"
 import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
 import type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
 import type { WorkflowStepEvent } from "../../protocol/gen/workflow-step-event.ts";
+import type { WorkflowOutputEvent } from "../../protocol/gen/workflow-output-event.ts";
 
-/** A `workflow.run.*` or `workflow.step.*` notification: `method` names the change, `params` is the state after it. */
+/** A `workflow.run.*`, `workflow.step.*` or `workflow.output.added` notification: `method` names the change, `params` is the state after it. */
 export type WorkflowNotice =
   | { kind: "run"; method: string; params: WorkflowRunEvent }
-  | { kind: "step"; method: string; params: WorkflowStepEvent };
+  | { kind: "step"; method: string; params: WorkflowStepEvent }
+  | { kind: "output"; method: string; params: WorkflowOutputEvent };
 import type { RunListResult } from "../../protocol/gen/run-list-result.ts";
 import type { SkillCall } from "../../protocol/gen/skill-call.ts";
 import type { SkillCreateResult } from "../../protocol/gen/skill-create-result.ts";
@@ -368,6 +370,7 @@ import {
   isWorkflowRunEvent,
   isWorkflowStartResult,
   isWorkflowStatusResult,
+  isWorkflowOutputEvent,
   isWorkflowStepEvent,
   isRunListResult,
   isSkillCreateResult,
@@ -1519,7 +1522,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
           ? { kind: "run", method, params }
           : method.startsWith("workflow.step.") && isWorkflowStepEvent(params)
             ? { kind: "step", method, params }
-            : null;
+            : method === "workflow.output.added" && isWorkflowOutputEvent(params)
+              ? { kind: "output", method, params }
+              : null;
       if (notice !== null) {
         record({ direction: "in", kind: method, detail: notice.params.workflow_run_id, json: line });
         for (const listener of workflowListeners) {

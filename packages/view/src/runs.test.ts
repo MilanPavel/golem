@@ -191,3 +191,13 @@ test("waiting elsewhere puts the newest start first", () => {
   const newer = run("s_new_wait", { status: "waiting", started_at: at(10, 9, 0) });
   assert.deepEqual(needsYouElsewhere([older, newer], null).map((r) => r.session_id), ["s_new_wait", "s_old_wait"]);
 });
+
+test("a run that carries its workflow's id is matched by it, one without by the name", () => {
+  const id = "/a/pr_digest.py::pr_digest";
+  const mine: RunLike = { kind: "workflow", origin: "workflow:pr_digest", workflow_id: id, status: "succeeded", workflow_run_id: "wr_1" };
+  const same: RunLike = { kind: "workflow", origin: "workflow:pr_digest", workflow_id: "/b/pr_digest.py::pr_digest", status: "succeeded", workflow_run_id: "wr_2" };
+  const fired: RunLike = { kind: "routine", origin: "workflow:pr_digest", routine: "weekday", status: "succeeded", session_id: "s_1" };
+  const older: RunLike = { kind: "workflow", origin: "workflow:pr_digest", workflow_id: null, status: "succeeded", workflow_run_id: "wr_3" };
+  assert.deepEqual(runsOfWorkflow([mine, same, fired, older], id), [mine, fired, older]);
+  assert.deepEqual(runsOfWorkflow([mine, same, fired, older], "/b/pr_digest.py::pr_digest"), [same, fired, older]);
+});
