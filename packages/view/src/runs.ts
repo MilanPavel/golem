@@ -128,6 +128,22 @@ export function runGroupHeading(group: Pick<RunGroup<unknown>, "label" | "items"
   return `${group.label} (${group.items.length})`;
 }
 
+/** A workflow's name from its id (`<path>::<name>`): what comes after the last `::`, or the whole id when it has none. */
+export function workflowNameOfId(id: string): string {
+  const at = id.lastIndexOf("::");
+  return at < 0 ? id : id.slice(at + 2);
+}
+
+/**
+ * The runs of one workflow, given its id: a workflow run, and a routine firing that started it, say
+ * `workflow:<name>` in `origin`. A row does not carry the workflow's path, so two workflows of one name
+ * in two folders are not told apart. Order is kept.
+ */
+export function runsOfWorkflow<T extends RunLike>(runs: readonly T[], workflowId: string): T[] {
+  const origin = `workflow:${workflowNameOfId(workflowId)}`;
+  return runs.filter((run) => run.origin === origin);
+}
+
 /** The row's name: the routine's, the workflow's, or `golem ask` for a detached ask. */
 export function runName(run: RunLike): string {
   if (run.kind === "workflow" && run.origin?.startsWith("workflow:")) return run.origin.slice("workflow:".length);

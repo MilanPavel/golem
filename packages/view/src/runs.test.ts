@@ -15,9 +15,21 @@ import {
   runRowLine,
   runStartedText,
   runTriggerWords,
+  runsOfWorkflow,
+  workflowNameOfId,
   type RunLike,
 } from "./runs.ts";
 import { runWhenText } from "./routines.ts";
+
+test("a workflow's name comes from its id, and its runs from the origin they carry", () => {
+  assert.equal(workflowNameOfId("/Users/you/.golem/workflows/pr_digest.py::pr_digest"), "pr_digest");
+  assert.equal(workflowNameOfId("plain"), "plain");
+  const mine: RunLike = { kind: "workflow", origin: "workflow:pr_digest", status: "succeeded", workflow_run_id: "wr_1" };
+  const fired: RunLike = { kind: "routine", origin: "workflow:pr_digest", routine: "weekday", status: "succeeded", session_id: "s_1" };
+  const other: RunLike = { kind: "workflow", origin: "workflow:hello", status: "succeeded", workflow_run_id: "wr_2" };
+  assert.deepEqual(runsOfWorkflow([mine, other, fired], "/p/pr_digest.py::pr_digest"), [mine, fired]);
+  assert.deepEqual(runsOfWorkflow([other], "/p/pr_digest.py::pr_digest"), []);
+});
 
 // Built from local calendar parts, so "08:30" is 08:30 in every time zone the suite runs in.
 const at = (day: number, hour: number, minute: number, second = 0): string => new Date(2026, 10, day, hour, minute, second).toISOString();

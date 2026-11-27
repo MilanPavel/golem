@@ -189,6 +189,8 @@ export {
   runStartedText,
   runStepsWords,
   runTriggerWords,
+  runsOfWorkflow,
+  workflowNameOfId,
   type RunGroup,
   type RunGroupLabel,
   type RunLike,
