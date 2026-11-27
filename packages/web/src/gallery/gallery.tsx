@@ -2350,7 +2350,7 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         <div className="flex flex-wrap gap-4">
           <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">
             <SidebarPanel title="Workflows" label={`Workflows, ${theme}`} onHide={() => {}}>
-              <WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} selected={SAMPLE_PR_DIGEST.id} onNavigate={() => {}} />
+              <WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} starters={SAMPLE_STARTERS} selected={SAMPLE_PR_DIGEST.id} onNavigate={() => {}} />
             </SidebarPanel>
           </div>
           <div className="h-96 w-67 overflow-hidden rounded-lg border border-line">

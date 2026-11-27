@@ -6,13 +6,20 @@ import { DIALOG_RULES, expectAxeClean, resetThemeAfterEach, showTheme } from "./
 
 resetThemeAfterEach();
 
+/** The button that opens a story, found by its text: a page-wide role query over the whole gallery is too slow for CI. */
+function storyButton(container: HTMLElement, name: string): HTMLButtonElement {
+  const found = [...container.querySelectorAll("button")].find((button) => button.textContent === name);
+  if (found === undefined) throw new Error(`no story button ${name}`);
+  return found;
+}
+
 for (const theme of ["slip", "kiln"] as const) {
   for (const label of ["Tune view", "Tune view, a model that is not the session's"]) {
     test(`the gallery's "${label}" in ${theme} lists every option and passes axe`, async () => {
       showTheme(theme);
       const user = userEvent.setup();
-      render(<Gallery />);
-      await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
+      const { container } = render(<Gallery />);
+      await user.click(storyButton(container, `${label}, ${theme}`));
       const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
       expect(await within(dialog).findAllByRole("slider")).toHaveLength(6);
       expect(within(dialog).getByRole("radiogroup", { name: "Keep loaded" })).toBeTruthy();
@@ -35,8 +42,8 @@ for (const theme of ["slip", "kiln"] as const) {
     test(`the gallery's "${label}" in ${theme} shows Try again and passes axe`, async () => {
       showTheme(theme);
       const user = userEvent.setup();
-      render(<Gallery />);
-      await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
+      const { container } = render(<Gallery />);
+      await user.click(storyButton(container, `${label}, ${theme}`));
       const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
       const button = (await within(dialog).findByRole("button", { name: "Try again with these settings" })) as HTMLButtonElement;
       expect(button.disabled).toBe(label === "Tune view, no question to try" || label === "Tune view, chat running");
@@ -52,8 +59,8 @@ for (const theme of ["slip", "kiln"] as const) {
     test(`the gallery's "${label}" in ${theme} has a think radio group and passes axe`, async () => {
       showTheme(theme);
       const user = userEvent.setup();
-      render(<Gallery />);
-      await user.click(screen.getByRole("button", { name: `${label}, ${theme}` }));
+      const { container } = render(<Gallery />);
+      await user.click(storyButton(container, `${label}, ${theme}`));
       const dialog = await screen.findByRole("dialog", { name: "Choose a model" });
       const group = await within(dialog).findByRole("radiogroup", { name: "Think" });
       expect(within(group).getAllByRole("radio").map((item) => item.textContent)).toEqual([...values]);

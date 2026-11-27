@@ -45,6 +45,19 @@ test("the panel lists This project first, then Yours, and a broken workflow show
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
 });
 
+test("under the workflows a Starters group lists the starters not added yet, each opening /workflows", async () => {
+  const onNavigate = vi.fn();
+  const { container, rerender } = render(<WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} starters={SAMPLE_STARTERS} selected={null} onNavigate={onNavigate} />);
+  const group = within(screen.getByRole("list", { name: "Starters" }));
+  const link = group.getByRole("link", { name: /Morning briefing/ });
+  expect(link.getAttribute("href")).toBe("/workflows");
+  await userEvent.setup().click(link);
+  expect(onNavigate).toHaveBeenCalledWith("/workflows");
+  expect((await axe.run(container, noContrast)).violations).toEqual([]);
+  rerender(<WorkflowsPanel list={SAMPLE_WORKFLOW_LIST} starters={[]} selected={null} onNavigate={onNavigate} />);
+  expect(screen.queryByRole("list", { name: "Starters" })).toBeNull();
+});
+
 test("with two projects each group is named by its folder, and an untrusted file says so", () => {
   render(<WorkflowsPanel list={SAMPLE_WORKFLOW_LIST_TWO_PROJECTS} selected={null} onNavigate={() => {}} />);
   expect(screen.getByText("site")).toBeTruthy();
