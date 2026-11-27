@@ -126,6 +126,19 @@
           "title": "Status",
           "type": "string"
         },
+        "steps_expected": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Steps Expected"
+        },
         "summary": {
           "anyOf": [
             {

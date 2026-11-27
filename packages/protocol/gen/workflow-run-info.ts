@@ -10,6 +10,7 @@ export type Outputs = WorkflowOutput[];
 export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+export type StepsExpected = number | null;
 export type Summary1 = string | null;
 export type Title1 = string | null;
 export type Trigger = string;
@@ -33,6 +34,7 @@ export interface WorkflowRunInfo {
   session_id?: SessionId;
   started_at?: StartedAt;
   status: Status;
+  steps_expected?: StepsExpected;
   summary?: Summary1;
   title?: Title1;
   trigger: Trigger;

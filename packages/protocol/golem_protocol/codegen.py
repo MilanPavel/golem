@@ -505,6 +505,7 @@ from golem_protocol.commands import (
     WorkflowModelInfo,
     WorkflowOutlineStep,
     WorkflowOutput,
+    WorkflowOutputEvent,
     WorkflowProblem,
     WorkflowProposeParams,
     WorkflowProposeResult,
@@ -686,6 +687,7 @@ from golem_protocol.rpc import (
     RuntimeInstallOutputNotification,
     SessionSummaryNotification,
     SkillRegistryChangedNotification,
+    WorkflowOutputAddedNotification,
     WorkflowRunCancelledNotification,
     WorkflowRunDoneNotification,
     WorkflowRunFailedNotification,
@@ -1358,6 +1360,7 @@ MODELS: tuple[type[BaseModel], ...] = (
     WorkflowStarterInfo,
     WorkflowStartersParams,
     WorkflowStartersResult,
+    WorkflowOutputEvent,
     WorkflowRunEvent,
     WorkflowRunInfo,
     WorkflowStartParams,
@@ -1387,6 +1390,7 @@ MODELS: tuple[type[BaseModel], ...] = (
     WorkflowStepFailedNotification,
     WorkflowStepWaitingNotification,
     WorkflowStepInDoubtNotification,
+    WorkflowOutputAddedNotification,
 )
 
 

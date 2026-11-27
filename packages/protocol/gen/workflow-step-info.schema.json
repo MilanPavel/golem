@@ -112,6 +112,18 @@
       "title": "Kind",
       "type": "string"
     },
+    "line": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Line"
+    },
     "model": {
       "anyOf": [
         {
@@ -123,6 +135,19 @@
       ],
       "default": null,
       "title": "Model"
+    },
+    "of": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Of"
     },
     "result": {
       "default": null,

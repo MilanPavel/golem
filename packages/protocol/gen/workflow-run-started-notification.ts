@@ -5,9 +5,12 @@ export type Method = 'workflow.run.started';
 export type Error = string | null;
 export type FinishedAt = string | null;
 export type Name = string;
+export type ResultSize = number;
 export type SessionId = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+export type StepsExpected = number | null;
+export type Summary = string | null;
 export type Trigger = string | null;
 export type WorkflowId = string;
 export type WorkflowRunId = string;
@@ -33,10 +36,17 @@ export interface WorkflowRunEvent {
   error?: Error;
   finished_at?: FinishedAt;
   name: Name;
+  result?: Result;
+  result_size?: ResultSize;
   session_id?: SessionId;
   started_at?: StartedAt;
   status: Status;
+  steps_expected?: StepsExpected;
+  summary?: Summary;
   trigger?: Trigger;
   workflow_id: WorkflowId;
   workflow_run_id: WorkflowRunId;
+}
+export interface Result {
+  [k: string]: unknown;
 }

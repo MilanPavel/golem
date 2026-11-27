@@ -35,6 +35,7 @@ from golem_protocol.commands import (
     RuntimeInstallOutput,
     SessionSummary,
     SkillRegistryChanged,
+    WorkflowOutputEvent,
     WorkflowRunEvent,
     WorkflowStepEvent,
 )
@@ -504,6 +505,19 @@ class WorkflowStepInDoubtNotification(BaseModel):
     params: WorkflowStepEvent
 
 
+class WorkflowOutputAddedNotification(BaseModel):
+    """Server → every connection: ``workflow.output.added``. Not stored.
+
+    The run marked a result with ``run.output``; the page shows it at once.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.output.added"] = "workflow.output.added"
+    params: WorkflowOutputEvent
+
+
 __all__ = [
     "AgentRegistryChangedNotification",
     "DataChangedNotification",
@@ -539,6 +553,7 @@ __all__ = [
     "RuntimeInstallOutputNotification",
     "SessionSummaryNotification",
     "SkillRegistryChangedNotification",
+    "WorkflowOutputAddedNotification",
     "WorkflowRunCancelledNotification",
     "WorkflowRunDoneNotification",
     "WorkflowRunFailedNotification",
