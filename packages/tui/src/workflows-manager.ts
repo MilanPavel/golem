@@ -365,7 +365,7 @@ export function outlineLines(workflow: WorkflowEntryInfo, detail: WorkflowDetail
   const numberWidth = String(rows.length).length;
   for (const row of rows) {
     const time = timeWidth > 0 ? `${timeOf(row.key).padEnd(timeWidth)}  ` : "";
-    lines.push({ text: `${String(row.number).padStart(numberWidth)}  ${time}${row.title}  ${row.notes.join(" · ")}` });
+    lines.push({ text: `${String(row.number).padStart(numberWidth)}  ${time}${row.title}${row.item === null ? "" : ` ${row.item}`}  ${[...row.notes, ...(row.group === null ? [] : [row.group])].join(" · ")}` });
   }
   return lines;
 }

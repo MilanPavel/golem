@@ -28,6 +28,7 @@ from golem.workflow import (
     WorkflowError,
     WorkflowSpec,
     WorkflowWaiting,
+    agent_title,
 )
 from golem.workflows.llm import Llm, parse_object
 from golem.workflows.tools import ToolVerdict, WorkflowTools
@@ -290,6 +291,8 @@ class WorkflowEngine:
                 "title": step.title or step.step_key,
                 "status": step.status,
                 "group": step.group_key,
+                "group_title": step.group_title,
+                "item": step.item,
                 "attempts": step.attempts,
                 "error": step.error,
                 "child_session_id": step.child_session_id,
@@ -383,6 +386,8 @@ class _Journal:
         keyed: bool = False,
         retries: int = 0,
         backoff: float = 0.0,
+        item: str | None = None,
+        group_title: str | None = None,
     ) -> Any:
         store = self._engine.store
         event = self._engine.step_event
@@ -392,7 +397,9 @@ class _Journal:
             # The daemon died while a keyed step ran: it may have done its action.
             await store.mark_in_doubt(workflow_run_id, key, _now())
             await event("workflow.step.in_doubt", workflow_run_id, key)
-        row = await store.begin_step(workflow_run_id, key, kind, title, group_key, _now())
+        row = await store.begin_step(
+            workflow_run_id, key, kind, title, group_key, _now(), item=item, group_title=group_title
+        )
         if row.status == "done":
             return json.loads(row.result_json) if row.result_json is not None else None
 
@@ -419,7 +426,16 @@ class _Journal:
                         raise
                     if backoff:
                         await asyncio.sleep(backoff)
-                    await store.begin_step(workflow_run_id, key, kind, title, group_key, _now())
+                    await store.begin_step(
+                        workflow_run_id,
+                        key,
+                        kind,
+                        title,
+                        group_key,
+                        _now(),
+                        item=item,
+                        group_title=group_title,
+                    )
                     continue
                 break
         except Exception as exc:
@@ -448,31 +464,43 @@ class _Journal:
         gets: tuple[str, ...] = (),
         budget: float | None = None,
         worktree: str | None = None,
+        title: str | None = None,
+        group_title: str | None = None,
     ) -> dict[str, Any]:
+        words = title or agent_title(agent_type)
         batch = None if group_key is None or position is None else (group_key, position)
         return await self.run_step(
             workflow_run_id,
             key,
             "agent",
-            agent_type if worktree is None else f"{agent_type} \u00b7 {worktree}",
+            words if worktree is None else f"{words} \u00b7 {worktree}",
             group_key,
             self._engine.run_agent,
             (workflow_run_id, key, agent_type, brief, model, batch, gets, budget, worktree),
             {},
+            group_title=group_title,
         )
 
     async def skill(
-        self, workflow_run_id: str, key: str, name: str, args: str, group_key: str | None
+        self,
+        workflow_run_id: str,
+        key: str,
+        name: str,
+        args: str,
+        group_key: str | None,
+        title: str | None = None,
+        group_title: str | None = None,
     ) -> dict[str, Any]:
         return await self.run_step(
             workflow_run_id,
             key,
             "skill",
-            name,
+            title or name,
             group_key,
             self._engine.run_skill,
             (workflow_run_id, key, name, args),
             {},
+            group_title=group_title,
         )
 
     async def tool(
@@ -483,6 +511,7 @@ class _Journal:
         args: dict[str, Any],
         group_key: str | None,
         keyed: bool,
+        group_title: str | None = None,
     ) -> str:
         """The ``run.tool`` step: the rules decide; ``ask`` waits like a review."""
         engine, store = self._engine, self._engine.store
@@ -500,11 +529,19 @@ class _Journal:
             refusal = verdict.reason
         elif verdict.action == "ask":
             refusal = await self._tool_approval(
-                workflow_run_id, key, name, args, verdict, group_key
+                workflow_run_id, key, name, args, verdict, group_key, group_title
             )
         if refusal is not None:
             await self.run_step(
-                workflow_run_id, key, "tool", name, group_key, _refuse, (refusal,), {}
+                workflow_run_id,
+                key,
+                "tool",
+                name,
+                group_key,
+                _refuse,
+                (refusal,),
+                {},
+                group_title=group_title,
             )
         saved = await self.run_step(
             workflow_run_id,
@@ -516,6 +553,7 @@ class _Journal:
             (workflow_run_id, key, name, args),
             {},
             keyed=keyed,
+            group_title=group_title,
         )
         return await engine.tool_output(workflow_run_id, saved)
 
@@ -527,6 +565,7 @@ class _Journal:
         args: dict[str, Any],
         verdict: ToolVerdict,
         group_key: str | None,
+        group_title: str | None = None,
     ) -> str | None:
         """None when you approved the call; the refusal when you did not. Waits when unanswered.
 
@@ -547,7 +586,9 @@ class _Journal:
                 raise WorkflowError(
                     f"tool {name!r} got arguments that are not JSON ({exc})"
                 ) from exc
-            await store.begin_step(workflow_run_id, key, "tool", name, group_key, _now())
+            await store.begin_step(
+                workflow_run_id, key, "tool", name, group_key, _now(), group_title=group_title
+            )
             await event("workflow.step.started", workflow_run_id, key)
             await store.create_review(workflow_run_id, key, pending, _now())
         elif review.answer_json is not None:
@@ -564,16 +605,21 @@ class _Journal:
         ask: str,
         group_key: str | None,
         draft: Any,
+        title: str | None = None,
+        group_title: str | None = None,
     ) -> Any:
         """The ``run.review`` step: return the answer, or write the review row and stop the run."""
         store = self._engine.store
         event = self._engine.step_event
+        words = title or ask
         before = await store.get_step(workflow_run_id, key)
         if before is not None and before.status == "done":
             return json.loads(before.result_json) if before.result_json is not None else None
         review = await store.get_review(workflow_run_id, key)
         if review is not None and review.answer_json is not None:
-            await store.begin_step(workflow_run_id, key, "review", ask, group_key, _now())
+            await store.begin_step(
+                workflow_run_id, key, "review", words, group_key, _now(), group_title=group_title
+            )
             await store.finish_step(workflow_run_id, key, review.answer_json, _now())
             await event("workflow.step.done", workflow_run_id, key)
             return json.loads(review.answer_json)
@@ -585,7 +631,9 @@ class _Journal:
                     f"review {key!r} got a draft that is not JSON ({exc}); pass a string, a list"
                     " or a dict"
                 ) from exc
-            await store.begin_step(workflow_run_id, key, "review", ask, group_key, _now())
+            await store.begin_step(
+                workflow_run_id, key, "review", words, group_key, _now(), group_title=group_title
+            )
             await event("workflow.step.started", workflow_run_id, key)
             await store.create_review(workflow_run_id, key, pending, _now())
         await store.set_step_status(workflow_run_id, key, "waiting")

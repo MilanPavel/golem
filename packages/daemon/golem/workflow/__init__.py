@@ -77,6 +77,8 @@ class WorkflowSpec:
     """Line of the function in its file."""
     on_restart: OnRestart = "resume"
     """What the daemon does with a run it finds ``running`` after a restart."""
+    title: str | None = None
+    """The name shown for the workflow, from ``@workflow(title=)``."""
 
 
 class WorkflowError(Exception):
@@ -107,6 +109,8 @@ class StepBackend(Protocol):
         keyed: bool = False,
         retries: int = 0,
         backoff: float = 0.0,
+        item: str | None = None,
+        group_title: str | None = None,
     ) -> Any: ...
 
     async def notify(self, workflow_run_id: str, title: str | None, text: str) -> None:
@@ -120,6 +124,8 @@ class StepBackend(Protocol):
         ask: str,
         group_key: str | None,
         draft: Any,
+        title: str | None = None,
+        group_title: str | None = None,
     ) -> Any: ...
 
     async def agent(
@@ -134,6 +140,8 @@ class StepBackend(Protocol):
         gets: tuple[str, ...] = (),
         budget: float | None = None,
         worktree: str | None = None,
+        title: str | None = None,
+        group_title: str | None = None,
     ) -> dict[str, Any]:
         """Run an agent as a helper of the run's session (the ``agent`` step).
 
@@ -143,7 +151,14 @@ class StepBackend(Protocol):
         ...
 
     async def skill(
-        self, workflow_run_id: str, key: str, name: str, args: str, group_key: str | None
+        self,
+        workflow_run_id: str,
+        key: str,
+        name: str,
+        args: str,
+        group_key: str | None,
+        title: str | None = None,
+        group_title: str | None = None,
     ) -> dict[str, Any]:
         """Run a skill as a helper of the run's session (the ``skill`` step)."""
         ...
@@ -168,15 +183,46 @@ class StepBackend(Protocol):
         args: dict[str, Any],
         group_key: str | None,
         keyed: bool,
+        group_title: str | None = None,
     ) -> Any:
         """Call a golem or MCP tool through the permission engine (the ``tool`` step)."""
         ...
 
 
 _group: ContextVar[str | None] = ContextVar("golem_workflow_group", default=None)
+_group_title: ContextVar[str | None] = ContextVar("golem_workflow_group_title", default=None)
 _position: ContextVar[int | None] = ContextVar("golem_workflow_position", default=None)
 IDEMPOTENCY_KEY: ContextVar[str | None] = ContextVar("golem_workflow_key", default=None)
 MAY_HAVE_RUN: ContextVar[bool] = ContextVar("golem_workflow_may_have_run", default=False)
+
+
+ITEM_CHARS = 80
+"""An ``item=`` longer than this is cut."""
+
+
+def _item_text(item: object) -> str | None:
+    if item is None:
+        return None
+    text = " ".join(str(item).split())
+    return text if len(text) <= ITEM_CHARS else text[: ITEM_CHARS - 1] + "\u2026"
+
+
+def _clean(title: str | None) -> str | None:
+    """A ``title=`` as given, or None when it is empty or not text."""
+    return (title.strip() or None) if isinstance(title, str) else None
+
+
+def llm_title(key: str | None, title: str | None = None) -> str:
+    """The title of a ``run.llm`` step: ``title=``, the key in words, else "Ask the model"."""
+    given = _clean(title)
+    if given is not None:
+        return given
+    return key[:1].upper() + key[1:] if key else "Ask the model"
+
+
+def agent_title(agent_type: str, title: str | None = None) -> str:
+    """The title of a ``run.agent`` step: ``title=``, else "<Type> agent"."""
+    return _clean(title) or f"{agent_type.capitalize()} agent"
 
 
 def idempotency_key() -> str | None:
@@ -217,9 +263,14 @@ class Run:
         key: str | None = None,
         retries: int = 0,
         backoff: float = 0.0,
+        item: Any = None,
         **kwargs: Any,
     ) -> Any:
         """Run ``fn(*args, **kwargs)`` once and keep its JSON result under ``key or name``.
+
+        ``item=`` is the part that changes in a loop (a folder, a file); it is shown after the
+        title and is never passed to ``fn``. Without ``key=``, an ``item`` is part of the step key
+        (``"count: a.md"``), so a loop needs no name that changes.
 
         Each key may be used once per run; inside a loop pass distinct names or keys.
         An explicit ``key=`` marks a step that changes something outside golem: if golem
@@ -227,7 +278,8 @@ class Run:
         ``retries=N`` runs the function up to N more times after an exception, waiting
         ``backoff`` seconds before each.
         """
-        step_key = key or name
+        shown = _item_text(item)
+        step_key = key or (name if item is None else f"{name}: {item}")
         self._use_key(step_key, name)
         return await self._backend.run_step(
             self.workflow_run_id,
@@ -241,6 +293,8 @@ class Run:
             keyed=key is not None,
             retries=max(0, retries),
             backoff=max(0.0, backoff),
+            item=shown,
+            group_title=_group_title.get(),
         )
 
     def _use_key(self, step_key: str, name: str) -> None:
@@ -251,16 +305,20 @@ class Run:
             )
         self._keys.add(step_key)
 
-    async def parallel(self, aws: Iterable[Awaitable[Any]]) -> list[Any]:
+    async def parallel(self, aws: Iterable[Awaitable[Any]], title: str | None = None) -> list[Any]:
         """Run the awaitables (usually ``run.step(...)``) together; results keep their order.
+
+        ``title=`` names the group where the steps are listed.
 
         When one fails the others finish and keep their results, then the first error is raised.
         """
         self._groups += 1
         group = f"parallel-{self._groups}"
+        group_title = _clean(title)
 
         async def member(position: int, aw: Awaitable[Any]) -> Any:
             _group.set(group)
+            _group_title.set(group_title)
             _position.set(position)
             return await aw
 
@@ -279,7 +337,11 @@ class Run:
         return list(outcomes)
 
     async def review(
-        self, draft: Any, ask: str = "Review this", key: str | None = None
+        self,
+        draft: Any,
+        ask: str = "Review this",
+        key: str | None = None,
+        title: str | None = None,
     ) -> dict[str, str]:
         """Stop and wait for a person to look at ``draft``; return ``{"verdict", "text"}``.
 
@@ -288,11 +350,19 @@ class Run:
         and this call returns the answer: ``verdict`` is ``approve``, ``edit`` (``text`` is the
         person's version) or ``reject`` (the workflow decides what that means). ``draft`` must be
         JSON. The step key is ``key`` or ``review:<ask>``; use ``key=`` for two reviews with the
-        same ask.
+        same ask. ``title=`` is the name the step is listed under (the ask when it is left out).
         """
         step_key = key or f"review:{ask}"
         self._use_key(step_key, ask)
-        return await self._backend.review(self.workflow_run_id, step_key, ask, _group.get(), draft)
+        return await self._backend.review(
+            self.workflow_run_id,
+            step_key,
+            ask,
+            _group.get(),
+            draft,
+            _clean(title) or ask,
+            _group_title.get(),
+        )
 
     async def notify(self, text: str, title: str | None = None, key: str | None = None) -> None:
         """Tell you ``text`` through the Notifier, once per run.
@@ -312,11 +382,12 @@ class Run:
             self.workflow_run_id,
             step_key,
             "notify",
-            title or text,
+            _clean(title) or "Notification",
             _group.get(),
             self._backend.notify,
             (self.workflow_run_id, title, text),
             {},
+            group_title=_group_title.get(),
         )
 
     async def agent(
@@ -328,8 +399,11 @@ class Run:
         gets: Iterable[str] = (),
         budget: str | float | None = None,
         worktree: str | None = None,
+        title: str | None = None,
     ) -> dict[str, Any]:
         """Run an agent of this ``type`` on ``brief``.
+
+        ``title=`` is the name the step is listed under ("<Type> agent" when it is left out).
 
         Returns ``{"status", "answer", "session_id"}``. An agent with tools that change files
         (``worker``) works in its own git copy of the run's folder, and its result also has
@@ -373,6 +447,8 @@ class Run:
             wanted,
             cap,
             worktree,
+            agent_title(type, title),
+            _group_title.get(),
         )
 
     async def llm(
@@ -381,6 +457,7 @@ class Run:
         schema: Any = None,
         model: str | None = None,
         key: str | None = None,
+        title: str | None = None,
     ) -> Any:
         """Ask a model one question, with no tools, as one step.
 
@@ -389,7 +466,8 @@ class Run:
         (``cheapest``, ``same``, ``stronger``, ``local``, ...), never a model name:
         routing picks the model, and a local-only folder only ever gets a local one. The step
         saves the model and the cost; a run that is executed again does not ask again. The
-        step key is ``key`` or ``llm:<short hash of the prompt>``, once per run.
+        step key is ``key`` or ``llm:<short hash of the prompt>``, once per run. ``title=`` is
+        the name the step is listed under (the key in words, else "Ask the model").
         """
         step_key = key or f"llm:{hashlib.sha256(prompt.encode()).hexdigest()[:8]}"
         self._use_key(step_key, "llm")
@@ -404,16 +482,16 @@ class Run:
                 schema_dict = dict(schema)  # pyright: ignore[reportUnknownArgumentType]
             else:
                 raise WorkflowError("run.llm: schema must be a Pydantic model class or a dict")
-        title = " ".join(prompt.split())
         return await self._backend.run_step(
             self.workflow_run_id,
             step_key,
             "llm",
-            title if len(title) <= 60 else title[:59] + "\u2026",
+            llm_title(key, title),
             _group.get(),
             self._backend.llm,
             (self.workflow_run_id, step_key, prompt, schema_dict, model, check),
             {},
+            group_title=_group_title.get(),
         )
 
     async def tool(self, name: str, /, key: str | None = None, **args: Any) -> str:
@@ -431,11 +509,21 @@ class Run:
         step_key = key or f"tool:{name}"
         self._use_key(step_key, f"tool {name}")
         return await self._backend.tool(
-            self.workflow_run_id, step_key, name, args, _group.get(), key is not None
+            self.workflow_run_id,
+            step_key,
+            name,
+            args,
+            _group.get(),
+            key is not None,
+            _group_title.get(),
         )
 
-    async def skill(self, name: str, args: str = "", key: str | None = None) -> str:
+    async def skill(
+        self, name: str, args: str = "", key: str | None = None, title: str | None = None
+    ) -> str:
         """Run the skill ``name`` with ``args`` as one short agent turn and return its answer.
+
+        ``title=`` is the name the step is listed under (the skill's name when it is left out).
 
         The skill's body, with the arguments filled in, is the brief of a helper of the run's
         session. The helper gets the skill's own tools and golem's permissions, so it has a
@@ -446,7 +534,15 @@ class Run:
         """
         step_key = key or f"skill:{name}"
         self._use_key(step_key, f"skill {name}")
-        found = await self._backend.skill(self.workflow_run_id, step_key, name, args, _group.get())
+        found = await self._backend.skill(
+            self.workflow_run_id,
+            step_key,
+            name,
+            args,
+            _group.get(),
+            _clean(title) or name,
+            _group_title.get(),
+        )
         return found["answer"]
 
 
@@ -487,8 +583,11 @@ def workflow(
     inputs: Mapping[str, object] | None = None,
     description: str | None = None,
     on_restart: OnRestart = "resume",
+    title: str | None = None,
 ) -> Callable[[F], F]:
     """Mark a function as a workflow.
+
+    ``title=`` is the name shown for it; without one the function name is shown.
 
     ``on_restart`` says what happens to a run the daemon stopped in the middle of: ``"resume"``
     continues it (finished steps are not run again), ``"fail"`` fails it, ``"ask"`` leaves it
@@ -509,6 +608,7 @@ def workflow(
             description=description if description is not None else doc,
             line=code.co_firstlineno if code is not None else 0,
             on_restart=on_restart,
+            title=_clean(title),
         )
         setattr(fn, SPEC_ATTR, spec)
         return fn

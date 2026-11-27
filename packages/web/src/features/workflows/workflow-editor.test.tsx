@@ -25,8 +25,26 @@ test("the outline is read from the code, numbered, with for each and if", () => 
   const items = within(screen.getByRole("list", { name: "Outline" })).getAllByRole("listitem");
   expect(items).toHaveLength(4);
   expect(items[1]!.textContent).toContain("2Summarise each pull request");
-  expect(items[1]!.textContent).toContain("for each pulls");
+  expect(items[1]!.textContent).toContain("Once for each pulls");
   expect(items[3]!.textContent).toContain('if reviewed["verdict"] != "reject"');
+});
+
+test("a step shows its item after the title, and a group reads its title or At the same time", () => {
+  const steps = [
+    { id: "a", kind: "step", title: "Check folder", lines: [12, 12] as [number, number], item: "golem", group: "parallel-1", group_title: "Both folders" },
+    { id: "b", kind: "step", title: "Check folder", lines: [13, 13] as [number, number], item: "web", group: "parallel-1", group_title: "Both folders" },
+    { id: "c", kind: "llm", title: "Ask the model", lines: [15, 15] as [number, number], group: "parallel-2" },
+    { id: "d", kind: "step", title: "Tidy", lines: [17, 17] as [number, number], for_each: "for each f in folders" },
+  ];
+  render(editor({ steps }));
+  const list = within(screen.getByRole("list", { name: "Outline" }));
+  const items = list.getAllByRole("listitem");
+  expect(items[0]!.textContent).toContain("Both folders");
+  expect(items[0]!.textContent).toContain("1Check foldergolem");
+  expect(items[1]!.textContent).not.toContain("Both folders");
+  expect(items[2]!.textContent).toContain("At the same time");
+  expect(items[3]!.textContent).toContain("Once for each f in folders");
+  expect(items[3]!.textContent).not.toContain("for each for each");
 });
 
 test("a step in the outline selects it, shows its fields and marks its lines", async () => {

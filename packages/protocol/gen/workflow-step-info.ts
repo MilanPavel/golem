@@ -6,6 +6,8 @@ export type CostUsd = number | null;
 export type Error = string | null;
 export type FinishedAt = string | null;
 export type Group = string | null;
+export type GroupTitle = string | null;
+export type Item = string | null;
 export type Key = string;
 export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'skill';
 export type Model = string | null;
@@ -28,6 +30,8 @@ export interface WorkflowStepInfo {
   error?: Error;
   finished_at?: FinishedAt;
   group?: Group;
+  group_title?: GroupTitle;
+  item?: Item;
   key: Key;
   kind: Kind;
   model?: Model;

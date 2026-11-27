@@ -80,6 +80,18 @@
           "default": null,
           "title": "Condition"
         },
+        "does": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Does"
+        },
         "for_each": {
           "anyOf": [
             {
@@ -116,10 +128,34 @@
           "default": null,
           "title": "Group"
         },
+        "group_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Title"
+        },
         "id": {
           "minLength": 1,
           "title": "Id",
           "type": "string"
+        },
+        "item": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item"
         },
         "key": {
           "anyOf": [

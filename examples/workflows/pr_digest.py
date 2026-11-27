@@ -15,6 +15,7 @@ def pulls_of(text: str) -> list[dict]:
 @workflow(
     trigger=manual(),
     inputs={"tool": str, "repo": str},
+    title="Pull request digest",
     description="One line for each open pull request, checked by you, then a notice.",
 )
 async def pr_digest(run: Run) -> str:
@@ -27,9 +28,11 @@ async def pr_digest(run: Run) -> str:
             run.llm(
                 f"Summarise this pull request in one line:\n{json.dumps(pr)[:2000]}",
                 key=f"summarise #{pr.get('number', i)}",
+                title="Summarise a pull request",
             )
             for i, pr in enumerate(pulls)
-        ]
+        ],
+        title="One line each",
     )
     digest = "\n".join(
         f"- #{pr.get('number', '?')}: {line}" for pr, line in zip(pulls, lines, strict=True)
@@ -37,7 +40,7 @@ async def pr_digest(run: Run) -> str:
 
     # To have a skill write the notes instead: digest = await run.skill("pr-notes", args=digest)
     ask = f"Digest of {len(pulls)} open PRs in {run.inputs['repo']}"
-    reviewed = await run.review(digest, ask=ask)
+    reviewed = await run.review(digest, ask=ask, title="Check the digest")
     if reviewed["verdict"] == "reject":
         return "rejected"
     if reviewed["verdict"] == "edit":

@@ -4,7 +4,7 @@ import type { WorkflowOutlineStep, WorkflowProblem } from "../../store/workflows
 
 import { outlineLine, outlineNotes } from "@golem/view";
 
-export { errorLine, triggerText, workflowGroups, workflowRowLine, type WorkflowGroup } from "@golem/view";
+export { errorLine, groupWords, triggerText, workflowGroups, workflowRowLine, type WorkflowGroup } from "@golem/view";
 
 /** The step's first line in the file (from 1), or null when the daemon sent none. */
 export const stepStart = outlineLine;

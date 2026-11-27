@@ -19,6 +19,13 @@ export type OutlineStepLike = {
   gets?: string | null;
   budget?: string | null;
   key?: string | null;
+  /** The part that changes in a loop: the source of `item=`. */
+  item?: string | null;
+  /** The parallel group the step is in, and its title when the code gave one. */
+  group?: string | null;
+  group_title?: string | null;
+  /** What the function a `run.step` calls does: the first sentence of its docstring. */
+  does?: string | null;
   /** The first and last line in the file. The generated type leaves the pair open. */
   lines?: readonly unknown[];
 };
@@ -28,8 +35,12 @@ export type OutlineRow = {
   number: number;
   id: string;
   title: string;
+  /** The part that changes in a loop, shown after the title. */
+  item: string | null;
   /** What it is, then what repeats or guards it. */
   notes: string[];
+  /** The words of the group the step is in ("At the same time" or the group's title), or null. */
+  group: string | null;
   /** The step's first line in the file, or null. */
   line: number | null;
   key: string | null;
@@ -41,11 +52,25 @@ export function outlineLine(step: Pick<OutlineStepLike, "lines">): number | null
   return typeof first === "number" && Number.isInteger(first) && first >= 1 ? first : null;
 }
 
+/** The words a group is listed under: its title, else "At the same time". Null for a step that is in no group. */
+export function groupWords(step: Pick<OutlineStepLike, "group" | "group_title">): string | null {
+  if (step.group === null || step.group === undefined || step.group === "") return null;
+  return step.group_title !== null && step.group_title !== undefined && step.group_title !== "" ? step.group_title : "At the same time";
+}
+
+/** What repeats a step as words: `for each f in folders` reads `Once for each f in folders`. A bare name is the thing it loops over. */
+export function repeatWords(forEach: string): string {
+  return forEach
+    .split("; ")
+    .map((part) => (part.startsWith("while ") ? part : `Once ${part.startsWith("for each ") ? part : `for each ${part}`}`))
+    .join("; ");
+}
+
 /** How one step reads: its kind, then agent, `for each`, `if`, `gets` and `budget`. */
 export function outlineNotes(step: OutlineStepLike): string[] {
   const notes: string[] = [step.kind];
   if (step.agent) notes.push(`agent ${step.agent}`);
-  if (step.for_each) notes.push(`for each ${step.for_each}`);
+  if (step.for_each) notes.push(repeatWords(step.for_each));
   if (step.condition) notes.push(`if ${step.condition}`);
   if (step.gets) notes.push(`gets ${step.gets}`);
   if (step.budget) notes.push(`budget ${step.budget}`);
@@ -58,7 +83,9 @@ export function outlineRows(steps: readonly OutlineStepLike[]): OutlineRow[] {
     number: at + 1,
     id: step.id,
     title: step.title,
+    item: step.item ?? null,
     notes: outlineNotes(step),
+    group: groupWords(step),
     line: outlineLine(step),
     key: step.key ?? null,
   }));

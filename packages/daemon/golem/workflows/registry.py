@@ -103,6 +103,7 @@ def _spec(raw: dict[str, object]) -> WorkflowSpec:
         description=str(raw.get("description") or ""),
         line=int(str(raw.get("line") or 0)),
         on_restart=_restart(raw.get("on_restart")),
+        title=str(raw["title"]) if raw.get("title") else None,
     )
 
 

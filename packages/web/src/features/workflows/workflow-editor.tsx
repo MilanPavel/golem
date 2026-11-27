@@ -8,7 +8,7 @@ import { Input } from "../../ui/input.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { StepFields } from "./step-fields.tsx";
-import { changedLines, compareSteps, lineDiff, problemCounts, stepAtLine, stepNotes, stepNumberLines, stepRange, type StepChange } from "./text.ts";
+import { changedLines, compareSteps, groupWords, lineDiff, problemCounts, stepAtLine, stepNotes, stepNumberLines, stepRange, type StepChange } from "./text.ts";
 
 /** How long the code rests before it is checked. */
 export const CHECK_DELAY_MS = 600;
@@ -71,7 +71,14 @@ function StepCard({ step, number, selected, problems, change, onSelect }: { step
     >
       <span className="flex items-baseline gap-2 text-sm font-medium">
         <span className={cn("w-5 shrink-0 text-right text-meta", selected ? "text-clay-ink" : "text-faint")}>{number}</span>
-        <span className="min-w-0 flex-1 wrap-anywhere">{step.title}</span>
+        <span className="min-w-0 flex-1 wrap-anywhere">
+          {step.title}
+          {step.item ? (
+            <span className="ml-2 font-normal">
+              <Code tone="muted">{step.item}</Code>
+            </span>
+          ) : null}
+        </span>
         {change === undefined ? null : <span className={cn("shrink-0 text-meta", change === "new" ? "text-allow" : "text-clay-ink")}>{change}</span>}
       </span>
       <span className="pl-7 text-meta text-muted wrap-anywhere">{stepNotes(step).join(" · ")}</span>
@@ -93,7 +100,7 @@ function Outline({ steps, selected, problemsOf, changes, onSelect }: { steps: re
         const before = at === 0 ? null : (steps[at - 1]?.group ?? null);
         return (
           <li key={step.id} className="flex flex-col gap-1.5">
-            {group !== null && group !== before ? <span className="pt-1 text-meta font-medium text-faint">{group}</span> : null}
+            {group !== null && group !== before ? <span className="pt-1 text-meta font-medium text-faint">{groupWords(step)}</span> : null}
             <div className={cn(group !== null && "border-l-2 border-line pl-2")}>
               <StepCard step={step} number={at + 1} selected={selected === step.id} problems={problemsOf(step)} change={changes?.get(step.id)} onSelect={() => onSelect(step)} />
             </div>
@@ -136,10 +143,18 @@ function StepPane({ step, number, lines, text, onEdit, agents, onOpenAgent, onJu
     <div className="flex flex-col gap-3">
       <h3 className="flex items-baseline gap-2 text-sm font-medium">
         <span className="text-meta text-clay-ink">{number}</span>
-        <span className="wrap-anywhere">{step.title}</span>
+        <span className="wrap-anywhere">
+          {step.title}
+          {step.item ? (
+            <span className="ml-2 font-normal">
+              <Code tone="muted">{step.item}</Code>
+            </span>
+          ) : null}
+        </span>
       </h3>
       <dl className="flex flex-col gap-1.5">
         <Field name="kind">{step.kind}</Field>
+        {step.does ? <Field name="does">{step.does}</Field> : null}
         {editable || !step.agent ? null : <Field name="agent">{step.agent}</Field>}
         {editable || brief === null ? null : (
           <Field name="brief">

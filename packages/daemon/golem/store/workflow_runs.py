@@ -54,6 +54,8 @@ class WorkflowStepRecord:
     started_at: str | None
     finished_at: str | None
     seq: int
+    item: str | None
+    group_title: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +199,9 @@ class WorkflowRuns:
         title: str | None,
         group_key: str | None,
         at: str,
+        *,
+        item: str | None = None,
+        group_title: str | None = None,
     ) -> WorkflowStepRecord:
         """Start a step: insert it, or bump ``attempts`` of the row that is there.
 
@@ -209,7 +214,7 @@ class WorkflowRuns:
                 (run_id, key),
             )
             if not rows:
-                await _insert_step(tx, run_id, key, kind, title, group_key, at)
+                await _insert_step(tx, run_id, key, kind, title, group_key, at, item, group_title)
             elif rows[0]["status"] not in ("done", "skipped"):
                 await tx.execute(
                     "UPDATE workflow_steps SET status = 'running', attempts = attempts + 1,"
@@ -316,10 +321,13 @@ async def _insert_step(
     title: str | None,
     group_key: str | None,
     at: str,
+    item: str | None,
+    group_title: str | None,
 ) -> None:
     await tx.execute(
         "INSERT INTO workflow_steps (workflow_run_id, step_key, kind, title, group_key, status,"
-        " attempts, started_at, seq) VALUES (?, ?, ?, ?, ?, 'running', 1, ?,"
-        " (SELECT COALESCE(MAX(seq), 0) + 1 FROM workflow_steps WHERE workflow_run_id = ?))",
-        (run_id, key, kind, title, group_key, at, run_id),
+        " attempts, started_at, seq, item, group_title) VALUES (?, ?, ?, ?, ?, 'running', 1, ?,"
+        " (SELECT COALESCE(MAX(seq), 0) + 1 FROM workflow_steps WHERE workflow_run_id = ?),"
+        " ?, ?)",
+        (run_id, key, kind, title, group_key, at, run_id, item, group_title),
     )

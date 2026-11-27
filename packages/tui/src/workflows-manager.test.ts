@@ -214,13 +214,23 @@ const RUNS = [
 const outline = (state: WorkflowsManagerState, detail: WorkflowDetailData | null = SEEN, rows = 40) =>
   layoutWorkflowsManager({ state, list: LIST, columns: 120, rows, detail, runs: RUNS, now: NOW }).map((line) => `${line.prefix ?? ""}${line.mark ? `${line.mark.text} ` : ""}${line.text}`);
 
+test("the outline shows a step's item after its title, and its group in words", () => {
+  const steps = [
+    { id: "a", kind: "step", title: "Check folder", item: "golem", group: "parallel-1", group_title: "Both folders", for_each: "for each f in folders", lines: [10, 10], after: [] },
+    { id: "b", kind: "llm", title: "Ask the model", group: "parallel-2", lines: [12, 12], after: [] },
+  ];
+  const lines = outline(openWorkflowsManager(), { ...SEEN, steps, lastRun: null } as unknown as WorkflowDetailData);
+  assert.ok(lines.includes("1  Check folder golem  step · Once for each f in folders · Both folders"));
+  assert.ok(lines.includes("2  Ask the model  llm · At the same time"));
+});
+
 test("the selected workflow shows its outline below the list, with last-run times and the header", () => {
   const lines = outline(openWorkflowsManager());
   const at = lines.indexOf("pr-digest");
   assert.ok(at > 0);
   assert.equal(lines[at + 1], "last run 08:30 · done · $0.04");
   assert.equal(lines[at + 2], "1  08:30  List pull requests  tool");
-  assert.equal(lines[at + 3], "2  08:31  Write a note  agent · agent writer · for each prs · if prs");
+  assert.equal(lines[at + 3], "2  08:31  Write a note  agent · agent writer · Once for each prs · if prs");
   assert.equal(lines[at + 4], "3         Look it over  review");
   assert.ok(outline(openWorkflowsManager(), null).includes("reading the file…"));
   assert.ok(outline(openWorkflowsManager(), { ...SEEN, steps: [], lastRun: null }).includes("No steps found in the file."));

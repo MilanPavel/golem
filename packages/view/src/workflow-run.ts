@@ -13,6 +13,8 @@ export type StepLike = {
   key: string;
   kind: string;
   title: string;
+  /** The part that changes in a loop. */
+  item?: string | null;
   status: string;
   error?: string | null;
   child_session_id?: string | null;
@@ -46,6 +48,11 @@ function parseTs(ts: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+/** The title, then the item when the step has one: `Check folder · golem`. */
+export function stepLabel(step: Pick<StepLike, "title" | "item">): string {
+  return step.item === null || step.item === undefined || step.item === "" ? step.title : `${step.title} · ${step.item}`;
+}
+
 /**
  * The steps as spans for `layoutSteps`. A step that never started begins at `nowMs`; one that is
  * running or waiting has no end, so it runs to "now". A step that waits for you is `you` from its start.
@@ -58,7 +65,7 @@ export function workflowStepSpans(steps: readonly StepLike[], nowMs: number): St
     const endMs = open ? null : (finished ?? startMs);
     return {
       id: step.key,
-      label: step.title,
+      label: stepLabel(step),
       role: "helper",
       startMs,
       endMs,

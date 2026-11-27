@@ -15,10 +15,13 @@ export type BriefLine = number | null;
 export type Budget = string | null;
 export type BudgetLine = number | null;
 export type Condition = string | null;
+export type Does = string | null;
 export type ForEach = string | null;
 export type Gets = string | null;
 export type Group = string | null;
+export type GroupTitle = string | null;
 export type Id = string;
+export type Item = string | null;
 export type Key = string | null;
 export type Kind = string;
 /**
@@ -44,10 +47,13 @@ export interface WorkflowOutlineStep {
   budget?: Budget;
   budget_line?: BudgetLine;
   condition?: Condition;
+  does?: Does;
   for_each?: ForEach;
   gets?: Gets;
   group?: Group;
+  group_title?: GroupTitle;
   id: Id;
+  item?: Item;
   key?: Key;
   kind: Kind;
   lines: Lines;

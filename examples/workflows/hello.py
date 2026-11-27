@@ -20,8 +20,16 @@ def add_up(counts: list[int]) -> int:
     return sum(counts)
 
 
-@workflow(trigger=manual(), inputs={"folder": str}, description="Count lines in three Markdown files.")
+@workflow(
+    trigger=manual(),
+    inputs={"folder": str},
+    title="Count the lines",
+    description="Count lines in three Markdown files.",
+)
 async def hello(run: Run) -> None:
-    files = await run.step("find files", find_files, run.inputs["folder"])
-    counts = await run.parallel([run.step(f"count {Path(f).name}", count_lines, f) for f in files])
-    await run.step("add up", add_up, counts)
+    files = await run.step("Find the files", find_files, run.inputs["folder"])
+    counts = await run.parallel(
+        [run.step("Count lines", count_lines, f, item=Path(f).name) for f in files],
+        title="Each file",
+    )
+    await run.step("Add up", add_up, counts)
