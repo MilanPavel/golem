@@ -151,6 +151,8 @@ export function fakeClient() {
     setDataNotes: vi.fn<PageClient["setDataNotes"]>(async () => ({ path: "~/.golem/data/x.md" })),
     draftDataNotes: vi.fn<PageClient["draftDataNotes"]>(async () => ({ text: "# x\n" })),
     listWorkflows: vi.fn<PageClient["listWorkflows"]>(async () => ({ workflows: [] })),
+    listWorkflowStarters: vi.fn<PageClient["listWorkflowStarters"]>(async () => ({ starters: [] })),
+    addWorkflowStarter: vi.fn<PageClient["addWorkflowStarter"]>(async (id) => ({ id: `/Users/me/.golem/workflows/${id}.py::${id}`, name: id, path: `/Users/me/.golem/workflows/${id}.py` })),
     getWorkflow: vi.fn<PageClient["getWorkflow"]>(async (id) => ({
       workflow: { id, name: id, path: "/Users/me/.golem/workflows/x.py", state: "ok", inputs: [], description: "" },
       steps: [],

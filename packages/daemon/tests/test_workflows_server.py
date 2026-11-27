@@ -251,6 +251,38 @@ async def test_get_returns_the_outline_and_tolerates_a_bad_file(short_home: Path
         await stop_daemon(app, task)
 
 
+async def test_starters_are_listed_and_added(short_home: Path, tmp_path: Path) -> None:
+    project = (tmp_path / "proj").resolve()
+    project.mkdir()
+    app, task = await start_daemon(short_home)
+    client = await RpcClient.connect(app.paths.socket_path)
+    try:
+        await client.call("hello", HELLO)
+        listed = cast(Rows, rpc_result(await client.call("workflow.starters", {}))["starters"])
+        assert [(s["id"], s["needs_folder"], s["schedule"]) for s in listed] == [
+            ("morning_briefing", False, "Runs every weekday at 07:30")
+        ]
+        added = rpc_result(await client.call("workflow.add_starter", {"id": "morning_briefing"}))
+        path = short_home / "workflows" / "morning_briefing.py"
+        assert (added["name"], added["path"]) == ("morning_briefing", str(path))
+        assert path.is_file() and added["id"] == f"{path}::morning_briefing"
+        got = rpc_result(await client.call("workflow.get", {"id": added["id"]}, timeout=20))
+        info = cast(dict[str, object], got["workflow"])
+        assert info["state"] == "ok"
+        assert cast(dict[str, object], info["trigger"])["kind"] == "schedule"
+
+        for params in (
+            {"id": "morning_briefing"},
+            {"id": "nope"},
+            {"id": "morning_briefing", "folder": "relative"},
+        ):
+            assert error_code(await client.call("workflow.add_starter", params)) == INVALID_PARAMS
+        assert not (project / "workflows").exists()
+    finally:
+        await client.close()
+        await stop_daemon(app, task)
+
+
 async def test_check_and_save(short_home: Path, tmp_path: Path) -> None:
     good = _write(short_home / "workflows", "adder.py", TWO_STEPS)
     bad = _write(short_home / "workflows", "bad.py", "def (:\n")

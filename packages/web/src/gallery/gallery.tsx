@@ -105,8 +105,8 @@ import { LeadRun, RunBanner, RunsList, RunsPanel, WorkflowRunView } from "../fea
 import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW } from "../features/runs/workflow-sample.ts";
 import { DataGallery } from "./gallery-data.tsx";
 import { DataResultGallery } from "./gallery-data-result.tsx";
-import { RunForm, WorkflowDetail, WorkflowsPanel } from "../features/workflows/index.ts";
-import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
+import { RunForm, WorkflowDetail, WorkflowStarters, WorkflowsEmpty, WorkflowsPanel } from "../features/workflows/index.ts";
+import { SAMPLE_BROKEN, SAMPLE_FIELD_REFUSED, SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_CODE, SAMPLE_PR_DIGEST_EDITED_CODE, SAMPLE_PR_DIGEST_EDITED_STEPS, SAMPLE_PR_DIGEST_HASH, SAMPLE_PR_DIGEST_PROBLEMS, SAMPLE_PR_DIGEST_PROPOSAL, SAMPLE_PR_DIGEST_PROPOSAL_PROBLEM, SAMPLE_PR_DIGEST_STEPS, SAMPLE_ROUTINE_WORKFLOW_RUN, SAMPLE_SAVE_CONFLICT, SAMPLE_BRIEFING, SAMPLE_PROJECT_STARTER, SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, SAMPLE_UNTRUSTED, SAMPLE_UPGRADE, SAMPLE_UPGRADE_AGENTS, SAMPLE_UPGRADE_CODE, SAMPLE_UPGRADE_STEPS, SAMPLE_WORKFLOW_LIST, SAMPLE_WORKFLOW_LIST_TWO_PROJECTS, SAMPLE_WORKFLOW_RUNS, WORKFLOWS_NOW } from "../features/workflows/sample.ts";
 import { RUNS_NOW, SAMPLE_RUN_LIST, SAMPLE_WAITING_RUN } from "../features/runs/sample.ts";
 import { HelperRowCardBody, Rail, SessionsPanel, SidebarPanel, WaitingChip } from "../features/sidebar/index.ts";
 import { ConnectionStrip } from "../features/connection/index.ts";
@@ -2368,6 +2368,23 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
             </SidebarPanel>
           </div>
         </div>
+        {(
+          [
+            ["Workflows, nothing yet", "empty", SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, undefined],
+            ["Workflows, nothing yet, project starter", "empty", [...SAMPLE_STARTERS, SAMPLE_PROJECT_STARTER], SAMPLE_STARTER_FOLDER, undefined],
+            ["Workflows, nothing yet, no folder", "empty", [...SAMPLE_STARTERS, SAMPLE_PROJECT_STARTER], null, undefined],
+            ["Workflows, nothing yet, add refused", "empty", SAMPLE_STARTERS, SAMPLE_STARTER_FOLDER, { id: "morning_briefing", text: "/Users/you/.golem/workflows/morning_briefing.py exists already; it was not changed" }],
+            ["Workflows, starters left", "section", [SAMPLE_BRIEFING], SAMPLE_STARTER_FOLDER, undefined],
+          ] as const
+        ).map(([title, kind, starters, folder, failed]) => (
+          <div key={title} className="mt-4 rounded-lg border border-line bg-bg p-5" role="region" aria-label={`${title}, ${theme}`}>
+            {kind === "empty" ? (
+              <WorkflowsEmpty starters={starters} folder={folder} onAdd={() => Promise.resolve()} failed={failed} />
+            ) : (
+              <WorkflowStarters starters={starters} folder={folder} onAdd={() => Promise.resolve()} failed={failed} />
+            )}
+          </div>
+        ))}
         {(
           [
             ["Workflow detail, Overview", "overview", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS],

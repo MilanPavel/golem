@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "description": "One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes\nin that project's ``workflows`` folder; the others go in the user's.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "line": {
+      "title": "Line",
+      "type": "string"
+    },
+    "needs_folder": {
+      "title": "Needs Folder",
+      "type": "boolean"
+    },
+    "schedule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Schedule"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "line",
+    "needs_folder"
+  ],
+  "title": "WorkflowStarterInfo",
+  "type": "object"
+}

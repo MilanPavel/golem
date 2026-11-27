@@ -265,6 +265,7 @@ const RUNS_HINT = "↑/↓ to navigate · Enter to open · Esc to go back";
 const FORM_HINT = "↑/↓ field · type to edit · ←/→ or Space to choose · Enter to run · Esc to go back";
 const STARTING_HINT = "Starting…";
 const NO_WORKFLOWS = "Put a workflow in workflows/ of this folder or in ~/.golem/workflows/, and it shows here.";
+const NO_WORKFLOWS_STARTERS = "Or start from one: golem workflow starters lists them, golem workflow add <id> adds one.";
 
 function fit(text: string, width: number): string {
   return text.length <= width ? text : `${text.slice(0, Math.max(0, width - 1))}…`;
@@ -272,7 +273,7 @@ function fit(text: string, width: number): string {
 
 function listLines(workflows: readonly WorkflowEntryInfo[], selected: number): McpManagerLine[] {
   const groups = workflowGroups(workflows);
-  if (groups.length === 0) return [{ text: "Workflows", bold: true }, { text: "no workflows", dim: true }, { text: "" }, { text: NO_WORKFLOWS }];
+  if (groups.length === 0) return [{ text: "Workflows", bold: true }, { text: "no workflows", dim: true }, { text: "" }, { text: NO_WORKFLOWS }, { text: NO_WORKFLOWS_STARTERS }];
   const items = groups.flatMap((group) => group.workflows);
   const nameWidth = Math.max(...items.map((workflow) => workflow.name.length));
   const broken = items.filter((workflow) => workflow.state === "broken").length;

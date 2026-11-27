@@ -1,5 +1,5 @@
 import type { RunInfo } from "../../store/runs.ts";
-import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStepArg } from "../../store/workflows.ts";
+import type { WorkflowEntryInfo, WorkflowGetResult, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowStarterInfo, WorkflowStepArg } from "../../store/workflows.ts";
 
 /** "Now" for the samples: a Tuesday evening. Run times are placed relative to it, so Today and Earlier hold in any time zone. */
 export const WORKFLOWS_NOW = new Date(2026, 10, 17, 18, 30).getTime();
@@ -243,3 +243,25 @@ export const SAMPLE_UPGRADE_AGENTS = ["explorer", "worker", "reviewer", "advisor
 
 /** What `workflow.edit_step` says to a value that is not a wish. */
 export const SAMPLE_FIELD_REFUSED = { name: "model", message: "model is a wish, one of cheapest, same, stronger, local, budget, frontier; got 'gpt-9'" } as const;
+
+/** The starter golem ships, as `workflow.starters` lists it. It goes in your own folder and turns on its schedule. */
+export const SAMPLE_BRIEFING: WorkflowStarterInfo = {
+  id: "morning_briefing",
+  title: "Morning briefing",
+  line: "Reads your project folders, logs and feeds since yesterday and leaves one short briefing in the Inbox.",
+  needs_folder: false,
+  schedule: "Runs every weekday at 07:30",
+};
+
+/** A starter that works on a project, which none ships yet. The gallery shows how it reads, so the page is ready for one. */
+export const SAMPLE_PROJECT_STARTER: WorkflowStarterInfo = {
+  id: "review_changes",
+  title: "Review the changes",
+  line: "Three reviewers read what changed on your branch at the same time, and you get one list.",
+  needs_folder: true,
+};
+
+export const SAMPLE_STARTERS: WorkflowStarterInfo[] = [SAMPLE_BRIEFING];
+
+/** The folder the gallery's project starter works on. */
+export const SAMPLE_STARTER_FOLDER = "/Users/you/work/golem";

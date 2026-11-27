@@ -113,6 +113,8 @@ import type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.t
 import type { WorkflowEditStepResult } from "../../protocol/gen/workflow-edit-step-result.ts";
 import type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
 import type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
+import type { WorkflowStartersResult } from "../../protocol/gen/workflow-starters-result.ts";
+import type { WorkflowAddStarterResult } from "../../protocol/gen/workflow-add-starter-result.ts";
 import type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
 import type { WorkflowStartResult } from "../../protocol/gen/workflow-start-result.ts";
 import type { WorkflowStatusResult } from "../../protocol/gen/workflow-status-result.ts";
@@ -350,6 +352,8 @@ import {
   isWorkflowEditStepResult,
   isWorkflowSaveResult,
   isWorkflowListResult,
+  isWorkflowStartersResult,
+  isWorkflowAddStarterResult,
   isWorkflowRunEvent,
   isWorkflowStartResult,
   isWorkflowStatusResult,
@@ -900,6 +904,10 @@ export interface GolemClient {
   onRoutinesChanged(listener: (kind: "changed" | "fired" | "finished") => void): () => void;
   /** `workflow.list`: the user's workflows and those of `folders`; a broken or untrusted file is listed with its state. */
   listWorkflows(folders?: string[]): Promise<WorkflowListResult>;
+  /** `workflow.starters`: the starter workflows golem ships. */
+  listWorkflowStarters(): Promise<WorkflowStartersResult>;
+  /** `workflow.add_starter`: write a starter as a workflow file, in `folder` (a trusted project) or the user's folder. Rejects with the daemon's reason: an untrusted folder, an existing file, an unknown id. */
+  addWorkflowStarter(id: string, folder?: string): Promise<WorkflowAddStarterResult>;
   /** `workflow.get`: one workflow with its outline steps and, for a trusted one, the text of its file. */
   getWorkflow(id: string): Promise<WorkflowGetResult>;
   /** `workflow.check`: the problems of the saved file, or of `code` when given (with the outline of that text). It imports nothing and asks no model. */
@@ -3111,6 +3119,22 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.list", folders === undefined ? {} : { folders });
       if (!isWorkflowListResult(result)) {
         throw new Error("invalid workflow.list result");
+      }
+      return result;
+    },
+    async listWorkflowStarters(): Promise<WorkflowStartersResult> {
+      await ready;
+      const result = await call("workflow.starters", {});
+      if (!isWorkflowStartersResult(result)) {
+        throw new Error("invalid workflow.starters result");
+      }
+      return result;
+    },
+    async addWorkflowStarter(id: string, folder?: string): Promise<WorkflowAddStarterResult> {
+      await ready;
+      const result = await call("workflow.add_starter", folder === undefined ? { id } : { id, folder });
+      if (!isWorkflowAddStarterResult(result)) {
+        throw new Error("invalid workflow.add_starter result");
       }
       return result;
     },

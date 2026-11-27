@@ -194,6 +194,7 @@ from golem.server.skills_edit import (
     skill_write_protected,
 )
 from golem.server.workflows import (
+    workflow_add_starter,
     workflow_cancel,
     workflow_check,
     workflow_edit_step,
@@ -204,6 +205,7 @@ from golem.server.workflows import (
     workflow_review_answer,
     workflow_save,
     workflow_start,
+    workflow_starters,
     workflow_status,
 )
 from golem.sessions.manager import (
@@ -515,6 +517,7 @@ from golem_protocol.commands import (
     TraceGetResult,
     TraceSpanParams,
     TraceSpanResult,
+    WorkflowAddStarterParams,
     WorkflowCancelParams,
     WorkflowCheckParams,
     WorkflowEditStepParams,
@@ -524,6 +527,7 @@ from golem_protocol.commands import (
     WorkflowResumeParams,
     WorkflowReviewAnswerParams,
     WorkflowSaveParams,
+    WorkflowStartersParams,
     WorkflowStartParams,
     WorkflowStatusParams,
 )
@@ -2496,6 +2500,12 @@ def standard_methods() -> dict[str, Method]:
             "workflow.edit_step", WorkflowEditStepParams, True, workflow_edit_step
         ),
         "workflow.save": Method("workflow.save", WorkflowSaveParams, True, workflow_save),
+        "workflow.starters": Method(
+            "workflow.starters", WorkflowStartersParams, True, workflow_starters
+        ),
+        "workflow.add_starter": Method(
+            "workflow.add_starter", WorkflowAddStarterParams, True, workflow_add_starter
+        ),
         "workflow.start": Method("workflow.start", WorkflowStartParams, True, workflow_start),
         "workflow.status": Method("workflow.status", WorkflowStatusParams, True, workflow_status),
         "workflow.cancel": Method("workflow.cancel", WorkflowCancelParams, True, workflow_cancel),

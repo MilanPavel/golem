@@ -184,6 +184,7 @@ public enum MethodAccess {
         "skill.write",
         "trace.get",
         "trace.span",
+        "workflow.add_starter",
         "workflow.cancel",
         "workflow.check",
         "workflow.edit_step",
@@ -194,6 +195,7 @@ public enum MethodAccess {
         "workflow.review.answer",
         "workflow.save",
         "workflow.start",
+        "workflow.starters",
         "workflow.status",
     ]
 

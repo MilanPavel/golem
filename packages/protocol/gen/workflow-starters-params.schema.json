@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.starters``. The starter workflows.",
+  "properties": {},
+  "title": "WorkflowStartersParams",
+  "type": "object"
+}

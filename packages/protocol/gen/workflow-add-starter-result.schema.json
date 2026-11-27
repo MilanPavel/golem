@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "The new workflow: ``id`` is the one ``workflow.get`` takes.",
+  "properties": {
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "path"
+  ],
+  "title": "WorkflowAddStarterResult",
+  "type": "object"
+}

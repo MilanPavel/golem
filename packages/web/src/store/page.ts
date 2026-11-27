@@ -18,7 +18,7 @@ import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
-import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
+import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
 import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -90,6 +90,8 @@ export type PageClient = Pick<
   | "proposeWorkflow"
   | "editWorkflowStep"
   | "startWorkflow"
+  | "listWorkflowStarters"
+  | "addWorkflowStarter"
   | "workflowStatus"
   | "cancelWorkflow"
   | "resumeWorkflow"
@@ -439,6 +441,8 @@ export type PageActions = {
   dataNotesDraft(name: string): Promise<string>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
+  /** Writes a starter as a workflow file: in `folder` for a starter that reads a project, in the user's folder when `folder` is null. The workflow list is read again. Resolves with the new workflow's id, which `/workflows/:id` opens it by. Rejects with the daemon's reason: the folder is not trusted, the file exists. */
+  addWorkflowStarter(id: string, folder: string | null): Promise<string>;
   /** Checks `code` as the file of the workflow `id`, without writing it: the problems with their lines and steps, and the outline of that text. */
   checkWorkflow(id: string, code: string): Promise<WorkflowCheckResult>;
   /** Asks golem for a change to `code`, the file of the workflow `id`: one model call, the answer checked, nothing written. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
@@ -531,6 +535,8 @@ export type PageQueries = {
   routineList(): Promise<RoutineListResult>;
   /** The workflows of the user and of `folders`, each with its state. */
   workflowList(folders: readonly string[]): Promise<WorkflowListResult>;
+  /** The starter workflows golem ships. */
+  workflowStarters(): Promise<WorkflowStartersResult>;
   /** One workflow with its outline steps and the text of its file. */
   workflowGet(id: string): Promise<WorkflowGetResult>;
   /** One run of a workflow, with its steps and the reviews that wait. */
@@ -685,6 +691,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       deviceList: () => client.deviceList(),
       routineList: () => client.listRoutines(),
       workflowList: (folders) => client.listWorkflows([...folders]),
+      workflowStarters: () => client.listWorkflowStarters(),
       workflowGet: (id) => client.getWorkflow(id),
       workflowStatus: (workflowRunId) => client.workflowStatus(workflowRunId),
       dataList: () => dataAnswer(() => client.listData()),
@@ -1031,6 +1038,13 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         const started = await client.startWorkflow(id, inputs);
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
         return started.workflow_run_id;
+      },
+      async addWorkflowStarter(id, folder) {
+        try {
+          return (await (folder === null ? client.addWorkflowStarter(id) : client.addWorkflowStarter(id, folder))).id;
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: WORKFLOW_LIST_KEY });
+        }
       },
       checkWorkflow: (id, code) => client.checkWorkflow(id, code),
       proposeWorkflow: (id, code, ask, previous) => client.proposeWorkflow(id, code, ask, previous),

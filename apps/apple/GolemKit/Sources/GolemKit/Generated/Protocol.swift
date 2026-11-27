@@ -31690,6 +31690,47 @@ public struct WorkerFile: Codable {
     }
 }
 
+/// ``workflow.add_starter``. Write the starter ``id`` as a workflow file.
+///
+/// A ``needs_folder`` starter needs ``folder`` (a trusted project folder); the others go in
+/// the
+/// user's folder. Refused for an unknown id, an untrusted folder and a file that exists.
+// MARK: - WorkflowAddStarterParams
+public struct WorkflowAddStarterParams: Codable {
+    public let folder: String?
+    public let id: String
+
+    public enum CodingKeys: String, CodingKey {
+        case folder = "folder"
+        case id = "id"
+    }
+
+    public init(folder: String?, id: String) {
+        self.folder = folder
+        self.id = id
+    }
+}
+
+/// The new workflow: ``id`` is the one ``workflow.get`` takes.
+// MARK: - WorkflowAddStarterResult
+public struct WorkflowAddStarterResult: Codable {
+    public let id: String
+    public let name: String
+    public let path: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case name = "name"
+        case path = "path"
+    }
+
+    public init(id: String, name: String, path: String) {
+        self.id = id
+        self.name = name
+        self.path = path
+    }
+}
+
 /// ``workflow.cancel``. Stop a run. A run that already ended is left as it is.
 // MARK: - WorkflowCancelParams
 public struct WorkflowCancelParams: Codable {
@@ -33878,6 +33919,81 @@ public struct WorkflowStartResult: Codable {
 
     public init(workflowRunID: String) {
         self.workflowRunID = workflowRunID
+    }
+}
+
+/// One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
+/// in that project's ``workflows`` folder; the others go in the user's.
+// MARK: - WorkflowStarterInfo
+public struct WorkflowStarterInfo: Codable {
+    public let id: String
+    public let line: String
+    public let needsFolder: Bool
+    public let schedule: String?
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case line = "line"
+        case needsFolder = "needs_folder"
+        case schedule = "schedule"
+        case title = "title"
+    }
+
+    public init(id: String, line: String, needsFolder: Bool, schedule: String?, title: String) {
+        self.id = id
+        self.line = line
+        self.needsFolder = needsFolder
+        self.schedule = schedule
+        self.title = title
+    }
+}
+
+/// ``workflow.starters``. The starter workflows.
+// MARK: - WorkflowStartersParams
+public struct WorkflowStartersParams: Codable {
+
+    public init() {
+    }
+}
+
+// MARK: - WorkflowStartersResult
+public struct WorkflowStartersResult: Codable {
+    public let starters: [StarterElement]
+
+    public enum CodingKeys: String, CodingKey {
+        case starters = "starters"
+    }
+
+    public init(starters: [StarterElement]) {
+        self.starters = starters
+    }
+}
+
+/// One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
+/// in that project's ``workflows`` folder; the others go in the user's.
+// MARK: - StarterElement
+public struct StarterElement: Codable {
+    public let id: String
+    public let line: String
+    public let needsFolder: Bool
+    public let schedule: String?
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case line = "line"
+        case needsFolder = "needs_folder"
+        case schedule = "schedule"
+        case title = "title"
+    }
+
+    public init(id: String, line: String, needsFolder: Bool, schedule: String?, title: String) {
+        self.id = id
+        self.line = line
+        self.needsFolder = needsFolder
+        self.schedule = schedule
+        self.title = title
     }
 }
 

@@ -160,6 +160,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "skill.write",
   "trace.get",
   "trace.span",
+  "workflow.add_starter",
   "workflow.cancel",
   "workflow.check",
   "workflow.edit_step",
@@ -170,6 +171,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "workflow.review.answer",
   "workflow.save",
   "workflow.start",
+  "workflow.starters",
   "workflow.status",
 ]);
 

@@ -22,7 +22,7 @@ import type { AuthListResult, FileListResult, CostGetResult, NotificationsValues
 import { isAgentsMissing } from "./agents.ts";
 import { ARTIFACT_PAGE, artifactKey, traceKey, traceSpanKey, type ArtifactReadResult, type TraceGetResult, type TraceSpanResult } from "./trace.ts";
 import { ROUTINE_LIST_KEY, routineGetKey, type RoutineGetResult, type RoutineListResult } from "./routines.ts";
-import { WORKFLOW_LIST_KEY, workflowGetKey, workflowStatusKey, type WorkflowGetResult, type WorkflowListResult, type WorkflowStatusResult } from "./workflows.ts";
+import { WORKFLOW_LIST_KEY, WORKFLOW_STARTERS_KEY, workflowGetKey, workflowStatusKey, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowStatusResult } from "./workflows.ts";
 import { RpcError } from "@golem/client";
 import { DATA_LIST_KEY, dataDescribeKey, dataNotesKey, type DataAnswer, type DataDescribeResult, type DataListResult, type DataNotesGetResult, type DataSampleRows } from "./data.ts";
 import { RUN_LIST_KEY, sessionRunKey, type RunInfo, type RunListResult } from "./runs.ts";
@@ -620,6 +620,12 @@ export function useWorkflowList(): UseQueryResult<WorkflowListResult> {
   const { queries } = usePage();
   const folders = useKnownFolders();
   return useQuery({ queryKey: [...WORKFLOW_LIST_KEY, folders], queryFn: () => queries.workflowList(folders), retry: false });
+}
+
+/** The starter workflows golem ships. */
+export function useWorkflowStarters(): UseQueryResult<WorkflowStartersResult> {
+  const { queries } = usePage();
+  return useQuery({ queryKey: [...WORKFLOW_STARTERS_KEY], queryFn: queries.workflowStarters, retry: false, staleTime: Infinity });
 }
 
 /** One workflow with its outline steps and the text of its file. */

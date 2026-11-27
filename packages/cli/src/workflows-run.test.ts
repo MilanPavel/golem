@@ -9,11 +9,13 @@ import {
   formatWorkflows,
   parseWorkflowArgs,
   pickWorkflow,
+  runWorkflowAdd,
   runWorkflowAnswer,
   runWorkflowCheck,
   runWorkflowList,
   runWorkflowResume,
   runWorkflowRun,
+  runWorkflowStarters,
   runWorkflowStatus,
   type WorkflowClient,
   type WorkflowDeps,
@@ -39,6 +41,11 @@ const broken: WorkflowEntryInfo = {
   description: "",
 };
 
+const STARTERS = [
+  { id: "fix_check", title: "Fix a failing check", line: "Fixes it in a copy.", needs_folder: true },
+  { id: "morning_briefing", title: "Morning briefing", line: "Reads your logs.", needs_folder: false, schedule: "Runs every weekday at 07:30" },
+];
+
 const T0 = "2026-11-25T10:00:00+00:00";
 const T1 = "2026-11-25T10:00:01.500+00:00";
 
@@ -62,6 +69,14 @@ function fake(script: WorkflowNotice[], entries: WorkflowEntryInfo[] = [ok, brok
     listWorkflows: async (folders) => {
       calls.push(`list ${JSON.stringify(folders)}`);
       return { workflows: entries };
+    },
+    listWorkflowStarters: async () => {
+      calls.push("starters");
+      return { starters: STARTERS };
+    },
+    addWorkflowStarter: async (id, folder) => {
+      calls.push(`add ${id} ${folder ?? "-"}`);
+      return { id: `/p/workflows/${id}.py::${id}`, name: id, path: `/p/workflows/${id}.py` };
     },
     checkWorkflow: async (id) => {
       calls.push(`check ${id}`);
@@ -348,4 +363,43 @@ test("check prints line, step and message, and exits 1 only for an error", async
   const missing = setup();
   assert.equal(await runWorkflowCheck(clean.client, { name: "nope" }, missing.deps), 1);
   assert.match(missing.err[0] as string, /no workflow called nope/);
+});
+
+test("the starter arguments parse", () => {
+  assert.deepEqual(parseWorkflowArgs(["starters"]), { kind: "starters" });
+  assert.deepEqual(parseWorkflowArgs(["add", "fix_check"]), { kind: "add", id: "fix_check", folder: null });
+  assert.deepEqual(parseWorkflowArgs(["add", "fix_check", "--folder", "/p"]), { kind: "add", id: "fix_check", folder: "/p" });
+  for (const bad of [["starters", "x"], ["add"], ["add", "a", "b"], ["add", "a", "--folder"], ["add", "--nope", "a"]]) {
+    assert.equal(parseWorkflowArgs(bad).kind, "error", bad.join(" "));
+  }
+});
+
+test("starters lists them with where each goes", async () => {
+  const { client } = fake([]);
+  const { deps, out } = setup();
+  assert.equal(await runWorkflowStarters(client, deps), 0);
+  assert.match(out[0] as string, /^STARTER\s+GOES IN\s+WHAT IT DOES/);
+  assert.match(out[0] as string, /fix_check\s+project\s+Fixes it in a copy\./);
+  assert.match(out[0] as string, /morning_briefing\s+\(user\)\s+Reads your logs\. Runs every weekday at 07:30\./);
+});
+
+test("add puts a project starter in the current folder, or in --folder, and a user one in no folder", async () => {
+  const { client, calls } = fake([]);
+  const { deps, out } = setup();
+  assert.equal(await runWorkflowAdd(client, { id: "fix_check", folder: null }, deps), 0);
+  assert.equal(await runWorkflowAdd(client, { id: "fix_check", folder: "../other" }, deps), 0);
+  assert.equal(await runWorkflowAdd(client, { id: "morning_briefing", folder: null }, deps), 0);
+  assert.deepEqual(calls.filter((c) => c.startsWith("add")), ["add fix_check /work/proj", "add fix_check /work/other", "add morning_briefing -"]);
+  assert.match(out[0] as string, /^added fix_check: \/p\/workflows\/fix_check\.py$/);
+});
+
+test("add says so for an unknown starter, and shows the daemon's reason when it refuses", async () => {
+  const { client } = fake([]);
+  const first = setup();
+  assert.equal(await runWorkflowAdd(client, { id: "nope", folder: null }, first.deps), 1);
+  assert.match(first.err[0] as string, /no starter called nope.*golem workflow starters/);
+  const refusing: WorkflowClient = { ...client, addWorkflowStarter: async () => Promise.reject(new Error("/work/proj/workflows/fix_check.py exists already")) };
+  const second = setup();
+  assert.equal(await runWorkflowAdd(refusing, { id: "fix_check", folder: null }, second.deps), 1);
+  assert.match(second.err[0] as string, /exists already/);
 });

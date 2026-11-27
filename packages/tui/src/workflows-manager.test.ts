@@ -68,7 +68,9 @@ test("the list groups This project first, then Yours, with the broken error and 
 });
 
 test("the list says when there are none, when it is loading, and why it failed", () => {
-  assert.ok(screen(openWorkflowsManager(), 24, { workflows: [], error: null }).includes("no workflows"));
+  const empty = screen(openWorkflowsManager(), 24, { workflows: [], error: null });
+  assert.ok(empty.includes("no workflows"));
+  assert.ok(empty.some((line) => line.includes("golem workflow add <id>")));
   assert.ok(screen(openWorkflowsManager(), 24, { workflows: null, error: null }).includes("asking the daemon…"));
   assert.ok(screen(openWorkflowsManager(), 24, { workflows: null, error: "no daemon" }).includes("no daemon"));
 });
