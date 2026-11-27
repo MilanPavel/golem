@@ -3037,3 +3037,49 @@ test("applyHelper, discardHelper and retryHelper send helper.apply, helper.disca
     await server.close();
   }
 });
+
+test("data.browse.keep sends the view with no paging, a project goes along where asked, and a malformed answer is refused", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: {
+        "data.browse.keep": { result_id: "res_1", rows: 3, truncated: true },
+        "data.list": { sources: [] },
+        "data.notes.get": { text: null, path: "/p/.golem/data/mine/DATA.md" },
+      },
+      onRequest: (_socket, method, params) => {
+        if (method.startsWith("data.")) {
+          sent.push({ method, ...params });
+        }
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: server.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    const view = { source: "bank", table: "t", sort: { column: "id", desc: true }, filters: [{ column: "id", op: "=" as const, value: 1 }], search: "ann", project: "/p" };
+    assert.deepEqual(await client.browseDataKeep(view), { result_id: "res_1", rows: 3, truncated: true });
+    await client.listData("/p");
+    await client.getDataNotes("mine", "/p");
+    await client.listData();
+    assert.deepEqual(sent, [
+      { method: "data.browse.keep", ...view },
+      { method: "data.list", project: "/p" },
+      { method: "data.notes.get", source: "mine", project: "/p" },
+      { method: "data.list" },
+    ]);
+  } finally {
+    client.close();
+    await server.close();
+  }
+  const bad = await listen((socket) => {
+    attach(socket, { answerPing: true, results: { "data.browse.keep": { rows: "no" } } });
+  });
+  const other = connectGolem({ socketPath: bad.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    await assert.rejects(other.browseDataKeep({ source: "bank", table: "t" }), /invalid data.browse.keep result/);
+  } finally {
+    other.close();
+    await bad.close();
+  }
+});

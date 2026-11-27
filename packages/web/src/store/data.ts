@@ -1,6 +1,6 @@
-import { RpcError, type DataBrowseParams, type DataBrowseResult, type DataColumnProfile, type DataProfileResult, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
+import { RpcError, type DataBrowseParams, type DataBrowseKeepParams, type DataBrowseKeepResult, type DataBrowseResult, type DataColumnProfile, type DataProfileResult, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
 
-export type { DataBrowseParams, DataBrowseResult, DataColumnProfile, DataProfileResult, DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectParams, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
+export type { DataBrowseKeepParams, DataBrowseKeepResult, DataBrowseParams, DataBrowseResult, DataColumnProfile, DataProfileResult, DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectParams, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
 
 /** The query key of `data.list`. A pushed `data.changed` and every action below mark it stale. */
 export const DATA_LIST_KEY = ["data.list"] as const;
@@ -58,5 +58,8 @@ export type DataResultPageParams = { result_id: string; offset: number; limit: n
 export type DataExportParams = { result_id: string; path: string; format: "csv" | "parquet" | "json" | "xlsx" };
 
 /** What a page of a table is asked by: the view, as names and values. It never holds SQL. */
-export type DataBrowseView = Omit<DataBrowseParams, "session_id" | "source" | "table">;
+export type DataBrowseView = Omit<DataBrowseParams, "session_id" | "project" | "source" | "table">;
 
+
+/** What a view is kept by to export it: the same view as a page of the table, without paging. It never holds SQL. */
+export type DataBrowseKeepView = Omit<DataBrowseKeepParams, "session_id" | "project" | "source" | "table">;

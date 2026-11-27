@@ -78,6 +78,8 @@ import type { DataExportResult } from "../../protocol/gen/data-export-result.ts"
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataBrowseParams } from "../../protocol/gen/data-browse-params.ts";
+import type { DataBrowseKeepParams } from "../../protocol/gen/data-browse-keep-params.ts";
+import type { DataBrowseKeepResult } from "../../protocol/gen/data-browse-keep-result.ts";
 import type { DataBrowseResult } from "../../protocol/gen/data-browse-result.ts";
 import type { DataProfileResult } from "../../protocol/gen/data-profile-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
@@ -332,6 +334,7 @@ import {
   isDataNotesDraftResult,
   isDataNotesGetResult,
   isDataNotesSetResult,
+  isDataBrowseKeepResult,
   isDataBrowseResult,
   isDataProfileResult,
   isDataQueryResult,
@@ -957,22 +960,24 @@ export interface GolemClient {
   /** `memory.changed`: a memory was made, edited, deleted, went stale or was resolved, so a list read before is stale. */
   onMemoryChanged(listener: (change: MemoryChanged) => void): () => void;
   /** `data.list`: every data source the person can see. */
-  listData(): Promise<DataListResult>;
+  listData(project?: string): Promise<DataListResult>;
   /** `data.describe`: one source with its tables, a sample, its notes and saved queries. */
-  describeData(source: string, table?: string): Promise<DataDescribeResult>;
+  describeData(source: string, table?: string, project?: string): Promise<DataDescribeResult>;
   /** `data.query`: run SQL on one source. Pass `result_id` to be able to cancel it with `cancelData`. */
   queryData(params: DataQueryParams): Promise<DataResult>;
   /** `data.profile`: the shape of each column of one table, for a person's screen. */
-  profileData(source: string, table: string): Promise<DataProfileResult>;
+  profileData(source: string, table: string, project?: string): Promise<DataProfileResult>;
   /** `data.browse`: a page of one table, sorted and filtered across all of its rows. It sends no SQL. */
   browseData(params: Omit<DataBrowseParams, "session_id">): Promise<DataBrowseResult>;
+  /** `data.browse.keep`: the whole view of a table (the same filters, search and sort, no paging) kept as a result to export. It sends no SQL. */
+  browseDataKeep(params: Omit<DataBrowseKeepParams, "session_id">): Promise<DataBrowseKeepResult>;
   /** `data.result.page`: one page of a kept result, by its `result_id`. */
   pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult>;
   /**
    * `data.export`: write a kept result to a new file. `format` is taken from the end of `path` when it is null.
    * The answer has `needs_extension` and no file when the Excel add-on is not here yet. A file that exists is never overwritten.
    */
-  exportDataResult(resultId: string, path: string, format?: DataExportParams["format"], sessionId?: string): Promise<DataExportResult>;
+  exportDataResult(resultId: string, path: string, format?: DataExportParams["format"], sessionId?: string, project?: string): Promise<DataExportResult>;
   /** `data.cancel`: stop a query that is still running, by its `result_id`. */
   cancelData(resultId: string): Promise<DataCancelResult>;
   /** `data.extension.install`: download the Excel or SQLite add-on once. Only when the person asks. */
@@ -988,11 +993,11 @@ export interface GolemClient {
   /** `data.remove`: forget a source. The files and the database stay as they are. */
   removeData(name: string): Promise<DataRemoveResult>;
   /** `data.notes.get`: the notes of a source, `text` null when there are none. */
-  getDataNotes(source: string): Promise<DataNotesGetResult>;
+  getDataNotes(source: string, project?: string): Promise<DataNotesGetResult>;
   /** `data.notes.set`: save the notes of a source. */
-  setDataNotes(source: string, text: string): Promise<DataNotesSetResult>;
+  setDataNotes(source: string, text: string, project?: string): Promise<DataNotesSetResult>;
   /** `data.notes.draft`: a proposal for the notes. It is not saved. */
-  draftDataNotes(source: string): Promise<DataNotesDraftResult>;
+  draftDataNotes(source: string, project?: string): Promise<DataNotesDraftResult>;
   /** `data.changed`: a source or the list of them changed, so what was read before is stale. */
   onDataChanged(listener: (change: DataChanged) => void): () => void;
   /** `device.list`: every paired phone, revoked ones last. */
@@ -3347,17 +3352,17 @@ export function connectGolem(options: ConnectOptions): GolemClient {
         deviceListeners.delete(listener);
       };
     },
-    async listData(): Promise<DataListResult> {
+    async listData(project?: string): Promise<DataListResult> {
       await ready;
-      const result = await call("data.list", {});
+      const result = await call("data.list", project === undefined ? {} : { project });
       if (!isDataListResult(result)) {
         throw new Error("invalid data.list result");
       }
       return result;
     },
-    async describeData(source: string, table?: string): Promise<DataDescribeResult> {
+    async describeData(source: string, table?: string, project?: string): Promise<DataDescribeResult> {
       await ready;
-      const result = await call("data.describe", table === undefined ? { source } : { source, table });
+      const result = await call("data.describe", { source, ...(table === undefined ? {} : { table }), ...(project === undefined ? {} : { project }) });
       if (!isDataDescribeResult(result)) {
         throw new Error("invalid data.describe result");
       }
@@ -3371,9 +3376,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async profileData(source: string, table: string): Promise<DataProfileResult> {
+    async profileData(source: string, table: string, project?: string): Promise<DataProfileResult> {
       await ready;
-      const result = await call("data.profile", { source, table });
+      const result = await call("data.profile", { source, table, ...(project === undefined ? {} : { project }) });
       if (!isDataProfileResult(result)) {
         throw new Error("invalid data.profile result");
       }
@@ -3387,6 +3392,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
+    async browseDataKeep(params: Omit<DataBrowseKeepParams, "session_id">): Promise<DataBrowseKeepResult> {
+      await ready;
+      const result = await call("data.browse.keep", { ...params });
+      if (!isDataBrowseKeepResult(result)) {
+        throw new Error("invalid data.browse.keep result");
+      }
+      return result;
+    },
     async pageDataResult(resultId: string, offset: number, limit: number): Promise<DataResult> {
       await ready;
       const result = await call("data.result.page", { result_id: resultId, offset, limit });
@@ -3395,13 +3408,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async exportDataResult(resultId: string, path: string, format?: DataExportParams["format"], sessionId?: string): Promise<DataExportResult> {
+    async exportDataResult(resultId: string, path: string, format?: DataExportParams["format"], sessionId?: string, project?: string): Promise<DataExportResult> {
       await ready;
       const result = await call("data.export", {
         result_id: resultId,
         path,
         ...(format === undefined || format === null ? {} : { format }),
         ...(sessionId === undefined ? {} : { session_id: sessionId }),
+        ...(project === undefined ? {} : { project }),
       });
       if (!isDataExportResult(result)) {
         throw new Error("invalid data.export result");
@@ -3464,25 +3478,25 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async getDataNotes(source: string): Promise<DataNotesGetResult> {
+    async getDataNotes(source: string, project?: string): Promise<DataNotesGetResult> {
       await ready;
-      const result = await call("data.notes.get", { source });
+      const result = await call("data.notes.get", { source, ...(project === undefined ? {} : { project }) });
       if (!isDataNotesGetResult(result)) {
         throw new Error("invalid data.notes.get result");
       }
       return result;
     },
-    async setDataNotes(source: string, text: string): Promise<DataNotesSetResult> {
+    async setDataNotes(source: string, text: string, project?: string): Promise<DataNotesSetResult> {
       await ready;
-      const result = await call("data.notes.set", { source, text });
+      const result = await call("data.notes.set", { source, text, ...(project === undefined ? {} : { project }) });
       if (!isDataNotesSetResult(result)) {
         throw new Error("invalid data.notes.set result");
       }
       return result;
     },
-    async draftDataNotes(source: string): Promise<DataNotesDraftResult> {
+    async draftDataNotes(source: string, project?: string): Promise<DataNotesDraftResult> {
       await ready;
-      const result = await call("data.notes.draft", { source });
+      const result = await call("data.notes.draft", { source, ...(project === undefined ? {} : { project }) });
       if (!isDataNotesDraftResult(result)) {
         throw new Error("invalid data.notes.draft result");
       }

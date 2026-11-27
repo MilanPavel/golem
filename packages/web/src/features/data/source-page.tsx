@@ -26,7 +26,7 @@ import { Code } from "../../ui/code.tsx";
 import { DataSourceIcon } from "../../ui/data-icons.tsx";
 import { Input } from "../../ui/input.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { dataErrorText, type DataBrowseResult, type DataBrowseView, type DataDescribeResult, type DataExtensionName, type DataProfileResult, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
+import { dataErrorText, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataExportParams, type DataExportResult, type DataDescribeResult, type DataExtensionName, type DataProfileResult, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
 import { DATA_TABS, type DataTab } from "../../store/router.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { ExtensionRow } from "./extension-row.tsx";
@@ -471,6 +471,10 @@ export type SourcePageProps = {
   onBrowse: (table: string, view: DataBrowseView) => Promise<DataBrowseResult>;
   /** Opens a new chat with this text in the composer, to ask about a view of the rows. */
   onAskView: (text: string) => void;
+  /** Keeps the whole current view of a table as a result to export. Without it the Rows tab has no Export button. */
+  onKeepView?: (table: string, view: DataBrowseKeepView) => Promise<DataBrowseKeepResult>;
+  /** Writes a kept view to a new file. */
+  onExportView?: (params: DataExportParams) => Promise<DataExportResult>;
   onSaveNotes: (text: string) => Promise<string>;
   onDraftNotes: () => Promise<string>;
   onPrivacy: (privacy: DataPrivacy) => Promise<void>;
@@ -496,6 +500,8 @@ export function SourcePage({
   onLoadProfile,
   onBrowse,
   onAskView,
+  onKeepView,
+  onExportView,
   onSaveNotes,
   onDraftNotes,
   onPrivacy,
@@ -573,7 +579,7 @@ export function SourcePage({
           <TableFrame source={source} described={described} picked={picked} onPick={setPicked}>
             {(table) => {
               const shown = withoutSingleFile(table.columns ?? [], []).columns;
-              return <RowsBrowser key={table.name} source={source.name} table={table.name} columns={shown} tableRows={table.rows ?? null} view={viewOf(table.name)} onView={(next) => setViews((now) => ({ ...now, [table.name]: next }))} onBrowse={onBrowse} onAskView={onAskView} />;
+              return <RowsBrowser key={table.name} source={source.name} table={table.name} columns={shown} tableRows={table.rows ?? null} view={viewOf(table.name)} onView={(next) => setViews((now) => ({ ...now, [table.name]: next }))} onBrowse={onBrowse} onAskView={onAskView} {...(onKeepView === undefined ? {} : { onKeep: onKeepView })} {...(onExportView === undefined ? {} : { onExport: onExportView })} {...(onInstallExtension === undefined ? {} : { onInstallExtension })} />;
             }}
           </TableFrame>
         )}

@@ -4810,24 +4810,22 @@ public enum ValueElement: Codable {
     }
 }
 
-/// ``data.browse``. A page of a table, sorted and filtered across all of its rows.
+/// ``data.browse.keep``. The whole view of a table, kept as a result a person can export.
 ///
-/// It carries no SQL: the daemon builds it from names it checks against the table.
-// MARK: - DataBrowseParams
-public struct DataBrowseParams: Codable {
-    public let filters: [FilterElement]?
-    public let limit: Int?
-    public let offset: Int?
+/// The view is the same as ``data.browse``, with no paging. It carries no SQL.
+// MARK: - DataBrowseKeepParams
+public struct DataBrowseKeepParams: Codable {
+    public let filters: [DataBrowseKeepParamsFilter]?
+    public let project: String?
     public let search: String?
     public let sessionID: String?
-    public let sort: DataBrowseSortClass?
+    public let sort: DataBrowseKeepParamsDataBrowseSort?
     public let source: String
     public let table: String
 
     public enum CodingKeys: String, CodingKey {
         case filters = "filters"
-        case limit = "limit"
-        case offset = "offset"
+        case project = "project"
         case search = "search"
         case sessionID = "session_id"
         case sort = "sort"
@@ -4835,10 +4833,9 @@ public struct DataBrowseParams: Codable {
         case table = "table"
     }
 
-    public init(filters: [FilterElement]?, limit: Int?, offset: Int?, search: String?, sessionID: String?, sort: DataBrowseSortClass?, source: String, table: String) {
+    public init(filters: [DataBrowseKeepParamsFilter]?, project: String?, search: String?, sessionID: String?, sort: DataBrowseKeepParamsDataBrowseSort?, source: String, table: String) {
         self.filters = filters
-        self.limit = limit
-        self.offset = offset
+        self.project = project
         self.search = search
         self.sessionID = sessionID
         self.sort = sort
@@ -4848,8 +4845,8 @@ public struct DataBrowseParams: Codable {
 }
 
 /// One test on a column. ``=`` needs a ``value``; ``is null`` takes none.
-// MARK: - FilterElement
-public struct FilterElement: Codable {
+// MARK: - DataBrowseKeepParamsFilter
+public struct DataBrowseKeepParamsFilter: Codable {
     public let column: String
     public let op: Op
     public let value: ValueElement?
@@ -4868,8 +4865,105 @@ public struct FilterElement: Codable {
 }
 
 /// A column to sort a view by.
-// MARK: - DataBrowseSortClass
-public struct DataBrowseSortClass: Codable {
+// MARK: - DataBrowseKeepParamsDataBrowseSort
+public struct DataBrowseKeepParamsDataBrowseSort: Codable {
+    public let column: String
+    public let desc: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case desc = "desc"
+    }
+
+    public init(column: String, desc: Bool?) {
+        self.column = column
+        self.desc = desc
+    }
+}
+
+/// The kept view. ``truncated`` is true when the usual row cap cut it.
+// MARK: - DataBrowseKeepResult
+public struct DataBrowseKeepResult: Codable {
+    public let resultID: String
+    public let rows: Int
+    public let truncated: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case resultID = "result_id"
+        case rows = "rows"
+        case truncated = "truncated"
+    }
+
+    public init(resultID: String, rows: Int, truncated: Bool?) {
+        self.resultID = resultID
+        self.rows = rows
+        self.truncated = truncated
+    }
+}
+
+/// ``data.browse``. A page of a table, sorted and filtered across all of its rows.
+///
+/// It carries no SQL: the daemon builds it from names it checks against the table.
+// MARK: - DataBrowseParams
+public struct DataBrowseParams: Codable {
+    public let filters: [DataBrowseParamsFilter]?
+    public let limit: Int?
+    public let offset: Int?
+    public let project: String?
+    public let search: String?
+    public let sessionID: String?
+    public let sort: DataBrowseParamsDataBrowseSort?
+    public let source: String
+    public let table: String
+
+    public enum CodingKeys: String, CodingKey {
+        case filters = "filters"
+        case limit = "limit"
+        case offset = "offset"
+        case project = "project"
+        case search = "search"
+        case sessionID = "session_id"
+        case sort = "sort"
+        case source = "source"
+        case table = "table"
+    }
+
+    public init(filters: [DataBrowseParamsFilter]?, limit: Int?, offset: Int?, project: String?, search: String?, sessionID: String?, sort: DataBrowseParamsDataBrowseSort?, source: String, table: String) {
+        self.filters = filters
+        self.limit = limit
+        self.offset = offset
+        self.project = project
+        self.search = search
+        self.sessionID = sessionID
+        self.sort = sort
+        self.source = source
+        self.table = table
+    }
+}
+
+/// One test on a column. ``=`` needs a ``value``; ``is null`` takes none.
+// MARK: - DataBrowseParamsFilter
+public struct DataBrowseParamsFilter: Codable {
+    public let column: String
+    public let op: Op
+    public let value: ValueElement?
+
+    public enum CodingKeys: String, CodingKey {
+        case column = "column"
+        case op = "op"
+        case value = "value"
+    }
+
+    public init(column: String, op: Op, value: ValueElement?) {
+        self.column = column
+        self.op = op
+        self.value = value
+    }
+}
+
+/// A column to sort a view by.
+// MARK: - DataBrowseParamsDataBrowseSort
+public struct DataBrowseParamsDataBrowseSort: Codable {
     public let column: String
     public let desc: Bool?
 
@@ -5164,17 +5258,20 @@ public struct DataColumn: Codable {
 /// ``data.describe``. A source, or one table of it.
 // MARK: - DataDescribeParams
 public struct DataDescribeParams: Codable {
+    public let project: String?
     public let sessionID: String?
     public let source: String
     public let table: String?
 
     public enum CodingKeys: String, CodingKey {
+        case project = "project"
         case sessionID = "session_id"
         case source = "source"
         case table = "table"
     }
 
-    public init(sessionID: String?, source: String, table: String?) {
+    public init(project: String?, sessionID: String?, source: String, table: String?) {
+        self.project = project
         self.sessionID = sessionID
         self.source = source
         self.table = table
@@ -5349,19 +5446,22 @@ public struct PurpleDataColumn: Codable {
 public struct DataExportParams: Codable {
     public let format: FormatEnum?
     public let path: String
+    public let project: String?
     public let resultID: String
     public let sessionID: String?
 
     public enum CodingKeys: String, CodingKey {
         case format = "format"
         case path = "path"
+        case project = "project"
         case resultID = "result_id"
         case sessionID = "session_id"
     }
 
-    public init(format: FormatEnum?, path: String, resultID: String, sessionID: String?) {
+    public init(format: FormatEnum?, path: String, project: String?, resultID: String, sessionID: String?) {
         self.format = format
         self.path = path
+        self.project = project
         self.resultID = resultID
         self.sessionID = sessionID
     }
@@ -5567,13 +5667,16 @@ public struct FluffyDataColumn: Codable {
 /// ``data.list``. Every source the user can see.
 // MARK: - DataListParams
 public struct DataListParams: Codable {
+    public let project: String?
     public let sessionID: String?
 
     public enum CodingKeys: String, CodingKey {
+        case project = "project"
         case sessionID = "session_id"
     }
 
-    public init(sessionID: String?) {
+    public init(project: String?, sessionID: String?) {
+        self.project = project
         self.sessionID = sessionID
     }
 }
@@ -5657,15 +5760,18 @@ public struct SourceElement: Codable {
 /// ``data.notes.draft``. Ask for a proposal.
 // MARK: - DataNotesDraftParams
 public struct DataNotesDraftParams: Codable {
+    public let project: String?
     public let sessionID: String?
     public let source: String
 
     public enum CodingKeys: String, CodingKey {
+        case project = "project"
         case sessionID = "session_id"
         case source = "source"
     }
 
-    public init(sessionID: String?, source: String) {
+    public init(project: String?, sessionID: String?, source: String) {
+        self.project = project
         self.sessionID = sessionID
         self.source = source
     }
@@ -5688,15 +5794,18 @@ public struct DataNotesDraftResult: Codable {
 /// ``data.notes.get``.
 // MARK: - DataNotesGetParams
 public struct DataNotesGetParams: Codable {
+    public let project: String?
     public let sessionID: String?
     public let source: String
 
     public enum CodingKeys: String, CodingKey {
+        case project = "project"
         case sessionID = "session_id"
         case source = "source"
     }
 
-    public init(sessionID: String?, source: String) {
+    public init(project: String?, sessionID: String?, source: String) {
+        self.project = project
         self.sessionID = sessionID
         self.source = source
     }
@@ -5722,17 +5831,20 @@ public struct DataNotesGetResult: Codable {
 /// ``data.notes.set``.
 // MARK: - DataNotesSetParams
 public struct DataNotesSetParams: Codable {
+    public let project: String?
     public let sessionID: String?
     public let source: String
     public let text: String
 
     public enum CodingKeys: String, CodingKey {
+        case project = "project"
         case sessionID = "session_id"
         case source = "source"
         case text = "text"
     }
 
-    public init(sessionID: String?, source: String, text: String) {
+    public init(project: String?, sessionID: String?, source: String, text: String) {
+        self.project = project
         self.sessionID = sessionID
         self.source = source
         self.text = text
@@ -5756,17 +5868,20 @@ public struct DataNotesSetResult: Codable {
 /// ``data.profile``. The shape of each column of one table.
 // MARK: - DataProfileParams
 public struct DataProfileParams: Codable {
+    public let project: String?
     public let sessionID: String?
     public let source: String
     public let table: String
 
     public enum CodingKeys: String, CodingKey {
+        case project = "project"
         case sessionID = "session_id"
         case source = "source"
         case table = "table"
     }
 
-    public init(sessionID: String?, source: String, table: String) {
+    public init(project: String?, sessionID: String?, source: String, table: String) {
+        self.project = project
         self.sessionID = sessionID
         self.source = source
         self.table = table
@@ -5970,6 +6085,7 @@ public struct DataQueriesSaveResultQuery: Codable {
 // MARK: - DataQueryParams
 public struct DataQueryParams: Codable {
     public let limit: Int?
+    public let project: String?
     public let resultID: String?
     public let sessionID: String?
     public let source: String
@@ -5977,14 +6093,16 @@ public struct DataQueryParams: Codable {
 
     public enum CodingKeys: String, CodingKey {
         case limit = "limit"
+        case project = "project"
         case resultID = "result_id"
         case sessionID = "session_id"
         case source = "source"
         case sql = "sql"
     }
 
-    public init(limit: Int?, resultID: String?, sessionID: String?, source: String, sql: String) {
+    public init(limit: Int?, project: String?, resultID: String?, sessionID: String?, source: String, sql: String) {
         self.limit = limit
+        self.project = project
         self.resultID = resultID
         self.sessionID = sessionID
         self.source = source

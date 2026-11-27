@@ -6,6 +6,7 @@ import {
   EXPORT_FORMATS,
   EXPORT_NEW_FILE_NOTE,
   EXPORT_TITLE,
+  exportCutText,
   exportedText,
   exportHeading,
   formatOfPath,
@@ -31,6 +32,8 @@ export type ExportFormProps = {
   /** Downloads an add-on. Without it the form only says the add-on is missing. */
   onInstallExtension?: (name: DataExtensionName) => Promise<void>;
   onClose: () => void;
+  /** The result was cut by the row cap: `rows` of this many go into the file. Null when the whole count is not known. */
+  cut?: { all: number | null };
   /** Today, for the name the form starts with. */
   today?: Date;
   /** The gallery shows the form on the page, outside a dialog: the title is then a plain heading. */
@@ -39,7 +42,7 @@ export type ExportFormProps = {
 };
 
 /** Export a result: its format, and the new file it goes to. Nothing is written until Export is pressed. */
-export function ExportForm({ resultId, source, rows, onExport, onInstallExtension, onClose, today, inline = false, initial }: ExportFormProps) {
+export function ExportForm({ resultId, source, rows, onExport, onInstallExtension, onClose, cut, today, inline = false, initial }: ExportFormProps) {
   const ids = useId();
   const start = today ?? new Date();
   const first = initial?.format ?? "csv";
@@ -93,6 +96,7 @@ export function ExportForm({ resultId, source, rows, onExport, onInstallExtensio
         {title}
         {inline ? null : <DialogDescription>{EXPORT_NEW_FILE_NOTE}</DialogDescription>}
         <p className="text-sm text-muted">{exportHeading(rows, source)}</p>
+        {cut === undefined ? null : <p className="text-sm text-muted">{exportCutText(rows, cut.all)}</p>}
       </div>
       <div className="mt-4 flex flex-col gap-3">
         <div className="flex items-start gap-3">

@@ -329,13 +329,19 @@ class Source:
         limit: int,
         cursor: Any | None = None,
         keep: Callable[[list[str], list[str], list[Any]], None] | None = None,
+        *,
+        params: list[Any] | None = None,
+        built: bool = False,
     ) -> dict[str, Any]:
         """Run ``sql``. ``keep`` gets the column names, their types and the raw rows to store.
+
+        ``built`` marks SQL the daemon made from names it checked, with ``params`` bound, so it
+        skips the guard that reads a person's own SQL.
 
         A ``keep`` that raises :class:`DataError` leaves the answer as it is, with ``stored``
         false: a result that cannot be kept is still a result.
         """
-        reason = guard.refusal(sql)
+        reason = None if built else guard.refusal(sql)
         if reason is not None:
             raise DataError(reason)
         if limit < 1:
@@ -344,7 +350,7 @@ class Source:
         run: Any = cursor if cursor is not None else self.cursor()
         started = time.monotonic()
         try:
-            run.execute(sql)
+            run.execute(sql, params) if params else run.execute(sql)
             description: list[Any] = run.description or []
             rows: list[Any] = run.fetchmany(limit + 1)
         except duckdb.InterruptException as exc:
@@ -433,6 +439,36 @@ class Source:
         finally:
             if own:
                 run.close()
+
+    def browse_keep(
+        self,
+        table: str,
+        args: dict[str, Any],
+        limit: int,
+        cursor: Any,
+        keep: Callable[[list[str], list[str], list[Any]], None] | None,
+    ) -> dict[str, Any]:
+        """The whole view of ``table`` (filters, search, sort; no paging), up to ``limit`` rows.
+
+        The SQL comes from the same builders as :meth:`browse`, so it is made of names checked
+        against the table and bound values.
+        """
+        from golem.data.browse import order_of, where_of
+
+        sql, columns = self._table(table, cursor)
+        if not columns:
+            raise DataError("The table has no columns.")
+        clause, params = where_of(columns, list(args.get("filters") or []), args.get("search"))
+        order = order_of(columns, args.get("sort"), fixed=self.spec.kind in DATABASE_KINDS)
+        select = ", ".join(_ident(n) for n, _ in columns)
+        return self.query(
+            f"select {select} from {sql}{clause}{order}",
+            limit,
+            cursor,
+            keep,
+            params=params,
+            built=True,
+        )
 
     # -- opening ---------------------------------------------------------------------------
 

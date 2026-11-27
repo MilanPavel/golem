@@ -6,6 +6,7 @@ export type Value = string | number | boolean | null;
 export type Filters = DataBrowseFilter[];
 export type Limit = number;
 export type Offset = number;
+export type Project = string | null;
 export type Search = string | null;
 export type SessionId = string | null;
 export type Column1 = string;
@@ -22,6 +23,7 @@ export interface DataBrowseParams {
   filters?: Filters;
   limit?: Limit;
   offset?: Offset;
+  project?: Project;
   search?: Search;
   session_id?: SessionId;
   sort?: DataBrowseSort | null;

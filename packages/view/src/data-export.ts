@@ -65,6 +65,12 @@ function rowsText(rows: number): string {
   return rows === 1 ? "1 row" : `${countText(rows)} rows`;
 }
 
+/** The line under the dialog title when the query had more rows than were kept: how many go into the file, out of how many. */
+export function exportCutText(kept: number, all: number | null): string {
+  const of = all === null ? "" : ` of ${rowsText(all)}`;
+  return `${rowsText(kept)}${of} will be exported: the query had more rows than were kept.`;
+}
+
 /** The title of the dialog. */
 export function exportHeading(rows: number, source: string): string {
   return `${rowsText(rows)} from @${source}`;

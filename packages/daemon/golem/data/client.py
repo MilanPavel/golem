@@ -146,6 +146,35 @@ class DataWorker:
             "browse", {"source": source, "table": table, **args}, timeout=timeout, tag=tag
         )
 
+    async def browse_keep(
+        self,
+        source: str,
+        table: str,
+        args: dict[str, Any],
+        *,
+        store: Path,
+        result_id: str,
+        label: str,
+    ) -> dict[str, Any]:
+        """The whole view of a table into a kept result file, up to the usual row cap.
+
+        ``args`` hold ``sort``, ``filters`` and ``search``. The worker builds the SQL as
+        :meth:`browse` does.
+        """
+        sent: dict[str, Any] = {
+            "source": source,
+            "table": table,
+            "sort": args.get("sort"),
+            "filters": args.get("filters") or [],
+            "search": args.get("search"),
+            "limit": self._settings.max_rows,
+            "store": str(store),
+            "label": label,
+        }
+        return await self.request(
+            "browse", sent, timeout=self._settings.query_timeout_seconds, tag=result_id
+        )
+
     async def query(
         self,
         source: str,

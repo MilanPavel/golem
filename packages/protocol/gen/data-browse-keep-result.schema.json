@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "The kept view. ``truncated`` is true when the usual row cap cut it.",
+  "properties": {
+    "result_id": {
+      "minLength": 1,
+      "title": "Result Id",
+      "type": "string"
+    },
+    "rows": {
+      "minimum": 0,
+      "title": "Rows",
+      "type": "integer"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "result_id",
+    "rows"
+  ],
+  "title": "DataBrowseKeepResult",
+  "type": "object"
+}

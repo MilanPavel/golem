@@ -94,9 +94,12 @@ export function DataScreen() {
 /** `/data/:name`: one source, from `data.list` and `data.describe`. */
 export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) {
   const list = useDataList();
-  const described = useDataDescribe(name);
-  const notes = useDataNotes(name);
-  const loadProfile = useDataProfileLoader(name);
+  // A project's source is found through its project folder, so nothing else asks before the list has said which.
+  const listed = list.data?.status === "ready" ? list.data.data.sources.find((each) => each.name === name) : undefined;
+  const project = listed?.project ?? null;
+  const described = useDataDescribe(name, project, null, listed !== undefined);
+  const notes = useDataNotes(name, project, listed !== undefined);
+  const loadProfile = useDataProfileLoader(name, project);
   const actions = usePageActions();
   const navigate = useNavigate();
   const [, setDraft] = useDraft(NEW_DRAFT_KEY);
@@ -156,10 +159,12 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
         onAsk={() => askInChat(askText(name))}
         onRun={(query: DataSavedQuery) => askInChat(runQueryText(name, query.sql))}
         onLoadProfile={loadProfile}
-        onBrowse={(table, view) => actions.dataBrowse(name, table, view)}
+        onBrowse={(table, view) => actions.dataBrowse(name, table, view, project)}
+        onKeepView={(table, view) => actions.dataBrowseKeep(name, table, view, project)}
+        onExportView={(params) => actions.dataExportResult(params, project)}
         onAskView={askInChat}
-        onSaveNotes={(text) => actions.dataNotesSet(name, text)}
-        onDraftNotes={() => actions.dataNotesDraft(name)}
+        onSaveNotes={(text) => actions.dataNotesSet(name, text, project)}
+        onDraftNotes={() => actions.dataNotesDraft(name, project)}
         onPrivacy={async (privacy) => {
           await actions.dataUpdate({ name, privacy });
         }}

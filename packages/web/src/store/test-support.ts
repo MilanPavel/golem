@@ -140,6 +140,7 @@ export function fakeClient() {
     inspectDatabase: vi.fn<PageClient["inspectDatabase"]>(async () => ({ kind: "postgres", tables: [], sample: {}, suggested_name: "x", suggested_privacy: "local" })),
     profileData: vi.fn<PageClient["profileData"]>(async (source, table) => ({ source, table, rows: 0, columns: [] })),
     browseData: vi.fn<PageClient["browseData"]>(async () => ({ columns: [], rows: [], total_rows: 0, elapsed_ms: 0 })),
+    browseDataKeep: vi.fn<PageClient["browseDataKeep"]>(async () => ({ result_id: "res_kept", rows: 0, truncated: false })),
     pageDataResult: vi.fn<PageClient["pageDataResult"]>(async (resultId) => ({ result_id: resultId, source: "bank", columns: [], rows: [], total_rows: 0, truncated: false, elapsed_ms: 0 })),
     exportDataResult: vi.fn<PageClient["exportDataResult"]>(async (_resultId, path) => ({ path, rows: 0 })),
     installDataExtension: vi.fn<PageClient["installDataExtension"]>(async () => ({})),

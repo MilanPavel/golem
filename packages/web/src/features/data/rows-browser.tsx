@@ -26,7 +26,9 @@ import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { Input } from "../../ui/input.tsx";
-import { dataErrorText, isDataMissing, type DataBrowseResult, type DataBrowseView } from "../../store/data.ts";
+import { dataErrorText, isDataMissing, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataExportParams, type DataExportResult } from "../../store/data.ts";
+import type { DataExtensionName } from "@golem/view";
+import { ExportDialog } from "./export-dialog.tsx";
 
 /** What narrows and orders the rows of a table: the filters, the search and the sort. It lives above the browser, so it survives a visit to another tab. */
 export interface RowsView {
@@ -58,6 +60,12 @@ function browseView(view: RowsView, offset: number): DataBrowseView {
     filters: view.filters.map((filter) => (filter.op === "is null" ? { column: filter.column, op: "is null" as const } : { column: filter.column, op: "=" as const, value: filter.value ?? null })),
     ...(view.search === "" ? {} : { search: view.search }),
   };
+}
+
+/** The view as what `data.browse.keep` takes: the same names and values as a page, with no paging. */
+function keepView(view: RowsView): DataBrowseKeepView {
+  const { sort, filters, search } = browseView(view, 0);
+  return { filters, ...(sort === undefined ? {} : { sort }), ...(search === undefined ? {} : { search }) };
 }
 
 function Skeleton({ at, column }: { at: number; column: number }) {
@@ -110,6 +118,11 @@ export interface RowsBrowserProps {
   onBrowse: (table: string, view: DataBrowseView) => Promise<DataBrowseResult>;
   /** Opens a new chat with this text in the composer. */
   onAskView: (text: string) => void;
+  /** Keeps the whole current view as a result to export, from `data.browse.keep`. Without it there is no Export button. */
+  onKeep?: (table: string, view: DataBrowseKeepView) => Promise<DataBrowseKeepResult>;
+  /** Writes the kept view to a new file. */
+  onExport?: (params: DataExportParams) => Promise<DataExportResult>;
+  onInstallExtension?: (name: DataExtensionName) => Promise<void>;
   /** A state to start in, for the gallery and the tests: pages already read, and a row already open. */
   initial?: RowsBrowserInitial;
 }
@@ -127,7 +140,7 @@ export interface RowsBrowserInitial {
  * the rows, a sort or a filter works across the whole table, and a click on a row reads it in full. The browser
  * asks for pages by name and value; it sends no SQL.
  */
-export function RowsBrowser({ source, table, columns, tableRows, view, onView, onBrowse, onAskView, initial }: RowsBrowserProps) {
+export function RowsBrowser({ source, table, columns, tableRows, view, onView, onBrowse, onAskView, onKeep, onExport, onInstallExtension, initial }: RowsBrowserProps) {
   const searchId = useId();
   const key = viewKey(table, view);
   const keyRef = useRef(key);
@@ -142,6 +155,9 @@ export function RowsBrowser({ source, table, columns, tableRows, view, onView, o
   const [selected, setSelected] = useState<number | null>(initial?.selected ?? null);
   const [open, setOpen] = useState(initial?.open ?? false);
   const [text, setText] = useState(view.search);
+  const [keeping, setKeeping] = useState(false);
+  const [kept, setKept] = useState<DataBrowseKeepResult | null>(null);
+  const [keepFailure, setKeepFailure] = useState<string | null>(null);
 
   const names = columns.map((column) => column.name).join("\u0000");
   const fresh = loaded.key === key;
@@ -216,6 +232,22 @@ export function RowsBrowser({ source, table, columns, tableRows, view, onView, o
     }
   }, [key, wantKey, names, pages]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  function keep(): void {
+    if (onKeep === undefined || keeping) return;
+    setKeeping(true);
+    setKeepFailure(null);
+    onKeep(table, keepView(view)).then(
+      (answer) => {
+        setKeeping(false);
+        setKept(answer);
+      },
+      (error: unknown) => {
+        setKeeping(false);
+        setKeepFailure(isDataMissing(error) ? ROWS_NOT_AVAILABLE : dataErrorText(error, "Could not get the rows to export."));
+      },
+    );
+  }
+
   function rowAt(index: number): ViewCell[] | null {
     return pages[Math.floor(index / PAGE_ROWS)]?.[index % PAGE_ROWS] ?? null;
   }
@@ -286,7 +318,29 @@ export function RowsBrowser({ source, table, columns, tableRows, view, onView, o
         <Button size="sm" onClick={() => onAskView(askViewText(source, viewSql(table, view, textColumns)))}>
           Ask about this view
         </Button>
+        {onKeep === undefined ? null : (
+          <Button size="sm" disabled={keeping} onClick={keep}>
+            {keeping ? "Getting the rows…" : "Export…"}
+          </Button>
+        )}
       </div>
+      {keepFailure === null ? null : (
+        <p role="alert" className="text-sm text-deny">
+          {keepFailure}
+        </p>
+      )}
+      {kept === null || onExport === undefined ? null : (
+        <ExportDialog
+          open
+          resultId={kept.result_id}
+          source={source}
+          rows={kept.rows}
+          onExport={onExport}
+          {...(onInstallExtension === undefined ? {} : { onInstallExtension })}
+          {...(kept.truncated === true ? { cut: { all: total } } : {})}
+          onClose={() => setKept(null)}
+        />
+      )}
       <div className="flex gap-3">
         <div
           ref={wrap}

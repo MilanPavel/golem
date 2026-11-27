@@ -51,6 +51,8 @@ from golem.sessions.manager import SchemaMismatchError, SessionNotFoundError
 from golem_protocol.commands import (
     DataAddParams,
     DataAddResult,
+    DataBrowseKeepParams,
+    DataBrowseKeepResult,
     DataBrowseParams,
     DataBrowseResult,
     DataCancelParams,
@@ -110,6 +112,29 @@ async def _root(ctx: RequestContext, session_id: str | None) -> Path | None:
     return None if cwd is None else Path(cwd)
 
 
+async def _where(
+    ctx: RequestContext, session_id: str | None, project: str | None, *, lenient: bool = False
+) -> Path | None:
+    """The folder whose project sources count: the session's, else a trusted ``project``.
+
+    ``lenient`` lets a folder that is not trusted count as no folder, for the list a person
+    sees before choosing anything. Everything else says why it cannot go on.
+    """
+    if session_id is not None or project is None:
+        return await _root(ctx, session_id)
+    folder = Path(project).expanduser()
+    policy = ctx.state.policy
+    if folder.is_absolute() and policy is not None and policy.trusted(folder):
+        return folder.resolve()
+    if lenient:
+        return None
+    raise RpcCallError(
+        INVALID_PARAMS,
+        f"The project {project} is not trusted, so its sources are not opened. "
+        "Trust the project first.",
+    )
+
+
 def wire_source(info: SourceInfo) -> DataSource:
     """A source for the wire. It never holds a password."""
     return DataSource(
@@ -154,13 +179,13 @@ _rows = wire_rows
 
 
 async def data_list(ctx: RequestContext, params: DataListParams) -> DataListResult:
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project, lenient=True)
     found = await _sources(ctx).list(root)
     return DataListResult(sources=[wire_source(info) for info in found])
 
 
 async def data_describe(ctx: RequestContext, params: DataDescribeParams) -> DataDescribeResult:
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     sources = _sources(ctx)
     try:
         info = next((i for i in sources.snapshot(root) if i.name == params.source), None)
@@ -180,7 +205,7 @@ async def data_describe(ctx: RequestContext, params: DataDescribeParams) -> Data
 
 async def data_profile(ctx: RequestContext, params: DataProfileParams) -> DataProfileResult:
     """The shape of each column of a table, for you to look at. Any source: no model gets it."""
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     try:
         found = await _sources(ctx).profile(root, params.source, params.table)
     except DataError as exc:
@@ -200,7 +225,7 @@ async def data_browse(ctx: RequestContext, params: DataBrowseParams) -> DataBrow
     It is you reading your own data, so any source's rows. The SQL is built in the data engine
     from names it checks; nothing from the browser is run as SQL.
     """
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     try:
         page = await _sources(ctx).browse(
             root,
@@ -222,8 +247,31 @@ async def data_browse(ctx: RequestContext, params: DataBrowseParams) -> DataBrow
     )
 
 
+async def data_browse_keep(
+    ctx: RequestContext, params: DataBrowseKeepParams
+) -> DataBrowseKeepResult:
+    """The whole view of a table, kept as a result to export. The SQL is built in the engine."""
+    root = await _where(ctx, params.session_id, params.project)
+    try:
+        result = await _sources(ctx).keep_browse(
+            root,
+            params.source,
+            params.table,
+            sort=None if params.sort is None else params.sort.model_dump(),
+            filters=[f.model_dump() for f in params.filters],
+            search=params.search,
+        )
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    if not result.stored:
+        raise RpcCallError(INTERNAL_ERROR, "The view could not be kept for export.")
+    return DataBrowseKeepResult(
+        result_id=result.result_id, rows=len(result.rows), truncated=result.truncated
+    )
+
+
 async def data_query(ctx: RequestContext, params: DataQueryParams) -> DataResult:
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     try:
         result = await _sources(ctx).query(
             root, params.source, params.sql, params.limit, params.result_id
@@ -277,7 +325,7 @@ async def data_result_page(ctx: RequestContext, params: DataResultPageParams) ->
 
 async def data_export(ctx: RequestContext, params: DataExportParams) -> DataExportResult:
     """Write a kept result to a new file. You are asking, so there is no approval card."""
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     sources = _sources(ctx)
     try:
         plan = await sources.plan_export(root, params.result_id, params.path, params.format)
@@ -545,7 +593,7 @@ async def data_extension_install(
 
 async def data_notes_get(ctx: RequestContext, params: DataNotesGetParams) -> DataNotesGetResult:
     """The notes of a source, null when there are none, and where they are kept."""
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     sources = _sources(ctx)
     try:
         found = await sources.read_notes(root, params.source)
@@ -557,12 +605,13 @@ async def data_notes_get(ctx: RequestContext, params: DataNotesGetParams) -> Dat
 
 async def data_notes_set(ctx: RequestContext, params: DataNotesSetParams) -> DataNotesSetResult:
     """Save the notes. Empty text deletes the file, so the built-in source gets its own back."""
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     sources = _sources(ctx)
     info = next((i for i in sources.snapshot(root) if i.name == params.source), None)
     if info is None:
         raise RpcCallError(INVALID_PARAMS, f"There is no source called {params.source}.")
-    if info.scope == "project":
+    if info.scope == "project" and params.session_id is not None:
+        # A project folder named without a session was checked as trusted when it was resolved.
         await config_target(ctx, "project", await get_scope(ctx, params.session_id))
     if len(params.text.encode("utf-8")) > MAX_BYTES:
         raise RpcCallError(INVALID_PARAMS, TOO_LONG)
@@ -582,7 +631,7 @@ async def data_notes_draft(
     drafts = ctx.state.drafts
     if drafts is None:
         raise RpcCallError(INTERNAL_ERROR, "the daemon is not ready to draft notes yet")
-    root = await _root(ctx, params.session_id)
+    root = await _where(ctx, params.session_id, params.project)
     sources = _sources(ctx)
     try:
         info = next((i for i in sources.snapshot(root) if i.name == params.source), None)

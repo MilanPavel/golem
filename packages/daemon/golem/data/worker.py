@@ -174,6 +174,10 @@ class Worker:
             table = str(args.get("table", ""))
             if op == "profile":
                 return source.profile(table, cursor)
+            if args.get("store"):
+                meta = {"source": str(args.get("source", "")), "sql": str(args.get("label", ""))}
+                keep = partial(parquet.write, Path(str(args["store"])), meta=meta)
+                return source.browse_keep(table, args, int(args.get("limit", 1000)), cursor, keep)
             return source.browse(table, args, cursor)
         finally:
             with self._lock:

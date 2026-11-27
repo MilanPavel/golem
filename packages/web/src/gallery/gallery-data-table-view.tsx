@@ -33,7 +33,7 @@ const SHOWN = PASSENGER_COLUMNS.map((column) => ({ name: column.name, type: colu
 
 function Rows({ story }: { story: Story }) {
   const [view, setView] = useState(story.view);
-  return <RowsBrowser source="titanic" table="titanic" columns={SHOWN} tableRows={story.all} view={view} onView={setView} onBrowse={NEVER} onAskView={() => {}} initial={story.initial} />;
+  return <RowsBrowser source="titanic" table="titanic" columns={SHOWN} tableRows={story.all} view={view} onView={setView} onBrowse={NEVER} onAskView={() => {}} onKeep={NEVER} onExport={NEVER} initial={story.initial} />;
 }
 
 /** The column profile and the row browser, as they look with the passenger list of the design. */
