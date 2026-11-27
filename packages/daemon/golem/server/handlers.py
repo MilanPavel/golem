@@ -203,6 +203,7 @@ from golem.server.workflows import (
     workflow_get,
     workflow_list,
     workflow_propose,
+    workflow_read_output,
     workflow_resume,
     workflow_review_answer,
     workflow_save,
@@ -528,6 +529,7 @@ from golem_protocol.commands import (
     WorkflowGetParams,
     WorkflowListParams,
     WorkflowProposeParams,
+    WorkflowReadOutputParams,
     WorkflowResumeParams,
     WorkflowReviewAnswerParams,
     WorkflowSaveParams,
@@ -2514,6 +2516,9 @@ def standard_methods() -> dict[str, Method]:
         ),
         "workflow.start": Method("workflow.start", WorkflowStartParams, True, workflow_start),
         "workflow.status": Method("workflow.status", WorkflowStatusParams, True, workflow_status),
+        "workflow.read_output": Method(
+            "workflow.read_output", WorkflowReadOutputParams, True, workflow_read_output
+        ),
         "workflow.cancel": Method("workflow.cancel", WorkflowCancelParams, True, workflow_cancel),
         "workflow.resume": Method("workflow.resume", WorkflowResumeParams, True, workflow_resume),
         "workflow.review.answer": Method(
