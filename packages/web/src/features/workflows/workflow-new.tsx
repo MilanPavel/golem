@@ -111,7 +111,7 @@ function Label({ id, children }: { id: string; children: string }) {
 /** The question after a file is made: a routine, filled in with this workflow, or not now. */
 function ScheduleAsk({ id, onNavigate, onClose }: { id: string; onNavigate: (path: string) => void; onClose: () => void }) {
   return (
-    <section aria-label={SCHEDULE_ASK_TITLE} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-allow bg-allow-soft px-3 py-2">
+    <div role="group" aria-label={SCHEDULE_ASK_TITLE} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-allow bg-allow-soft px-3 py-2">
       <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5">
         <h2 className="text-sm font-semibold">{SCHEDULE_ASK_TITLE}</h2>
         <p className="text-meta text-muted">{SCHEDULE_ASK_HELP}</p>
@@ -127,7 +127,7 @@ function ScheduleAsk({ id, onNavigate, onClose }: { id: string; onNavigate: (pat
           {SCHEDULE_NO_WORDS}
         </Button>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -211,6 +211,7 @@ export function WorkflowNew({ starters, workflows, folder, models, defaultModel,
   const askId = useId();
   const whereId = useId();
   const modelId = useId();
+  const startersId = useId();
   const nameBox = useRef<HTMLInputElement>(null);
   const turn = useRef(0);
   const place: SaveWhere = where === "project" && folder === null ? "yours" : where;
@@ -421,8 +422,8 @@ export function WorkflowNew({ starters, workflows, folder, models, defaultModel,
         </Card>
       </div>
       {starters.length === 0 ? null : (
-        <section aria-labelledby="new-workflow-starters" className="flex flex-col gap-2">
-          <h2 id="new-workflow-starters" className="text-sm font-semibold">
+        <div role="group" aria-labelledby={startersId} className="flex flex-col gap-2">
+          <h2 id={startersId} className="text-sm font-semibold">
             {STARTERS_TITLE}
           </h2>
           <p className="text-sm text-muted">{STARTERS_HELP}</p>
@@ -433,7 +434,7 @@ export function WorkflowNew({ starters, workflows, folder, models, defaultModel,
               </li>
             ))}
           </ul>
-        </section>
+        </div>
       )}
       <Card className="flex flex-col gap-2">
         <h2 className="text-xs font-medium text-faint">What happens next</h2>

@@ -180,8 +180,8 @@ test("the gallery's New workflow stories show the empty page, the page, a projec
     const draft = story("New workflow, a draft, not saved");
     expect(draft.getByRole("list", { name: "Outline" })).toBeTruthy();
     expect(draft.getByText(/Nothing has run and nothing is saved/)).toBeTruthy();
-    expect(draft.queryByRole("region", { name: "Run it on a schedule?" })).toBeNull();
-    expect(story("New workflow, saved, run it on a schedule").getByRole("region", { name: "Run it on a schedule?" })).toBeTruthy();
+    expect(draft.queryByRole("group", { name: "Run it on a schedule?" })).toBeNull();
+    expect(story("New workflow, saved, run it on a schedule").getByRole("group", { name: "Run it on a schedule?" })).toBeTruthy();
     const empty = story("New workflow, an empty file");
     expect(empty.getByRole("button", { name: "Code" }).getAttribute("aria-pressed")).toBe("true");
     unmount();

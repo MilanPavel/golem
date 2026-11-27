@@ -147,7 +147,7 @@ test("Save creates the file from the draft, then asks Run it on a schedule? and 
   await screen.findByRole("list", { name: "Outline" });
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(onCreate).toHaveBeenCalledWith("weekly_invoices", null, SAMPLE_DRAFT.code));
-  const ask = await screen.findByRole("region", { name: "Run it on a schedule?" });
+  const ask = await screen.findByRole("group", { name: "Run it on a schedule?" });
   expect(screen.getByText("Saved.")).toBeTruthy();
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
   await user.click(within(ask).getByRole("button", { name: "Yes, add a routine" }));
@@ -164,9 +164,9 @@ test("after the first Save, a later Save writes the file it made and does not cr
   await user.click(screen.getByRole("button", { name: "Write the steps" }));
   await screen.findByRole("list", { name: "Outline" });
   await user.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByRole("region", { name: "Run it on a schedule?" });
+  await screen.findByRole("group", { name: "Run it on a schedule?" });
   await user.click(screen.getByRole("button", { name: "Not now" }));
-  expect(screen.queryByRole("region", { name: "Run it on a schedule?" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Run it on a schedule?" })).toBeNull();
   await user.click(await screen.findByRole("button", { name: "Steps and code" }));
   await user.click(screen.getByRole("textbox", { name: /Code of/ }));
   await user.keyboard("# more");
@@ -188,7 +188,7 @@ test("a refused Save of the draft says why and keeps the draft", async () => {
   await screen.findByRole("list", { name: "Outline" });
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect((await screen.findByText(/Not saved\. not created: line 3/)).getAttribute("role")).toBe("alert");
-  expect(screen.queryByRole("region", { name: "Run it on a schedule?" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "Run it on a schedule?" })).toBeNull();
   expect(screen.getByRole("list", { name: "Outline" })).toBeTruthy();
 });
 
@@ -200,7 +200,7 @@ test("an empty file is created at once with the typed name, and opens in Code vi
   await user.click(screen.getByRole("button", { name: "Create" }));
   await waitFor(() => expect(onCreate).toHaveBeenCalledWith("Weekly invoices", null, null));
   expect((await screen.findByRole("button", { name: "Code" })).getAttribute("aria-pressed")).toBe("true");
-  expect(screen.getByRole("region", { name: "Run it on a schedule?" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "Run it on a schedule?" })).toBeTruthy();
   expect(screen.getByText(/Saved as/).textContent).toContain(SAMPLE_PR_DIGEST.path);
 });
 
@@ -343,7 +343,7 @@ test("/workflows/new: Create makes an empty file through workflow.create and lis
   });
   await user.type(await screen.findByRole("textbox", { name: "Name" }), "Weekly invoices");
   await user.click(screen.getByRole("button", { name: "Create" }));
-  expect(await screen.findByRole("region", { name: "Run it on a schedule?" })).toBeTruthy();
+  expect(await screen.findByRole("group", { name: "Run it on a schedule?" })).toBeTruthy();
   expect(fake.raw.createWorkflow).toHaveBeenCalledWith("Weekly invoices", undefined, undefined);
   await waitFor(() => expect(fake.raw.listWorkflows.mock.calls.length).toBeGreaterThan(1));
 });
