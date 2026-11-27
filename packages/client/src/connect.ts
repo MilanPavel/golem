@@ -109,6 +109,7 @@ import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-re
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
+import type { WorkflowReadOutputResult } from "../../protocol/gen/workflow-read-output-result.ts";
 import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
 import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
@@ -350,6 +351,7 @@ import {
   isRoutineRemoveResult,
   isRoutineRunResult,
   isWorkflowCancelResult,
+  isWorkflowReadOutputResult,
   isWorkflowResumeResult,
   isWorkflowReviewAnswerResult,
   isWorkflowCheckResult,
@@ -930,6 +932,8 @@ export interface GolemClient {
   workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
   /** `workflow.cancel`: stop a run. `cancelled` is false when it had already ended. */
   cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult>;
+  /** `workflow.read_output`: the text of output `index` of a run, when it is a file path the run marked. Cut at a limit; `truncated` says so. Rejects with the daemon's reason (a secret folder, a file that is gone). */
+  readWorkflowOutput(workflowRunId: string, index: number): Promise<WorkflowReadOutputResult>;
   /** `workflow.resume`: continue a stopped (`running`, `waiting` or `failed`) run; finished steps are not run again. */
   resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult>;
   /** `workflow.review.answer`: answer the review `key` of a waiting run. `text` is required for `edit`; the run continues once none of its reviews waits. */
@@ -3204,6 +3208,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       const result = await call("workflow.status", { workflow_run_id: workflowRunId });
       if (!isWorkflowStatusResult(result)) {
         throw new Error("invalid workflow.status result");
+      }
+      return result;
+    },
+    async readWorkflowOutput(workflowRunId: string, index: number): Promise<WorkflowReadOutputResult> {
+      await ready;
+      const result = await call("workflow.read_output", { workflow_run_id: workflowRunId, index });
+      if (!isWorkflowReadOutputResult(result)) {
+        throw new Error("invalid workflow.read_output result");
       }
       return result;
     },
