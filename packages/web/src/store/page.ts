@@ -18,7 +18,7 @@ import { SKILL_LIST_KEY } from "./skills.ts";
 import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExportResult, type MemoryListRequest, type MemoryListResult, type MemoryPrivacy, type MemoryScope } from "./memory.ts";
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
-import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
+import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowReadOutputResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
 import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
@@ -98,6 +98,7 @@ export type PageClient = Pick<
   | "workflowStatus"
   | "cancelWorkflow"
   | "resumeWorkflow"
+  | "readWorkflowOutput"
   | "answerWorkflowReview"
   | "onWorkflowEvent"
   | "listRuns"
@@ -460,6 +461,8 @@ export type PageActions = {
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
   /** Stops a workflow run. `cancelled` is false when it had ended already. */
   cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult>;
+  /** The text of output `index` of a run that is a file path the run marked: cut at a limit, `truncated` says so. Rejects with the daemon's reason. */
+  readWorkflowOutput(workflowRunId: string, index: number): Promise<WorkflowReadOutputResult>;
   /** Continues a stopped run; the steps that finished are not run again. Resolves with the run as it is then. */
   resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult>;
   /** Answers the review `key` of a waiting run. `text` is what an edit says. The run continues once none of its reviews waits. */
@@ -1084,6 +1087,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
         }
       },
+      readWorkflowOutput: (workflowRunId, index) => client.readWorkflowOutput(workflowRunId, index),
       async resumeWorkflow(workflowRunId) {
         try {
           return await client.resumeWorkflow(workflowRunId);

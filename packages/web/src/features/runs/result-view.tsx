@@ -137,18 +137,28 @@ function Readable({ result }: { result: unknown }) {
 export function ResultView({ result, label }: { result: unknown; label: string }) {
   const [raw, setRaw] = useState(false);
   if (result === null || result === undefined) return null;
-  const choice = (on: boolean) => cn("rounded px-2 py-0.5 text-meta outline-offset-2 outline-clay focus-visible:outline-2", raw === on ? "bg-surface text-ink" : "text-muted hover:text-ink");
   return (
     <div role="group" aria-label={label} className="flex flex-col gap-2">
-      <div role="group" aria-label="Show the result as" className="flex w-fit gap-1 rounded-md border border-line p-0.5">
-        <button type="button" aria-pressed={!raw} className={choice(false)} onClick={() => setRaw(false)}>
-          Readable
-        </button>
-        <button type="button" aria-pressed={raw} className={choice(true)} onClick={() => setRaw(true)}>
-          Raw
-        </button>
-      </div>
+      <ReadableRawSwitch raw={raw} onChange={setRaw} />
       {raw ? <pre className={PRE}>{stepOutputText(result)}</pre> : <Readable result={result} />}
     </div>
   );
 }
+
+/** The Readable / Raw switch above a result. */
+export function ReadableRawSwitch({ raw, onChange }: { raw: boolean; onChange: (raw: boolean) => void }) {
+  const choice = (on: boolean) => cn("rounded px-2 py-0.5 text-meta outline-offset-2 outline-clay focus-visible:outline-2", raw === on ? "bg-surface text-ink" : "text-muted hover:text-ink");
+  return (
+    <div role="group" aria-label="Show the result as" className="flex w-fit gap-1 rounded-md border border-line p-0.5">
+      <button type="button" aria-pressed={!raw} className={choice(false)} onClick={() => onChange(false)}>
+        Readable
+      </button>
+      <button type="button" aria-pressed={raw} className={choice(true)} onClick={() => onChange(true)}>
+        Raw
+      </button>
+    </div>
+  );
+}
+
+/** The look of a block of raw text. */
+export const RAW_TEXT = PRE;

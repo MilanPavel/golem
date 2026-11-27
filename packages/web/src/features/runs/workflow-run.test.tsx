@@ -13,7 +13,7 @@ import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { RunRow } from "./runs-list.tsx";
 import { RUNS_NOW } from "./sample.ts";
 import { WorkflowRunView, type WorkflowRunViewProps } from "./workflow-run-view.tsx";
-import { SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
+import { SAMPLE_BRIEFING_PATH, SAMPLE_FILE_CUT, SAMPLE_FILE_READ, SAMPLE_RESULTS, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_FAILED, SAMPLE_RUN_FILE, SAMPLE_RUN_LOOP, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_REVIEW, SAMPLE_RUN_RUNNING, SAMPLE_RUN_TEXT, SAMPLE_RUN_TOOL_ASK, WORKFLOW_RUN_NOW, type WorkflowRunSample } from "./workflow-sample.ts";
 
 const noContrast = { rules: { "color-contrast": { enabled: false } } };
 const CONNECTED: ConnectionSnapshot = { state: { status: "connected" }, daemonVersion: "0.9.1" };
@@ -42,39 +42,141 @@ function view(sample: WorkflowRunSample, extra: Partial<WorkflowRunViewProps> = 
   return { props, ...render(<WorkflowRunView {...props} />) };
 }
 
-test("the steps list shows each step's state, time, model, cost and the line of its output", () => {
+const rowsOf = () => Array.from(document.querySelectorAll("[data-step-row]"));
+
+test("the steps list is vertical: each step's state, time and the line of its output", () => {
   view(SAMPLE_RUN_DONE);
-  const rows = screen.getAllByRole("listitem").filter((item) => item.hasAttribute("data-step-row"));
+  const rows = rowsOf();
   expect(rows).toHaveLength(5);
-  expect(within(rows[1]!).getByText("summarise")).toBeTruthy();
-  expect(rows[1]!.textContent).toContain("llm · deepseek/deepseek-chat · $0.01");
+  expect(within(rows[1] as HTMLElement).getByText("summarise")).toBeTruthy();
+  expect(rows[1]!.textContent).toContain("37s");
   expect(rows[1]!.textContent).toContain("Twelve open pull requests.");
   expect(rows[0]!.textContent).toContain("12 pull requests");
+  expect(rows[0]!.textContent).toContain("3s");
   // A worker shows its diff, a review its answer.
   expect(rows[3]!.textContent).toContain("2 files · +6 −2 · checks passed");
   expect(rows[4]!.textContent).toContain("edited and approved");
 });
 
-test("a row opens its whole output, and an agent step opens its chat", async () => {
+test("one bar and a count say how far the run is", () => {
+  view(SAMPLE_RUN_RUNNING);
+  expect(screen.getByText("2 of 3 steps")).toBeTruthy();
+  expect(screen.getByText(/· reviewer/)).toBeTruthy();
+  const bar = screen.getByRole("progressbar");
+  expect(bar.getAttribute("aria-valuenow")).toBe("2");
+  expect(bar.getAttribute("aria-valuemax")).toBe("3");
+  expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+});
+
+test("the header has the workflow's title with its state, and the goal under it", () => {
+  view(SAMPLE_RUN_TEXT);
+  const heading = within(screen.getAllByRole("heading", { level: 1 })[0]!);
+  expect(heading.getByText("Morning briefing")).toBeTruthy();
+  expect(heading.getByText("done")).toBeTruthy();
+  expect(screen.getByText("Tell me what needs me today.")).toBeTruthy();
+  expect(screen.getAllByText("3 things need you").length).toBeGreaterThan(0);
+});
+
+test("a step opens its output in the place of the result, with its chat", async () => {
   const user = userEvent.setup();
   const { props } = view(SAMPLE_RUN_DONE);
-  const summarise = screen.getByRole("button", { name: /summarise/ });
-  expect(summarise.getAttribute("aria-expanded")).toBe("false");
-  await user.click(summarise);
-  expect(summarise.getAttribute("aria-expanded")).toBe("true");
+  await user.click(screen.getByRole("button", { name: /^summarise/ }));
   expect(screen.getByLabelText("Output of summarise").textContent).toContain("Five wait on a review from you.");
   await user.click(screen.getByRole("button", { name: /^reviewer/ }));
   await user.click(screen.getByRole("link", { name: "Open chat" }));
   expect(props.onNavigate).toHaveBeenCalledWith("/s/s_reviewer?lead=s_digest");
+  await user.click(screen.getByRole("button", { name: /^Result/ }));
+  expect(screen.getByRole("group", { name: "What it did" })).toBeTruthy();
 });
 
-test("a worker row unfolds its copy, its changes and its checks", async () => {
+test("a worker step shows its copy, its changes and its checks", async () => {
   view(SAMPLE_RUN_DONE);
-  await userEvent.setup().click(screen.getByRole("button", { name: /worker · typer/ }));
-  const open = within(document.querySelector("[data-row-open]:not([hidden])") as HTMLElement);
+  await userEvent.setup().click(screen.getByRole("button", { name: /^worker · typer/ }));
+  const open = within(screen.getByLabelText("Output of worker · typer"));
   expect(open.getByText("wf-typer-1")).toBeTruthy();
   expect(open.getByText("2 files, +6 −2")).toBeTruthy();
   expect(open.getByText("passed")).toBeTruthy();
+});
+
+test("a run with no result says what it did, from its tool, review and notify steps", () => {
+  view(SAMPLE_RUN_DONE);
+  const did = within(screen.getByRole("group", { name: "What it did" }));
+  expect(did.getByText("list_pull_requests")).toBeTruthy();
+  expect(did.getByText("12 pull requests")).toBeTruthy();
+  expect(did.getByText("Send this digest?")).toBeTruthy();
+  expect(did.getByText("edited and approved · Hi team, twelve pull requests are open.")).toBeTruthy();
+  expect(did.queryByText("summarise")).toBeNull();
+});
+
+test("a text result is drawn as Markdown, with Readable and Raw", async () => {
+  view(SAMPLE_RUN_TEXT);
+  const result = within(screen.getByRole("group", { name: "Result: Morning briefing" }));
+  expect(result.getByRole("heading", { name: "Morning briefing" })).toBeTruthy();
+  expect(result.getAllByRole("listitem")).toHaveLength(2);
+  await userEvent.setup().click(result.getByRole("button", { name: "Raw" }));
+  expect(result.getByText(/^# Morning briefing/)).toBeTruthy();
+});
+
+test("a table and a link result come out by their kind, the others as tabs", async () => {
+  const user = userEvent.setup();
+  view(SAMPLE_RUN_OUTPUTS);
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Steps", "Trace", "Report", "Failing checks", "Pull request"]);
+  await user.click(screen.getByRole("tab", { name: "Failing checks" }));
+  expect(within(screen.getByRole("group", { name: "Result: Failing checks" })).getAllByRole("row")).toHaveLength(4);
+  await user.click(screen.getByRole("tab", { name: "Pull request" }));
+  expect(screen.getByRole("link", { name: "https://github.com/golem/golem/pull/1921" })).toBeTruthy();
+});
+
+test("a record and a changes result come out by their kind", () => {
+  const record = SAMPLE_RESULTS.find(([kind]) => kind === "record")![1];
+  const changes = SAMPLE_RESULTS.find(([kind]) => kind === "changes")![1];
+  const { unmount } = view({ ...SAMPLE_RUN_TEXT, run: { ...SAMPLE_RUN_TEXT.run, outputs: [{ title: "State", value: record as never }] } });
+  expect(screen.getByText("not_pushed").nextElementSibling?.textContent).toBe("2");
+  unmount();
+  view({ ...SAMPLE_RUN_TEXT, run: { ...SAMPLE_RUN_TEXT.run, outputs: [{ title: "Work", value: changes as never }] } });
+  expect(screen.getByText("1 file, +6 −2")).toBeTruthy();
+});
+
+test("a run that marked nothing shows what it returned", () => {
+  view({ ...SAMPLE_RUN_DONE, run: { ...SAMPLE_RUN_DONE.run, result: { branch: "main", commits: 3 } } });
+  expect(screen.getByText("commits").nextElementSibling?.textContent).toBe("3");
+});
+
+test("a file result is read through workflow.read_output and its Markdown drawn", async () => {
+  const onReadOutput = vi.fn(async () => SAMPLE_FILE_READ);
+  view(SAMPLE_RUN_FILE, { onReadOutput });
+  const file = within(screen.getByRole("group", { name: "Result: Briefing file" }));
+  expect(await file.findByRole("heading", { name: "Morning briefing" })).toBeTruthy();
+  expect(onReadOutput).toHaveBeenCalledWith(0);
+  expect(file.getByText(SAMPLE_BRIEFING_PATH)).toBeTruthy();
+  expect(file.queryByRole("status")).toBeNull();
+});
+
+test("a file that was cut says so, and one that cannot be read says why", async () => {
+  const { unmount } = view(SAMPLE_RUN_FILE, { onReadOutput: vi.fn(async () => SAMPLE_FILE_CUT) });
+  expect((await screen.findByRole("status")).textContent).toContain("cut here");
+  expect(screen.getByRole("status").textContent).toContain("482,113 bytes");
+  unmount();
+  view(SAMPLE_RUN_FILE, { onReadOutput: vi.fn(async () => Promise.reject(new Error("a file in a secret folder is not read"))) });
+  expect(await screen.findByText("a file in a secret folder is not read")).toBeTruthy();
+  expect(screen.getByText(SAMPLE_BRIEFING_PATH)).toBeTruthy();
+});
+
+test("a loop of thirty steps is one row, as long as the page of nine", async () => {
+  const user = userEvent.setup();
+  view(SAMPLE_RUN_LOOP);
+  expect(rowsOf()).toHaveLength(2);
+  const fold = screen.getByRole("button", { name: /^Read each feed, 26 of 30/ });
+  expect(fold.getAttribute("aria-expanded")).toBe("false");
+  await user.click(fold);
+  // Only the items that work or failed: three working and one failed.
+  const items = within(document.querySelector("[data-fold]") as HTMLElement).getAllByRole("button", { name: /feed-/ });
+  expect(items).toHaveLength(4);
+  await user.click(screen.getByRole("button", { name: "Show all 30" }));
+  expect(within(document.querySelector("[data-fold]") as HTMLElement).getAllByRole("button", { name: /feed-/ })).toHaveLength(30);
+  // One of its items is picked like a step.
+  await user.click(screen.getByRole("button", { name: /feed-5\.example\.com, failed/ }));
+  expect(screen.getByText("the feed did not answer", { selector: "p" })).toBeTruthy();
 });
 
 test("a review shows its draft in a field, and Approve answers without text", async () => {
@@ -155,6 +257,32 @@ test("a failed run shows its error and resumes from the header and from the fail
   expect(props.onResume).toHaveBeenCalledTimes(2);
 });
 
+test("a failed run offers Why did this fail?: it asks golem with the failed step and shows the answer", async () => {
+  const user = userEvent.setup();
+  const onAsk = vi.fn(async () => "The sign-in ran out. Sign in again and resume.");
+  view(SAMPLE_RUN_FAILED, { onAsk });
+  await user.click(screen.getByRole("button", { name: "Why did this fail?" }));
+  expect(onAsk).toHaveBeenCalledTimes(1);
+  const question = (onAsk.mock.calls[0] as unknown as [string])[0];
+  expect(question).toContain("Why did this fail?");
+  expect(question).toContain('"list_pull_requests" failed with: tool mcp__github__list_pull_requests: needs sign-in');
+  const answer = within(await screen.findByRole("group", { name: "Answer" }));
+  expect(answer.getByText("The sign-in ran out. Sign in again and resume.")).toBeTruthy();
+  expect(answer.getByText("Answer · nothing is changed")).toBeTruthy();
+  await user.click(answer.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("group", { name: "Answer" })).toBeNull();
+});
+
+test("Why did this fail? says why when golem cannot answer, and a run that did not fail does not offer it", async () => {
+  const user = userEvent.setup();
+  const { unmount } = view(SAMPLE_RUN_FAILED, { onAsk: vi.fn(async () => Promise.reject(new Error("no model for this folder"))) });
+  await user.click(screen.getByRole("button", { name: "Why did this fail?" }));
+  expect(await screen.findByText("no model for this folder")).toBeTruthy();
+  unmount();
+  view(SAMPLE_RUN_DONE, { onAsk: vi.fn(async () => "") });
+  expect(screen.queryByRole("button", { name: "Why did this fail?" })).toBeNull();
+});
+
 test("a cancelled and a done run offer neither Cancel nor Resume", () => {
   for (const sample of [SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE]) {
     const { unmount } = view(sample);
@@ -171,8 +299,8 @@ test("the Trace tab holds what the page gives it", async () => {
 });
 
 test("every state passes axe", async () => {
-  for (const sample of [SAMPLE_RUN_RUNNING, SAMPLE_RUN_REVIEW, SAMPLE_RUN_TOOL_ASK, SAMPLE_RUN_FAILED, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE]) {
-    const { container, unmount } = view(sample);
+  for (const sample of [SAMPLE_RUN_RUNNING, SAMPLE_RUN_REVIEW, SAMPLE_RUN_TOOL_ASK, SAMPLE_RUN_FAILED, SAMPLE_RUN_CANCELLED, SAMPLE_RUN_DONE, SAMPLE_RUN_TEXT, SAMPLE_RUN_FILE, SAMPLE_RUN_OUTPUTS, SAMPLE_RUN_LOOP]) {
+    const { container, unmount } = view(sample, { onReadOutput: async () => SAMPLE_FILE_READ });
     expect((await axe.run(container, noContrast)).violations).toEqual([]);
     // And with every row open.
     for (const button of container.querySelectorAll("button[aria-expanded=false]")) fireEvent.click(button);
@@ -233,6 +361,17 @@ test("/runs/:id reads workflow.status, answers a review through the client, and 
   await waitFor(() => expect(fake.raw.workflowStatus.mock.calls.length).toBeGreaterThan(before));
   await waitFor(() => expect(screen.queryByRole("region", { name: "Review, Send this digest?" })).toBeNull());
   expect(within(screen.getByRole("heading", { level: 1 })).getByText("done")).toBeTruthy();
+});
+
+test("/runs/:id asks golem about a failed run through the workflow's own ask, with the file's text", async () => {
+  const fake = mount("/runs/wr_1", (one) => {
+    one.raw.workflowStatus.mockResolvedValue({ ...SAMPLE_RUN_FAILED, run: { ...SAMPLE_RUN_FAILED.run, workflow_run_id: "wr_1" } });
+    one.raw.getWorkflow.mockResolvedValue({ workflow: { id: SAMPLE_RUN_FAILED.run.workflow_id }, steps: [], code: "print(1)", code_hash: "h" } as never);
+    one.raw.proposeWorkflow.mockResolvedValue({ code: "print(1)", note: "", answer: "Sign in again.", kind: "answer", model: "m" } as never);
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Why did this fail?" }));
+  expect(await screen.findByText("Sign in again.")).toBeTruthy();
+  expect(fake.raw.proposeWorkflow).toHaveBeenCalledWith(SAMPLE_RUN_FAILED.run.workflow_id, "print(1)", expect.stringContaining("Why did this fail?"), undefined);
 });
 
 test("/runs/:id says so when the run does not exist", async () => {

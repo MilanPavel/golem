@@ -96,6 +96,7 @@ import type { RoutinePreviewResult } from "../../protocol/gen/routine-preview-re
 import type { RoutineRemoveResult } from "../../protocol/gen/routine-remove-result.ts";
 import type { RoutineRunResult } from "../../protocol/gen/routine-run-result.ts";
 import type { WorkflowCancelResult } from "../../protocol/gen/workflow-cancel-result.ts";
+import type { WorkflowReadOutputResult } from "../../protocol/gen/workflow-read-output-result.ts";
 import type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 import type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
 import type { WorkflowCheckResult } from "../../protocol/gen/workflow-check-result.ts";
@@ -414,6 +415,10 @@ export function isWorkflowStatusResult(value: unknown): value is WorkflowStatusR
 
 export function isWorkflowCancelResult(value: unknown): value is WorkflowCancelResult {
   return isRecord(value) && typeof value["cancelled"] === "boolean";
+}
+
+export function isWorkflowReadOutputResult(value: unknown): value is WorkflowReadOutputResult {
+  return isRecord(value) && typeof value["path"] === "string" && typeof value["text"] === "string" && typeof value["size"] === "number";
 }
 
 export function isWorkflowResumeResult(value: unknown): value is WorkflowResumeResult {

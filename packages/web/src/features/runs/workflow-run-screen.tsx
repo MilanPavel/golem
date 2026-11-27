@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { actionErrorText } from "../../store/errors.ts";
-import { useNavigate, usePageActions, useWorkflowStatus } from "../../store/page-context.tsx";
+import { useNavigate, usePageActions, useWorkflowReader, useWorkflowStatus } from "../../store/page-context.tsx";
 import { helperPath, sessionPath } from "../../store/router.ts";
 import { TraceBody, useTraceData } from "../trace/trace-screen.tsx";
 import { useNow } from "../sessions/use-now.ts";
@@ -25,6 +25,7 @@ function RunTrace({ sessionId }: { sessionId: string }) {
 export function WorkflowRunScreen({ id }: { id: string }) {
   const query = useWorkflowStatus(id);
   const actions = usePageActions();
+  const readWorkflow = useWorkflowReader();
   const navigate = useNavigate();
   const status = query.data?.run.status;
   // A run that moves shows its seconds; one that has stopped does not need the tick.
@@ -51,6 +52,13 @@ export function WorkflowRunScreen({ id }: { id: string }) {
         onCancel={() => actions.cancelWorkflow(id)}
         onResume={() => actions.resumeWorkflow(id)}
         onAnswer={(key, verdict, text) => actions.answerWorkflowReview(id, key, verdict, text)}
+        onReadOutput={(index) => actions.readWorkflowOutput(id, index)}
+        onAsk={async (question) => {
+          // The same ask the workflow page has: one model call over the file, answered, nothing written.
+          const workflow = await readWorkflow(run.workflow_id);
+          const reply = await actions.proposeWorkflow(run.workflow_id, workflow.code ?? "", question);
+          return reply.answer ?? reply.note;
+        }}
         trace={sessionId === null || sessionId === undefined ? undefined : <RunTrace sessionId={sessionId} />}
       />
     </Frame>
