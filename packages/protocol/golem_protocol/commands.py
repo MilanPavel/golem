@@ -5546,6 +5546,11 @@ class FsRevealParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     path: str = Field(min_length=1)
+    workflow_run_id: str | None = Field(default=None, min_length=1)
+    output_index: int | None = Field(default=None, ge=0)
+    """With ``workflow_run_id``: ``path`` is the file that output of the run marked with
+    ``run.output`` (as ``workflow.read_output`` reads it). It is shown if it is that file, an
+    existing file outside the folders golem keeps private, wherever it is. Both or neither."""
 
 
 class FsRevealResult(BaseModel):
@@ -6513,6 +6518,9 @@ class WorkflowRunInfo(BaseModel):
     """How many steps (rows of the list, a repeating step being one) the run is expected to have
     in all, read from the workflow file's outline. Null when it cannot be known: the file cannot
     be read, a step may be skipped, or the run is over."""
+    usual_ms: int | None = Field(default=None, ge=0)
+    """How long a run of this workflow usually takes: the median of the last five runs that
+    finished (``done``), in milliseconds. Null when fewer than two have."""
 
 
 class WorkflowStepInfo(BaseModel):
@@ -6550,6 +6558,10 @@ class WorkflowStepInfo(BaseModel):
     of: int | None = Field(default=None, ge=1)
     """How many steps of this title the run has in all (``run.step(of=)``), when the workflow
     said. Null when it did not: the page then counts the ones it has seen, and says so."""
+    progress: str | None = None
+    """The text so far of a running step that sends progress (the answer of a ``run.llm`` as it
+    is written, or the last ``run.progress``). Kept in memory while the step runs, never saved;
+    null when it has none. It lets a client that opens the run midway show what came so far."""
 
 
 class WorkflowStatusParams(BaseModel):
@@ -6743,6 +6755,23 @@ class WorkflowStepEvent(BaseModel):
     """The one-line form of the result, for a list. Always sent with a result."""
     of: int | None = Field(default=None, ge=1)
     """As ``WorkflowStepInfo.of``."""
+
+
+class WorkflowStepProgressEvent(BaseModel):
+    """The params of ``workflow.step.progress``: the text of a running step, as it comes.
+
+    ``text`` is the text so far, not a delta (a client that missed one event needs no other),
+    cut to its last 8000 characters. It is sent at most four times a second for a step, and
+    once more with ``done`` true when the step ends (``text`` is then the last text, and the
+    client drops what it kept). A model that cannot stream sends nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    text: str = ""
+    done: bool = False
 
 
 class WorkflowOutputEvent(BaseModel):
@@ -7849,6 +7878,7 @@ __all__ = [
     "WorkflowStepEvent",
     "WorkflowStepInfo",
     "WorkflowStepKind",
+    "WorkflowStepProgressEvent",
     "WorkflowStepStatus",
     "WorkflowTriggerInfo",
     "WorkflowTriggerKind",

@@ -19,6 +19,7 @@ export type StepsExpected = number | null;
 export type Summary1 = string | null;
 export type Title1 = string | null;
 export type Trigger = string;
+export type UsualMs = number | null;
 export type WorkflowId = string;
 export type WorkflowRunId = string;
 export type Attempts = number;
@@ -34,6 +35,7 @@ export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'sk
 export type Line = string | null;
 export type Model = string | null;
 export type Of = number | null;
+export type Progress = string | null;
 export type StartedAt1 = string | null;
 export type Status1 = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'in_doubt';
 export type Title2 = string;
@@ -94,6 +96,7 @@ export interface WorkflowRunInfo {
   summary?: Summary1;
   title?: Title1;
   trigger: Trigger;
+  usual_ms?: UsualMs;
   workflow_id: WorkflowId;
   workflow_run_id: WorkflowRunId;
 }
@@ -144,6 +147,7 @@ export interface WorkflowStepInfo {
   line?: Line;
   model?: Model;
   of?: Of;
+  progress?: Progress;
   result?: Result1;
   started_at?: StartedAt1;
   status: Status1;

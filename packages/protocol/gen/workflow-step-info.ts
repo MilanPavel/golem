@@ -13,6 +13,7 @@ export type Kind = 'step' | 'agent' | 'review' | 'notify' | 'llm' | 'tool' | 'sk
 export type Line = string | null;
 export type Model = string | null;
 export type Of = number | null;
+export type Progress = string | null;
 export type StartedAt = string | null;
 export type Status = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'skipped' | 'in_doubt';
 export type Title = string;
@@ -39,6 +40,7 @@ export interface WorkflowStepInfo {
   line?: Line;
   model?: Model;
   of?: Of;
+  progress?: Progress;
   result?: Result;
   started_at?: StartedAt;
   status: Status;

@@ -202,6 +202,19 @@
           "title": "Trigger",
           "type": "string"
         },
+        "usual_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usual Ms"
+        },
         "workflow_id": {
           "minLength": 1,
           "title": "Workflow Id",
@@ -373,6 +386,18 @@
           ],
           "default": null,
           "title": "Of"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
         },
         "result": {
           "default": null,

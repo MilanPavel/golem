@@ -9559,14 +9559,20 @@ public struct EntryElement: Codable {
 /// ``HelloResult.local_ui``).
 // MARK: - FSRevealParams
 public struct FSRevealParams: Codable {
+    public let outputIndex: Int?
     public let path: String
+    public let workflowRunID: String?
 
     public enum CodingKeys: String, CodingKey {
+        case outputIndex = "output_index"
         case path = "path"
+        case workflowRunID = "workflow_run_id"
     }
 
-    public init(path: String) {
+    public init(outputIndex: Int?, path: String, workflowRunID: String?) {
+        self.outputIndex = outputIndex
         self.path = path
+        self.workflowRunID = workflowRunID
     }
 }
 
@@ -34078,6 +34084,7 @@ public struct WorkflowResumeResultRun: Codable {
     public let summary: String?
     public let title: String?
     public let trigger: String
+    public let usualMS: Int?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -34096,11 +34103,12 @@ public struct WorkflowResumeResultRun: Codable {
         case summary = "summary"
         case title = "title"
         case trigger = "trigger"
+        case usualMS = "usual_ms"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [PurpleWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [PurpleWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
@@ -34115,6 +34123,7 @@ public struct WorkflowResumeResultRun: Codable {
         self.summary = summary
         self.title = title
         self.trigger = trigger
+        self.usualMS = usualMS
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
     }
@@ -34220,6 +34229,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
     public let summary: String?
     public let title: String?
     public let trigger: String
+    public let usualMS: Int?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -34238,11 +34248,12 @@ public struct WorkflowReviewAnswerResultRun: Codable {
         case summary = "summary"
         case title = "title"
         case trigger = "trigger"
+        case usualMS = "usual_ms"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [FluffyWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [FluffyWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
@@ -34257,6 +34268,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
         self.summary = summary
         self.title = title
         self.trigger = trigger
+        self.usualMS = usualMS
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
     }
@@ -34618,6 +34630,7 @@ public struct WorkflowRunInfo: Codable {
     public let summary: String?
     public let title: String?
     public let trigger: String
+    public let usualMS: Int?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -34636,11 +34649,12 @@ public struct WorkflowRunInfo: Codable {
         case summary = "summary"
         case title = "title"
         case trigger = "trigger"
+        case usualMS = "usual_ms"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [WorkflowRunInfoOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [WorkflowRunInfoOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
@@ -34655,6 +34669,7 @@ public struct WorkflowRunInfo: Codable {
         self.summary = summary
         self.title = title
         self.trigger = trigger
+        self.usualMS = usualMS
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
     }
@@ -35570,6 +35585,7 @@ public struct WorkflowStatusResultRun: Codable {
     public let summary: String?
     public let title: String?
     public let trigger: String
+    public let usualMS: Int?
     public let workflowID: String
     public let workflowRunID: String
 
@@ -35588,11 +35604,12 @@ public struct WorkflowStatusResultRun: Codable {
         case summary = "summary"
         case title = "title"
         case trigger = "trigger"
+        case usualMS = "usual_ms"
         case workflowID = "workflow_id"
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [TentacledWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [TentacledWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
@@ -35607,6 +35624,7 @@ public struct WorkflowStatusResultRun: Codable {
         self.summary = summary
         self.title = title
         self.trigger = trigger
+        self.usualMS = usualMS
         self.workflowID = workflowID
         self.workflowRunID = workflowRunID
     }
@@ -35657,6 +35675,7 @@ public struct StepClass: Codable {
     public let line: String?
     public let model: String?
     public let of: Int?
+    public let progress: String?
     public let result: JSONAny?
     public let startedAt: String?
     public let status: StepStatus
@@ -35676,13 +35695,14 @@ public struct StepClass: Codable {
         case line = "line"
         case model = "model"
         case of = "of"
+        case progress = "progress"
         case result = "result"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, result: JSONAny?, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, progress: String?, result: JSONAny?, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
         self.costUsd = costUsd
@@ -35696,6 +35716,7 @@ public struct StepClass: Codable {
         self.line = line
         self.model = model
         self.of = of
+        self.progress = progress
         self.result = result
         self.startedAt = startedAt
         self.status = status
@@ -36144,6 +36165,7 @@ public struct WorkflowStepInfo: Codable {
     public let line: String?
     public let model: String?
     public let of: Int?
+    public let progress: String?
     public let result: JSONAny?
     public let startedAt: String?
     public let status: StepStatus
@@ -36163,13 +36185,14 @@ public struct WorkflowStepInfo: Codable {
         case line = "line"
         case model = "model"
         case of = "of"
+        case progress = "progress"
         case result = "result"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, result: JSONAny?, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, progress: String?, result: JSONAny?, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
         self.costUsd = costUsd
@@ -36183,10 +36206,91 @@ public struct WorkflowStepInfo: Codable {
         self.line = line
         self.model = model
         self.of = of
+        self.progress = progress
         self.result = result
         self.startedAt = startedAt
         self.status = status
         self.title = title
+    }
+}
+
+/// The params of ``workflow.step.progress``: the text of a running step, as it comes.
+///
+/// ``text`` is the text so far, not a delta (a client that missed one event needs no other),
+/// cut to its last 8000 characters. It is sent at most four times a second for a step, and
+/// once more with ``done`` true when the step ends (``text`` is then the last text, and the
+/// client drops what it kept). A model that cannot stream sends nothing.
+// MARK: - WorkflowStepProgressEvent
+public struct WorkflowStepProgressEvent: Codable {
+    public let done: Bool?
+    public let key: String
+    public let text: String?
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case done = "done"
+        case key = "key"
+        case text = "text"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(done: Bool?, key: String, text: String?, workflowRunID: String) {
+        self.done = done
+        self.key = key
+        self.text = text
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.step.progress``. Not stored.
+// MARK: - WorkflowStepProgressNotification
+public struct WorkflowStepProgressNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowStepProgressNotificationMethod?
+    public let params: WorkflowStepProgressNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowStepProgressNotificationMethod?, params: WorkflowStepProgressNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowStepProgressNotificationMethod: String, Codable {
+    case workflowStepProgress = "workflow.step.progress"
+}
+
+/// The params of ``workflow.step.progress``: the text of a running step, as it comes.
+///
+/// ``text`` is the text so far, not a delta (a client that missed one event needs no other),
+/// cut to its last 8000 characters. It is sent at most four times a second for a step, and
+/// once more with ``done`` true when the step ends (``text`` is then the last text, and the
+/// client drops what it kept). A model that cannot stream sends nothing.
+// MARK: - WorkflowStepProgressNotificationParams
+public struct WorkflowStepProgressNotificationParams: Codable {
+    public let done: Bool?
+    public let key: String
+    public let text: String?
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case done = "done"
+        case key = "key"
+        case text = "text"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(done: Bool?, key: String, text: String?, workflowRunID: String) {
+        self.done = done
+        self.key = key
+        self.text = text
+        self.workflowRunID = workflowRunID
     }
 }
 

@@ -38,6 +38,7 @@ from golem_protocol.commands import (
     WorkflowOutputEvent,
     WorkflowRunEvent,
     WorkflowStepEvent,
+    WorkflowStepProgressEvent,
 )
 from golem_protocol.events import ChatEvent
 
@@ -505,6 +506,16 @@ class WorkflowStepInDoubtNotification(BaseModel):
     params: WorkflowStepEvent
 
 
+class WorkflowStepProgressNotification(BaseModel):
+    """Server → every connection: ``workflow.step.progress``. Not stored."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    jsonrpc: Literal["2.0"] = "2.0"
+    method: Literal["workflow.step.progress"] = "workflow.step.progress"
+    params: WorkflowStepProgressEvent
+
+
 class WorkflowOutputAddedNotification(BaseModel):
     """Server → every connection: ``workflow.output.added``. Not stored.
 
@@ -564,6 +575,7 @@ __all__ = [
     "WorkflowStepDoneNotification",
     "WorkflowStepFailedNotification",
     "WorkflowStepInDoubtNotification",
+    "WorkflowStepProgressNotification",
     "WorkflowStepStartedNotification",
     "WorkflowStepWaitingNotification",
 ]

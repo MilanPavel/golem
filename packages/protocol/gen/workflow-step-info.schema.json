@@ -149,6 +149,18 @@
       "default": null,
       "title": "Of"
     },
+    "progress": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Progress"
+    },
     "result": {
       "default": null,
       "title": "Result"

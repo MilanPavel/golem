@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "The params of ``workflow.step.progress``: the text of a running step, as it comes.\n\n``text`` is the text so far, not a delta (a client that missed one event needs no other),\ncut to its last 8000 characters. It is sent at most four times a second for a step, and\nonce more with ``done`` true when the step ends (``text`` is then the last text, and the\nclient drops what it kept). A model that cannot stream sends nothing.",
+  "properties": {
+    "done": {
+      "default": false,
+      "title": "Done",
+      "type": "boolean"
+    },
+    "key": {
+      "minLength": 1,
+      "title": "Key",
+      "type": "string"
+    },
+    "text": {
+      "default": "",
+      "title": "Text",
+      "type": "string"
+    },
+    "workflow_run_id": {
+      "minLength": 1,
+      "title": "Workflow Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_run_id",
+    "key"
+  ],
+  "title": "WorkflowStepProgressEvent",
+  "type": "object"
+}

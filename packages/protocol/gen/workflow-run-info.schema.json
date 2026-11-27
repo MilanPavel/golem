@@ -167,6 +167,19 @@
       "title": "Trigger",
       "type": "string"
     },
+    "usual_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usual Ms"
+    },
     "workflow_id": {
       "minLength": 1,
       "title": "Workflow Id",

@@ -14,6 +14,7 @@ export type StepsExpected = number | null;
 export type Summary1 = string | null;
 export type Title1 = string | null;
 export type Trigger = string;
+export type UsualMs = number | null;
 export type WorkflowId = string;
 export type WorkflowRunId = string;
 
@@ -47,6 +48,7 @@ export interface WorkflowRunInfo {
   summary?: Summary1;
   title?: Title1;
   trigger: Trigger;
+  usual_ms?: UsualMs;
   workflow_id: WorkflowId;
   workflow_run_id: WorkflowRunId;
 }
