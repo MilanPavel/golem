@@ -17,14 +17,17 @@ import {
   SORTED_ON_PAGE,
   type DataExtensionName,
   EXPORT_BUTTON,
+  SAVE_QUERY_BUTTON,
+  suggestQueryName,
   type ResultCell,
 } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
 import { Button } from "../../ui/button.tsx";
-import { dataErrorText, type DataExportParams, type DataExportResult, type DataResult, type DataResultPageParams, type ToolTable } from "../../store/data.ts";
+import { dataErrorText, type DataExportParams, type DataExportResult, type DataResult, type DataResultPageParams, type DataSaveQueryParams, type ToolTable } from "../../store/data.ts";
 import { Code } from "../../ui/code.tsx";
 import { ExportDialog } from "./export-dialog.tsx";
 import { ResultChart } from "./result-chart.tsx";
+import { SaveQueryDialog } from "./query-dialogs.tsx";
 
 type Sort = { column: number; descending: boolean };
 type Page = { offset: number; rows: readonly (readonly ResultCell[])[]; total: number };
@@ -52,7 +55,15 @@ function Cell({ value, type, open, onToggle }: { value: ResultCell; type: string
 }
 
 /** The state a table can open in. For the gallery and tests; a person never sets it. */
-export type ResultTableInitial = { page?: Page; size?: number; sort?: Sort; view?: "table" | "chart"; showStub?: boolean; error?: string };
+export type ResultTableInitial = { page?: Page; size?: number; sort?: Sort; view?: "table" | "chart"; showStub?: boolean; error?: string; saving?: boolean; saved?: boolean };
+
+/** What the Save query button needs: where the source keeps queries, the question to name it from, and the call. */
+export type ResultTableSave = {
+  scope: "builtin" | "user" | "project";
+  /** The question the person asked, to suggest a name from. */
+  question: string | null;
+  onSave: (params: DataSaveQueryParams) => Promise<unknown>;
+};
 
 /**
  * A kept query result: its columns with their types, a page of rows, paging through the daemon, a sort of
@@ -65,6 +76,9 @@ export function ResultTable({
   onPage,
   onExport,
   onInstallExtension,
+  save,
+  heading,
+  onClose,
   initial,
 }: {
   table: ToolTable;
@@ -72,6 +86,12 @@ export function ResultTable({
   onPage?: (params: DataResultPageParams) => Promise<DataResult>;
   onExport?: (params: DataExportParams) => Promise<DataExportResult>;
   onInstallExtension?: (name: DataExtensionName) => Promise<void>;
+  /** Without it, or when the table has no SQL (an older result), there is no Save query button. */
+  save?: ResultTableSave;
+  /** Replaces the line above the table. */
+  heading?: string;
+  /** Adds a ✕ that closes the table. */
+  onClose?: () => void;
   initial?: ResultTableInitial;
 }) {
   const ids = useId();
@@ -85,6 +105,9 @@ export function ResultTable({
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [showStub, setShowStub] = useState(initial?.showStub ?? false);
   const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(initial?.saving ?? false);
+  const [saved, setSaved] = useState(initial?.saved ?? false);
+  const canSave = save !== undefined && table.sql !== undefined && table.sql !== null && table.sql !== "";
   const latest = useRef(0);
 
   const pick = useMemo(() => pickChart(table.columns), [table.columns]);
@@ -124,8 +147,8 @@ export function ResultTable({
   return (
     <div data-result={table.result_id} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Code tone="muted" className="text-meta">{resultHeader({ ...table })}</Code>
-        {pick === null && onExport === undefined ? null : (
+        <Code tone="muted" className="text-meta">{heading ?? resultHeader({ ...table })}</Code>
+        {pick === null && onExport === undefined && !canSave && onClose === undefined ? null : (
           <div className="ml-auto flex items-center gap-2">
           {pick === null ? null : (
             <span role="group" aria-label="Show as" className="flex overflow-hidden rounded-md border border-line-strong text-meta">
@@ -142,10 +165,21 @@ export function ResultTable({
               ))}
             </span>
           )}
+          {canSave ? (
+            <Button size="sm" aria-haspopup="dialog" className="border-clay text-clay-ink" onClick={() => setSaving(true)}>
+              <span aria-hidden="true">{saved ? "★ " : "☆ "}</span>
+              {saved ? "Saved" : SAVE_QUERY_BUTTON}
+            </Button>
+          ) : null}
           {onExport === undefined ? null : (
             <Button size="sm" aria-haspopup="dialog" onClick={() => setExporting(true)}>
               <span aria-hidden="true">⤓ </span>
               {EXPORT_BUTTON}
+            </Button>
+          )}
+          {onClose === undefined ? null : (
+            <Button size="sm" kind="ghost" aria-label="Close the result" onClick={onClose}>
+              <span aria-hidden="true">✕</span>
             </Button>
           )}
           </div>
@@ -292,6 +326,20 @@ export function ResultTable({
               <Code tone="inherit">{modelSawText({ ...table })}</Code>
             </pre> : null}
         </div>
+      ) : null}
+      {canSave && save !== undefined && table.sql !== undefined && table.sql !== null ? (
+        <SaveQueryDialog
+          open={saving}
+          source={table.source}
+          scope={save.scope}
+          sql={table.sql}
+          suggested={suggestQueryName(save.question)}
+          onSave={async (params) => {
+            await save.onSave(params);
+            setSaved(true);
+          }}
+          onClose={() => setSaving(false)}
+        />
       ) : null}
       {onExport === undefined ? null : (
         <ExportDialog

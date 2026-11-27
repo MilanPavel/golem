@@ -36,7 +36,11 @@ function Story({ title, theme, source, described, tab, notes = NOTES_READY, desc
         tab={shown}
         onTab={setShown}
         onAsk={() => {}}
-        onRun={() => {}}
+        onAskQuery={() => {}}
+        onRunQuery={() => Promise.reject(new Error("not in the gallery"))}
+        onTryQuery={() => Promise.reject(new Error("not in the gallery"))}
+        onSaveQuery={() => Promise.resolve()}
+        onRemoveQuery={() => Promise.resolve()}
         onLoadProfile={(table) => Promise.resolve(profileOfTable(source.name, described?.tables.find((each) => each.name === table)))}
         onBrowse={() => new Promise(() => {})}
         onAskView={() => {}}

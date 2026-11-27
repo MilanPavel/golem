@@ -182,6 +182,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "data.notes.get": "browser",
     "data.notes.set": "browser",
     "data.notes.draft": "browser",
+    "data.queries.save": "browser",
+    "data.queries.remove": "browser",
     "agents.list": "browser",
     "agents.get": "browser",
     "agents.set_wish": "browser",

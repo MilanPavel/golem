@@ -930,6 +930,8 @@ class ToolTable(BaseModel):
     rows: list[list[str | int | float | bool | None]]
     total_rows: int = Field(ge=0)
     truncated: bool = False
+    sql: str | None = None
+    """The SQL that made it, so a person can save it as a query."""
 
 
 class ToolCompletedData(BaseModel):

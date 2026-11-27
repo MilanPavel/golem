@@ -64,6 +64,8 @@ test("the panel says so when there are none, when it is loading, and when the da
   expect(screen.getByText(/not available yet/)).toBeTruthy();
 });
 
+const RAN = { result_id: "res_1", source: "bank", columns: [], rows: [], total_rows: 0, truncated: false, elapsed_ms: 1 };
+
 function page(over: Partial<SourcePageProps> = {}): SourcePageProps {
   return {
     source: SAMPLE_BANK,
@@ -72,7 +74,11 @@ function page(over: Partial<SourcePageProps> = {}): SourcePageProps {
     tab: "tables",
     onTab: () => {},
     onAsk: () => {},
-    onRun: () => {},
+    onAskQuery: () => {},
+    onRunQuery: () => Promise.resolve(RAN),
+    onTryQuery: () => Promise.resolve(RAN),
+    onSaveQuery: () => Promise.resolve(),
+    onRemoveQuery: () => Promise.resolve(),
     onLoadProfile: (table) => Promise.resolve(profileOfTable("bank", (over.described ?? SAMPLE_BANK_DESCRIBED).tables.find((each) => each.name === table))),
     onBrowse: () => Promise.resolve({ columns: [], rows: [], total_rows: 0, elapsed_ms: 0 }),
     onAskView: () => {},
@@ -290,11 +296,11 @@ test("Notes and Queries say what to do when the notes methods are missing or the
   expect(screen.getByText("Run it again in one click, use it in a routine, or let golem reuse it.")).toBeTruthy();
 });
 
-test("Queries: Run hands the query to the chat", async () => {
-  const onRun = vi.fn();
-  render(<SourcePage {...page({ tab: "queries", onRun })} />);
-  await userEvent.setup().click(screen.getByRole("button", { name: "Run spending by month" }));
-  expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ name: "spending by month" }));
+test("Queries: Ask in chat hands the query to the chat", async () => {
+  const onAskQuery = vi.fn();
+  render(<SourcePage {...page({ tab: "queries", onAskQuery })} />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Ask in chat: spending by month" }));
+  expect(onAskQuery).toHaveBeenCalledWith(expect.objectContaining({ name: "spending by month" }));
 });
 
 function form(over: Partial<AddDialogProps> = {}) {

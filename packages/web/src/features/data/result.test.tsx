@@ -286,7 +286,11 @@ test("a source page whose source needs an add-on offers the download", async () 
       tab="tables"
       onTab={() => {}}
       onAsk={() => {}}
-      onRun={() => {}}
+      onAskQuery={() => {}}
+      onRunQuery={() => Promise.reject(new Error("no"))}
+      onTryQuery={() => Promise.reject(new Error("no"))}
+      onSaveQuery={() => Promise.resolve()}
+      onRemoveQuery={() => Promise.resolve()}
       onLoadProfile={() => Promise.reject(new Error("no"))}
       onBrowse={() => Promise.reject(new Error("no"))}
       onAskView={() => {}}

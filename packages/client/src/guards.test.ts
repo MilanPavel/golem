@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { asChatEvent } from "./guards.ts";
+import { asChatEvent, isDataQueriesRemoveResult, isDataQueriesSaveResult } from "./guards.ts";
 
 /** Every `type` constant in the generated schema of the `event` notification. */
 function eventTypes(): string[] {
@@ -63,4 +63,12 @@ test("a run.list answer with a workflow run is accepted", async () => {
   const row = { session_id: "s_1", kind: "workflow", origin: "workflow:morning_briefing", status: "succeeded", approvals: 0, steps: 7, workflow_run_id: "wr_1" };
   assert.equal(isRunListResult({ runs: [row] }), true);
   assert.equal(isRunListResult({ runs: [{ ...row, kind: "chat" }] }), false);
+});
+
+test("a saved query's answer has a name and its SQL", () => {
+  assert.equal(isDataQueriesSaveResult({ query: { name: "Totals", sql: "select 1" } }), true);
+  assert.equal(isDataQueriesSaveResult({ query: { name: "Totals" } }), false);
+  assert.equal(isDataQueriesSaveResult({}), false);
+  assert.equal(isDataQueriesRemoveResult({}), true);
+  assert.equal(isDataQueriesRemoveResult(null), false);
 });

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { askText, DATA_NOT_AVAILABLE, runQueryText } from "@golem/view";
+import { askText, DATA_NOT_AVAILABLE, runQueryText, TRY_ROWS } from "@golem/view";
 import { dataErrorText, type DataSavedQuery, type DataSource } from "../../store/data.ts";
 import { NEW_DRAFT_KEY } from "../../store/drafts.ts";
 import { dataPath, settingsPath, type DataTab } from "../../store/router.ts";
@@ -97,6 +97,7 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
   // A project's source is found through its project folder, so nothing else asks before the list has said which.
   const listed = list.data?.status === "ready" ? list.data.data.sources.find((each) => each.name === name) : undefined;
   const project = listed?.project ?? null;
+  const inProject = project === null ? {} : { project };
   const described = useDataDescribe(name, project, null, listed !== undefined);
   const notes = useDataNotes(name, project, listed !== undefined);
   const loadProfile = useDataProfileLoader(name, project);
@@ -157,7 +158,13 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
         tab={tab}
         onTab={(next) => navigate(dataPath(name, next))}
         onAsk={() => askInChat(askText(name))}
-        onRun={(query: DataSavedQuery) => askInChat(runQueryText(name, query.sql))}
+        onAskQuery={(query: DataSavedQuery) => askInChat(runQueryText(name, query.sql))}
+        onRunQuery={(saved) => actions.dataRunQuery({ source: name, saved, ...inProject })}
+        onTryQuery={(sql) => actions.dataRunQuery({ source: name, sql, limit: TRY_ROWS, ...inProject })}
+        onSaveQuery={(params) => actions.dataSaveQuery({ ...params, ...inProject })}
+        onRemoveQuery={(query) => actions.dataRemoveQuery(name, query, project)}
+        onPage={actions.dataResultPage}
+        onExport={actions.dataExportResult}
         onLoadProfile={loadProfile}
         onBrowse={(table, view) => actions.dataBrowse(name, table, view, project)}
         onKeepView={(table, view) => actions.dataBrowseKeep(name, table, view, project)}

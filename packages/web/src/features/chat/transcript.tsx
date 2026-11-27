@@ -1,6 +1,7 @@
 import { BUILD_TEXT, turnFooterLine, canTryStronger, lastQuestion, NO_STRONGER_NOTICE, STRONGER_ACTION, strongerLabel, helperLine, isDelegate, openPlan, displayToolName, groupTurns, stepCount, stepMark, summarizeSteps, turnFooter, LIVE_OUTPUT_CHARS, thinkingLine, unreadCallNotice, writingLabel, REPLY_CUT_NOTE, type ChatMessage, type ChatState, type Detail, type HelperBatch, type IsLocal, isLocalFrom, type StepMark, type ToolBlock, type WritingBlock, noticesAfter, type ChatNotice, turnSources, type TurnSource, checksOf, checksSummary, turnRoutedNote, sessionModelOf, type SessionModelRef, rewoundLine, UNDO_WAIT } from "@golem/view";
-import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { useConfig, usePageActions, usePageActionsOrNull, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useConfig, useDataList, usePageActions, usePageActionsOrNull, usePulls, useSession, useModelList, useTurnCards } from "../../store/page-context.tsx";
+import type { PageActions } from "../../store/page.ts";
 import type { PullsSnapshot } from "../../store/pulls.ts";
 import type { SessionModel } from "../../store/session-store.ts";
 import { pullShare, shortName } from "../models/index.ts";
@@ -73,14 +74,28 @@ function Label({ children }: { children: string }) {
   return <p className="mb-1 text-faint">{children}</p>;
 }
 
+/** The question a turn answers, so a table in it can suggest a name for the query it saves. */
+const QuestionContext = createContext<string | null>(null);
+
 /** The table of a `data_query` call, paging through the daemon when the page has a connection. */
 function LiveResultTable({ tool, table }: { tool: ToolBlock; table: NonNullable<ToolBlock["table"]> }) {
   const actions = usePageActionsOrNull();
+  if (actions === null) return <ResultTable table={table} rowsWithheld={tool.rowsWithheld === true} />;
+  return <ConnectedResultTable tool={tool} table={table} actions={actions} />;
+}
+
+function ConnectedResultTable({ tool, table, actions }: { tool: ToolBlock; table: NonNullable<ToolBlock["table"]>; actions: PageActions }) {
+  const question = useContext(QuestionContext);
+  const list = useDataList();
+  const source = list.data?.status === "ready" ? list.data.data.sources.find((each) => each.name === table.source) : undefined;
   return (
     <ResultTable
       table={table}
       rowsWithheld={tool.rowsWithheld === true}
-      {...(actions === null ? {} : { onPage: actions.dataResultPage, onExport: actions.dataExportResult, onInstallExtension: actions.dataInstallExtension })}
+      onPage={actions.dataResultPage}
+      onExport={actions.dataExportResult}
+      onInstallExtension={actions.dataInstallExtension}
+      {...(source === undefined ? {} : { save: { scope: source.scope, question, onSave: (params) => actions.dataSaveQuery({ ...params, ...(source.project === undefined || source.project === null ? {} : { project: source.project }) }) } })}
     />
   );
 }
@@ -568,6 +583,12 @@ function turnChecks(chat: TranscriptChat, steps: readonly ChatMessage[]): Return
   return turn === null ? null : checksSummary(turn, chat.busy === true && chat.runId === runId);
 }
 
+/** The text of the user turn right before turn `index`, or null when the turn does not follow one. */
+function questionBefore(turns: ReturnType<typeof groupTurns>, index: number): string | null {
+  const before = turns[index - 1];
+  return before?.kind === "user" ? before.message.text : null;
+}
+
 /** The messages and the closing error or notice. Pure: the page's stores are not read here. */
 export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null, plan, session = null, undo, stronger, isLocal }: { isLocal?: IsLocal; session?: SessionModelRef | null; chat: TranscriptChat; thinkingShown?: boolean; detail?: Detail; waiting?: string | null; plan?: Omit<PlanActions, "open">; undo?: TurnUndo; stronger?: StrongerAction }) {
   const pendingId = chat.approval?.callId ?? null;
@@ -594,8 +615,8 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             ))}
           </Fragment>
         ) : (
+          <QuestionContext.Provider key={turn.id} value={questionBefore(turns, index)}>
           <GolemTurn
-            key={turn.id}
             steps={turn.steps}
             pendingId={pendingId}
             thinkingShown={thinkingShown}
@@ -609,6 +630,7 @@ export function TranscriptMessages({ chat, thinkingShown, detail, waiting = null
             {...(undo === undefined ? {} : { undo })}
             {...(stronger === undefined || index !== turns.length - 1 ? {} : { stronger })}
           />
+          </QuestionContext.Provider>
         ),
       )}
       {waiting === null ? null : <p role="status" className="text-meta text-muted">{waiting}</p>}

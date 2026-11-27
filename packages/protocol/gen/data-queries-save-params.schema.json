@@ -19,6 +19,37 @@
       "title": "Name",
       "type": "string"
     },
+    "previous_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Name"
+    },
+    "project": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project"
+    },
+    "replace": {
+      "default": false,
+      "title": "Replace",
+      "type": "boolean"
+    },
     "session_id": {
       "anyOf": [
         {

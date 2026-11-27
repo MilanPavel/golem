@@ -43,6 +43,8 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "data.notes.get",
   "data.notes.set",
   "data.profile",
+  "data.queries.remove",
+  "data.queries.save",
   "data.query",
   "data.remove",
   "data.result.page",

@@ -729,6 +729,7 @@ async def _kept_table(
         "rows": read.rows,
         "total_rows": read.total_rows,
         "truncated": read.truncated,
+        "sql": read.sql,
     }
 
 

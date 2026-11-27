@@ -19,7 +19,7 @@ import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExpor
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowReadOutputResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
-import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
+import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams, type DataRunParams, type DataSaveQueryParams, type DataSavedQuery } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -86,6 +86,9 @@ export type PageClient = Pick<
   | "removeData"
   | "getDataNotes"
   | "setDataNotes"
+  | "queryData"
+  | "saveDataQuery"
+  | "removeDataQuery"
   | "draftDataNotes"
   | "onDataChanged"
   | "getWorkflow"
@@ -450,6 +453,12 @@ export type PageActions = {
   dataNotesSet(name: string, text: string, project: string | null): Promise<string>;
   /** A proposal for the notes of a source. It is not saved. */
   dataNotesDraft(name: string, project: string | null): Promise<string>;
+  /** Runs SQL, or a saved query by name, on a source. A saved run marks the description stale, for its last run. Rejects with the engine's words. */
+  dataRunQuery(params: DataRunParams): Promise<DataResult>;
+  /** Keeps a query with its source. Rejects with the daemon's reason, such as a name that is taken (unless `replace`). */
+  dataSaveQuery(params: DataSaveQueryParams): Promise<DataSavedQuery>;
+  /** Deletes a saved query. */
+  dataRemoveQuery(source: string, name: string, project?: string | null): Promise<void>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>, model?: string): Promise<string>;
   /** Writes a starter as a workflow file: in `folder` for a starter that reads a project, in the user's folder when `folder` is null. With `routine` it also makes the starter's routine, and the routine list is read again too. The workflow list is read again. Resolves with the result: its `id` is the new workflow's, which `/workflows/:id` opens it by, and `routine_problem` says why the routine was not made. Rejects with the daemon's reason: the folder is not trusted, the file exists. */
@@ -1053,6 +1062,27 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         return saved.path;
       },
       dataNotesDraft: async (name, project) => (await (project === null ? client.draftDataNotes(name) : client.draftDataNotes(name, project))).text,
+      async dataRunQuery(params) {
+        try {
+          return await client.queryData(params);
+        } finally {
+          if (params.saved !== undefined) await queryClient.invalidateQueries({ queryKey: [...DATA_DESCRIBE_KEY, params.source] });
+        }
+      },
+      async dataSaveQuery(params) {
+        try {
+          return (await client.saveDataQuery(params)).query;
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: [...DATA_DESCRIBE_KEY, params.source] });
+        }
+      },
+      async dataRemoveQuery(source, name, project = null) {
+        try {
+          await (project === null ? client.removeDataQuery(source, name) : client.removeDataQuery(source, name, project));
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: [...DATA_DESCRIBE_KEY, source] });
+        }
+      },
       async startWorkflow(id, inputs, model) {
         const started = await (model === undefined ? client.startWorkflow(id, inputs) : client.startWorkflow(id, inputs, model));
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });

@@ -81,6 +81,18 @@
           "title": "Source",
           "type": "string"
         },
+        "sql": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sql"
+        },
         "total_rows": {
           "minimum": 0,
           "title": "Total Rows",

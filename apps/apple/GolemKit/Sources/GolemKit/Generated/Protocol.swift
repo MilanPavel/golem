@@ -5308,19 +5308,28 @@ public struct DataDescribeResult: Codable {
 // MARK: - QueryElement
 public struct QueryElement: Codable {
     public let description: String?
+    public let lastError: String?
+    public let lastMS: Int?
+    public let lastRows: Int?
     public let lastRunAt: String?
     public let name: String
     public let sql: String
 
     public enum CodingKeys: String, CodingKey {
         case description = "description"
+        case lastError = "last_error"
+        case lastMS = "last_ms"
+        case lastRows = "last_rows"
         case lastRunAt = "last_run_at"
         case name = "name"
         case sql = "sql"
     }
 
-    public init(description: String?, lastRunAt: String?, name: String, sql: String) {
+    public init(description: String?, lastError: String?, lastMS: Int?, lastRows: Int?, lastRunAt: String?, name: String, sql: String) {
         self.description = description
+        self.lastError = lastError
+        self.lastMS = lastMS
+        self.lastRows = lastRows
         self.lastRunAt = lastRunAt
         self.name = name
         self.sql = sql
@@ -5994,17 +6003,20 @@ public struct ColumnDataTopValue: Codable {
 // MARK: - DataQueriesRemoveParams
 public struct DataQueriesRemoveParams: Codable {
     public let name: String
+    public let project: String?
     public let sessionID: String?
     public let source: String
 
     public enum CodingKeys: String, CodingKey {
         case name = "name"
+        case project = "project"
         case sessionID = "session_id"
         case source = "source"
     }
 
-    public init(name: String, sessionID: String?, source: String) {
+    public init(name: String, project: String?, sessionID: String?, source: String) {
         self.name = name
+        self.project = project
         self.sessionID = sessionID
         self.source = source
     }
@@ -6023,6 +6035,9 @@ public struct DataQueriesRemoveResult: Codable {
 public struct DataQueriesSaveParams: Codable {
     public let description: String?
     public let name: String
+    public let previousName: String?
+    public let project: String?
+    public let replace: Bool?
     public let sessionID: String?
     public let source: String
     public let sql: String
@@ -6030,14 +6045,20 @@ public struct DataQueriesSaveParams: Codable {
     public enum CodingKeys: String, CodingKey {
         case description = "description"
         case name = "name"
+        case previousName = "previous_name"
+        case project = "project"
+        case replace = "replace"
         case sessionID = "session_id"
         case source = "source"
         case sql = "sql"
     }
 
-    public init(description: String?, name: String, sessionID: String?, source: String, sql: String) {
+    public init(description: String?, name: String, previousName: String?, project: String?, replace: Bool?, sessionID: String?, source: String, sql: String) {
         self.description = description
         self.name = name
+        self.previousName = previousName
+        self.project = project
+        self.replace = replace
         self.sessionID = sessionID
         self.source = source
         self.sql = sql
@@ -6062,19 +6083,28 @@ public struct DataQueriesSaveResult: Codable {
 // MARK: - DataQueriesSaveResultQuery
 public struct DataQueriesSaveResultQuery: Codable {
     public let description: String?
+    public let lastError: String?
+    public let lastMS: Int?
+    public let lastRows: Int?
     public let lastRunAt: String?
     public let name: String
     public let sql: String
 
     public enum CodingKeys: String, CodingKey {
         case description = "description"
+        case lastError = "last_error"
+        case lastMS = "last_ms"
+        case lastRows = "last_rows"
         case lastRunAt = "last_run_at"
         case name = "name"
         case sql = "sql"
     }
 
-    public init(description: String?, lastRunAt: String?, name: String, sql: String) {
+    public init(description: String?, lastError: String?, lastMS: Int?, lastRows: Int?, lastRunAt: String?, name: String, sql: String) {
         self.description = description
+        self.lastError = lastError
+        self.lastMS = lastMS
+        self.lastRows = lastRows
         self.lastRunAt = lastRunAt
         self.name = name
         self.sql = sql
@@ -6087,23 +6117,26 @@ public struct DataQueryParams: Codable {
     public let limit: Int?
     public let project: String?
     public let resultID: String?
+    public let saved: String?
     public let sessionID: String?
     public let source: String
-    public let sql: String
+    public let sql: String?
 
     public enum CodingKeys: String, CodingKey {
         case limit = "limit"
         case project = "project"
         case resultID = "result_id"
+        case saved = "saved"
         case sessionID = "session_id"
         case source = "source"
         case sql = "sql"
     }
 
-    public init(limit: Int?, project: String?, resultID: String?, sessionID: String?, source: String, sql: String) {
+    public init(limit: Int?, project: String?, resultID: String?, saved: String?, sessionID: String?, source: String, sql: String?) {
         self.limit = limit
         self.project = project
         self.resultID = resultID
+        self.saved = saved
         self.sessionID = sessionID
         self.source = source
         self.sql = sql
@@ -6229,19 +6262,28 @@ public struct DataResultColumn: Codable {
 // MARK: - DataSavedQuery
 public struct DataSavedQuery: Codable {
     public let description: String?
+    public let lastError: String?
+    public let lastMS: Int?
+    public let lastRows: Int?
     public let lastRunAt: String?
     public let name: String
     public let sql: String
 
     public enum CodingKeys: String, CodingKey {
         case description = "description"
+        case lastError = "last_error"
+        case lastMS = "last_ms"
+        case lastRows = "last_rows"
         case lastRunAt = "last_run_at"
         case name = "name"
         case sql = "sql"
     }
 
-    public init(description: String?, lastRunAt: String?, name: String, sql: String) {
+    public init(description: String?, lastError: String?, lastMS: Int?, lastRows: Int?, lastRunAt: String?, name: String, sql: String) {
         self.description = description
+        self.lastError = lastError
+        self.lastMS = lastMS
+        self.lastRows = lastRows
         self.lastRunAt = lastRunAt
         self.name = name
         self.sql = sql
@@ -24434,6 +24476,7 @@ public struct PurpleToolTable: Codable {
     public let resultID: String
     public let rows: [[ValueElement]]
     public let source: String
+    public let sql: String?
     public let totalRows: Int
     public let truncated: Bool?
 
@@ -24442,15 +24485,17 @@ public struct PurpleToolTable: Codable {
         case resultID = "result_id"
         case rows = "rows"
         case source = "source"
+        case sql = "sql"
         case totalRows = "total_rows"
         case truncated = "truncated"
     }
 
-    public init(columns: [PurpleToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, totalRows: Int, truncated: Bool?) {
+    public init(columns: [PurpleToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, sql: String?, totalRows: Int, truncated: Bool?) {
         self.columns = columns
         self.resultID = resultID
         self.rows = rows
         self.source = source
+        self.sql = sql
         self.totalRows = totalRows
         self.truncated = truncated
     }
@@ -29105,6 +29150,7 @@ public struct ToolCompletedDataToolTable: Codable {
     public let resultID: String
     public let rows: [[ValueElement]]
     public let source: String
+    public let sql: String?
     public let totalRows: Int
     public let truncated: Bool?
 
@@ -29113,15 +29159,17 @@ public struct ToolCompletedDataToolTable: Codable {
         case resultID = "result_id"
         case rows = "rows"
         case source = "source"
+        case sql = "sql"
         case totalRows = "total_rows"
         case truncated = "truncated"
     }
 
-    public init(columns: [FluffyToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, totalRows: Int, truncated: Bool?) {
+    public init(columns: [FluffyToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, sql: String?, totalRows: Int, truncated: Bool?) {
         self.columns = columns
         self.resultID = resultID
         self.rows = rows
         self.source = source
+        self.sql = sql
         self.totalRows = totalRows
         self.truncated = truncated
     }
@@ -29289,6 +29337,7 @@ public struct FluffyToolTable: Codable {
     public let resultID: String
     public let rows: [[ValueElement]]
     public let source: String
+    public let sql: String?
     public let totalRows: Int
     public let truncated: Bool?
 
@@ -29297,15 +29346,17 @@ public struct FluffyToolTable: Codable {
         case resultID = "result_id"
         case rows = "rows"
         case source = "source"
+        case sql = "sql"
         case totalRows = "total_rows"
         case truncated = "truncated"
     }
 
-    public init(columns: [TentacledToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, totalRows: Int, truncated: Bool?) {
+    public init(columns: [TentacledToolTableColumn], resultID: String, rows: [[ValueElement]], source: String, sql: String?, totalRows: Int, truncated: Bool?) {
         self.columns = columns
         self.resultID = resultID
         self.rows = rows
         self.source = source
+        self.sql = sql
         self.totalRows = totalRows
         self.truncated = truncated
     }

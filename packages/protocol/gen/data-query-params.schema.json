@@ -41,6 +41,19 @@
       "default": null,
       "title": "Result Id"
     },
+    "saved": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Saved"
+    },
     "session_id": {
       "anyOf": [
         {
@@ -60,14 +73,21 @@
       "type": "string"
     },
     "sql": {
-      "minLength": 1,
-      "title": "Sql",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sql"
     }
   },
   "required": [
-    "source",
-    "sql"
+    "source"
   ],
   "title": "DataQueryParams",
   "type": "object"

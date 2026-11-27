@@ -35,6 +35,18 @@ from golem.data.database import (
 )
 from golem.data.notes import MAX_BYTES, Notes, notes_file, read_notes
 from golem.data.privacy import guess_privacy
+from golem.data.queries import (
+    RUNS_FILE,
+    RunLog,
+    SavedQuery,
+    find,
+    queries_file,
+    read_queries,
+    with_last_run,
+    with_saved,
+    without,
+    write_queries,
+)
 from golem.data.results import ResultStore
 from golem.data.types import DATABASE_KINDS, DataError, NeedsExtension, SourceSpec
 from golem.paths import GolemPaths
@@ -131,6 +143,8 @@ class Description:
     notes_cut: bool = False
     """True when the notes file is longer than the model reads, so ``notes`` is its start."""
     sample: dict[str, list[list[Any]]] = field(default_factory=dict[str, list[list[Any]]])
+    queries: tuple[SavedQuery, ...] = ()
+    """The queries a person saved with the source, each with its last run."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,6 +288,7 @@ class DataSources:
         self._loaded_at = 0.0
         self._warming: set[asyncio.Task[None]] = set()
         self._watch_seconds = watch_seconds
+        self._runs = RunLog(paths.data_dir / RUNS_FILE)
         self._watcher: asyncio.Task[None] | None = None
         self.secrets: SecretStore | None = None
         """Where a database source's password is read from. Set by the daemon."""
@@ -832,7 +847,105 @@ class DataSources:
         found = await asyncio.to_thread(self._notes, entry)
         notes = None if found is None else found.text
         cut = found is not None and found.cut
-        return Description(self._info(entry), (*described, *rest), notes, cut, rows)
+        saved = await asyncio.to_thread(self._saved, entry, tolerant=True)
+        return Description(self._info(entry), (*described, *rest), notes, cut, rows, tuple(saved))
+
+    def _queries_path(self, entry: _Entry) -> Path:
+        return queries_file(self._paths.data_dir, entry.project, entry.name)
+
+    def _saved(self, entry: _Entry, *, tolerant: bool = False) -> list[SavedQuery]:
+        """The saved queries of ``entry`` with their last runs. A broken file is none when
+        ``tolerant``, so a description still works."""
+        try:
+            found = read_queries(self._queries_path(entry))
+        except DataError:
+            if not tolerant:
+                raise
+            return []
+        return [
+            with_last_run(q, self._runs.last(RunLog.key(entry.project, entry.name, q.name)))
+            for q in found
+        ]
+
+    async def list_queries(self, root: Path | None, name: str) -> list[SavedQuery]:
+        """The queries saved with source ``name``. Raises :class:`DataError`."""
+        entry = self._entry(root, name)
+        return await asyncio.to_thread(self._saved, entry)
+
+    async def save_query(
+        self,
+        root: Path | None,
+        name: str,
+        query_name: str,
+        sql: str,
+        description: str | None,
+        *,
+        replace: bool = False,
+        previous_name: str | None = None,
+    ) -> SavedQuery:
+        """Create, replace or rename a saved query. Raises :class:`DataError`."""
+        entry = self._entry(root, name)
+
+        def write() -> SavedQuery:
+            path = self._queries_path(entry)
+            changed = with_saved(
+                read_queries(path),
+                query_name,
+                sql,
+                description,
+                replace=replace,
+                previous_name=previous_name,
+            )
+            write_queries(path, changed)
+            if previous_name is not None:
+                self._runs.move(
+                    RunLog.key(entry.project, entry.name, previous_name),
+                    RunLog.key(entry.project, entry.name, query_name),
+                )
+            return find(self._saved(entry), query_name)
+
+        try:
+            return await asyncio.to_thread(write)
+        except OSError as exc:
+            raise DataError(f"Could not write the saved queries: {exc}") from exc
+
+    async def remove_query(self, root: Path | None, name: str, query_name: str) -> None:
+        """Delete a saved query. Raises :class:`DataError` when there is none by that name."""
+        entry = self._entry(root, name)
+
+        def write() -> None:
+            path = self._queries_path(entry)
+            write_queries(path, without(read_queries(path), query_name))
+            self._runs.forget(RunLog.key(entry.project, entry.name, query_name))
+
+        try:
+            await asyncio.to_thread(write)
+        except OSError as exc:
+            raise DataError(f"Could not write the saved queries: {exc}") from exc
+
+    def queries_path(self, root: Path | None, name: str) -> Path:
+        """Where the saved queries of source ``name`` are kept, whether or not the file exists."""
+        return self._queries_path(self._entry(root, name))
+
+    async def query_saved(
+        self,
+        root: Path | None,
+        name: str,
+        saved: str,
+        limit: int | None = None,
+        result_id: str | None = None,
+    ) -> QueryResult:
+        """Run the saved query ``saved`` and note how the run went. Raises :class:`DataError`."""
+        entry = self._entry(root, name)
+        found = find(await asyncio.to_thread(self._saved, entry), saved)
+        key = RunLog.key(entry.project, entry.name, found.name)
+        try:
+            result = await self.query(root, name, found.sql, limit, result_id)
+        except DataError as exc:
+            await asyncio.to_thread(self._runs.record, key, error=str(exc))
+            raise
+        await asyncio.to_thread(self._runs.record, key, rows=len(result.rows), ms=result.elapsed_ms)
+        return result
 
     def notes_path(self, root: Path | None, name: str) -> Path:
         """Where the notes of source ``name`` are kept, whether or not the file exists."""
@@ -1078,6 +1191,9 @@ class DataAccess:
 
     async def query(self, name: str, sql: str, limit: int | None = None) -> QueryResult:
         return await self._sources.query(self._root, name, sql, limit)
+
+    async def query_saved(self, name: str, saved: str, limit: int | None = None) -> QueryResult:
+        return await self._sources.query_saved(self._root, name, saved, limit)
 
     def source(self, name: str) -> SourceInfo:
         """The source called ``name``, without opening it. Raises :class:`DataError`."""

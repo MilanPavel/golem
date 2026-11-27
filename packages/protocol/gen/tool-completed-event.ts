@@ -20,6 +20,7 @@ export type Columns = ToolTableColumn[];
 export type ResultId = string;
 export type Rows = (string | number | boolean | null)[][];
 export type Source = string;
+export type Sql = string | null;
 export type TotalRows = number;
 export type Truncated = boolean;
 export type Truncated1 = boolean;
@@ -120,6 +121,7 @@ export interface ToolTable {
   result_id: ResultId;
   rows: Rows;
   source: Source;
+  sql?: Sql;
   total_rows: TotalRows;
   truncated?: Truncated;
 }

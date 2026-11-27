@@ -10,8 +10,6 @@ import {
   NOTES_NOT_AVAILABLE,
   PASSWORD_NOTE,
   PRIVACY_SENTENCE,
-  QUERIES_EMPTY,
-  QUERIES_EMPTY_MORE,
   withoutSingleFile,
   REMOVE_SENTENCE,
   savedInText,
@@ -26,11 +24,12 @@ import { Code } from "../../ui/code.tsx";
 import { DataSourceIcon } from "../../ui/data-icons.tsx";
 import { Input } from "../../ui/input.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
-import { dataErrorText, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataExportParams, type DataExportResult, type DataDescribeResult, type DataExtensionName, type DataProfileResult, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
+import { dataErrorText, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataExportParams, type DataExportResult, type DataDescribeResult, type DataExtensionName, type DataProfileResult, type DataSavedQuery, type DataSource, type DataTable, type DataResult, type DataResultPageParams, type DataSaveQueryParams } from "../../store/data.ts";
 import { DATA_TABS, type DataTab } from "../../store/router.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { ExtensionRow } from "./extension-row.tsx";
 import { PrivacyChip } from "./privacy-chip.tsx";
+import { QueriesTab } from "./queries-tab.tsx";
 import { ColumnProfile } from "./column-profile.tsx";
 import { EMPTY_VIEW, RowsBrowser, type RowsView } from "./rows-browser.tsx";
 
@@ -239,35 +238,6 @@ function NotesEditor({ source, initial, path, onSave, onDraft }: { source: DataS
   );
 }
 
-function QueriesTab({ queries, onRun }: { queries: readonly DataSavedQuery[]; onRun: (query: DataSavedQuery) => void }) {
-  if (queries.length === 0) {
-    return (
-      <div className="flex max-w-xl flex-col gap-1 text-sm text-muted">
-        <p>{QUERIES_EMPTY}</p>
-        <p>{QUERIES_EMPTY_MORE}</p>
-      </div>
-    );
-  }
-  return (
-    <ul aria-label="Saved queries" className="flex max-w-3xl flex-col gap-2">
-      {queries.map((query) => (
-        <li key={query.name} className="flex items-center gap-3 rounded-lg border border-line bg-surface p-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate text-sm font-medium">{query.name}</span>
-            <span className="truncate text-meta text-faint">
-              {query.description === null || query.description === undefined || query.description === "" ? "No description" : query.description} ·{" "}
-              {query.last_run_at === null || query.last_run_at === undefined ? "never run" : `last run ${new Date(query.last_run_at).toLocaleDateString()}`}
-            </span>
-          </div>
-          <Button size="sm" aria-label={`Run ${query.name}`} onClick={() => onRun(query)}>
-            Run
-          </Button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** The password of a database source: where it is kept, and a way to store a new one. The old one is never shown. */
 function PasswordRow({ source, onChange, busy, attempt }: { source: DataSource; onChange: (password: string) => Promise<void>; busy: boolean; attempt: (work: () => Promise<void>, fallback: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -464,7 +434,16 @@ export type SourcePageProps = {
   /** Opens a new chat with `@name` in the composer. */
   onAsk: () => void;
   /** Opens a chat that runs a saved query. */
-  onRun: (query: DataSavedQuery) => void;
+  onAskQuery: (query: DataSavedQuery) => void;
+  /** Runs a saved query by name, with no model. */
+  onRunQuery: (name: string) => Promise<DataResult>;
+  /** Runs SQL with a small limit, for Try in the New and Edit dialog. */
+  onTryQuery: (sql: string) => Promise<DataResult>;
+  onSaveQuery: (params: DataSaveQueryParams) => Promise<unknown>;
+  onRemoveQuery: (name: string) => Promise<void>;
+  /** One page of a kept result, for a result that opened under a query. */
+  onPage?: (params: DataResultPageParams) => Promise<DataResult>;
+  onExport?: (params: DataExportParams) => Promise<DataExportResult>;
   /** The shape of each column of one table, from `data.profile`. */
   onLoadProfile: (table: string) => Promise<DataProfileResult>;
   /** One page of a table, from `data.browse`. */
@@ -496,7 +475,13 @@ export function SourcePage({
   tab,
   onTab,
   onAsk,
-  onRun,
+  onAskQuery,
+  onRunQuery,
+  onTryQuery,
+  onSaveQuery,
+  onRemoveQuery,
+  onPage,
+  onExport,
   onLoadProfile,
   onBrowse,
   onAskView,
@@ -588,7 +573,7 @@ export function SourcePage({
         <NotesTab source={source} notes={notes} onSave={onSaveNotes} onDraft={onDraftNotes} />
       </TabsContent>
       <TabsContent value="queries">
-        {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab queries={described.queries ?? []} onRun={onRun} />}
+        {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab source={source} queries={described.queries ?? []} onRun={onRunQuery} onTry={onTryQuery} onAsk={onAskQuery} onSave={onSaveQuery} onRemove={onRemoveQuery} {...(onPage === undefined ? {} : { onPage })} {...(onExport === undefined ? {} : { onExport })} {...(onInstallExtension === undefined ? {} : { onInstallExtension })} />}
       </TabsContent>
       <TabsContent value="settings">
         <SettingsTab source={source} onPrivacy={onPrivacy} onWatch={onWatch} onRemove={onRemove} {...(onChangePassword === undefined ? {} : { onChangePassword })} />
