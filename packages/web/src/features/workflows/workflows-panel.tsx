@@ -1,13 +1,14 @@
 import { useId, useMemo, useState } from "react";
 import { cn } from "../../ui/cn.ts";
 import { Input } from "../../ui/input.tsx";
-import { useNavigate, useRoute, useWorkflowList } from "../../store/page-context.tsx";
+import { useNavigate, useNewSessionFolder, useRoute, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
 import { workflowPath } from "../../store/router.ts";
-import type { WorkflowEntryInfo, WorkflowListResult } from "../../store/workflows.ts";
+import type { WorkflowEntryInfo, WorkflowListResult, WorkflowStarterInfo } from "../../store/workflows.ts";
 import { Link } from "../../ui/link.tsx";
 import { folderName } from "../sessions/folder.ts";
 import { WorkflowDot } from "./workflow-dot.tsx";
 import { workflowGroups, workflowRowLine, type WorkflowGroup } from "./text.ts";
+import { starterStillToAdd } from "./workflows-empty.tsx";
 
 function WorkflowRow({ workflow, selected, onNavigate }: { workflow: WorkflowEntryInfo; selected: boolean; onNavigate: (path: string) => void }) {
   return (
@@ -50,18 +51,51 @@ function Group({ group, selected, onNavigate }: { group: WorkflowGroup<WorkflowE
   );
 }
 
+/** The starters not added yet. Each opens `/workflows`, where its card adds it. */
+function StarterGroup({ starters, onNavigate }: { starters: readonly WorkflowStarterInfo[]; onNavigate: (path: string) => void }) {
+  const headingId = useId();
+  return (
+    <div>
+      <div id={headingId} className="mb-1 px-2.5 text-xs font-medium text-faint">
+        Starters
+      </div>
+      <ul aria-labelledby={headingId} className="flex flex-col gap-px">
+        {starters.map((starter) => (
+          <li key={starter.id}>
+            <Link
+              href={workflowPath()}
+              onNavigate={onNavigate}
+              className="flex items-center gap-2 rounded-md py-1.5 pr-2.5 pl-2.5 text-muted outline-offset-2 outline-clay hover:bg-line hover:text-ink focus-visible:outline-2"
+            >
+              <span aria-hidden="true" className="w-2 text-center text-faint">
+                +
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="min-w-0 truncate">{starter.title}</span>
+                <span className="truncate text-xs text-faint">{starter.line}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export type WorkflowsPanelProps = {
   /** The daemon's answer, or null while it has not come. */
   list: WorkflowListResult | null;
   /** The reason the answer did not come, if it did not. */
   error?: string | null;
+  /** The starters not added yet, listed under the workflows. */
+  starters?: readonly WorkflowStarterInfo[];
   /** The id of the workflow in view. */
   selected: string | null;
   onNavigate: (path: string) => void;
 };
 
 /** The workflows panel's body: a filter, then the workflows of this project and yours. A broken one shows its error. */
-export function WorkflowsPanel({ list, error = null, selected, onNavigate }: WorkflowsPanelProps) {
+export function WorkflowsPanel({ list, error = null, starters = [], selected, onNavigate }: WorkflowsPanelProps) {
   const [filter, setFilter] = useState("");
   const needle = filter.trim().toLowerCase();
   const workflows = list?.workflows;
@@ -106,6 +140,7 @@ export function WorkflowsPanel({ list, error = null, selected, onNavigate }: Wor
         {grouped.map((group) => (
           <Group key={group.key} group={group} selected={selected} onNavigate={onNavigate} />
         ))}
+        {list === null || list.workflows.length === 0 || needle !== "" || starters.length === 0 ? null : <StarterGroup starters={starters} onNavigate={onNavigate} />}
       </div>
     </div>
   );
@@ -116,5 +151,8 @@ export function LiveWorkflowsPanel() {
   const query = useWorkflowList();
   const route = useRoute();
   const navigate = useNavigate();
-  return <WorkflowsPanel list={query.data ?? null} error={query.error?.message ?? null} selected={route.name === "workflow" ? route.id : null} onNavigate={navigate} />;
+  const starters = useWorkflowStarters();
+  const [folder] = useNewSessionFolder();
+  const left = query.data === undefined ? [] : starterStillToAdd(starters.data?.starters ?? [], query.data.workflows, folder);
+  return <WorkflowsPanel list={query.data ?? null} error={query.error?.message ?? null} starters={left} selected={route.name === "workflow" ? route.id : null} onNavigate={navigate} />;
 }
