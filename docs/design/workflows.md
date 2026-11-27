@@ -45,7 +45,7 @@ Rules:
 
 - `key=` means "do this once". A finished keyed step never runs again. A crash between the action and saving its result leaves the step "may have run". On retry, the key goes to the receiver as an idempotency key.
 - Step keys are unique within a run and stable across restarts. A repeated key fails the run.
-- There are no model names in the file. `type` names an agent file. The file wishes `cheapest` or `stronger`, and routing decides.
+- The model is written in the file (3.13.7): `@workflow(model=)` is the default and `model=` on a step overrides it; with neither, golem's default model is used. The old wish words (`cheapest`, `stronger`) still work. `type` names an agent file. See ADR-062, amended 2026-11-27.
 - `gets=` hands earlier results over as they are (saved artifacts), without retelling them.
 - `worktree=` needs copies (15.10). Until then, Check fails it with "copies arrive with 15.10".
 
@@ -150,7 +150,7 @@ In a chat, the lead model calls `delegate`. In a workflow, your code calls `run.
 |---|---|---|
 | `run.agent("worker", brief=...)` | One helper, a child session of the run's headless session, from `agents/worker.md` (15.1, 15.2) | Built |
 | No `model=` | The agent's wish (`cheapest` or `stronger`), resolved by routing (15.3, Phase 9) | Built |
-| `model="local"` | A wish for this one step | Built |
+| `model="local"` | A wish for this one step (a model name works too, 3.13.7) | Built |
 | `budget="$0.50"` | Helper limits: calls, working time, cost (15.6, `D/sessions/helper_limits.py`) | In progress |
 | The helper asks you | A pending item in the run's session, shown in Runs, Inbox and on the phone (15.5) | Built |
 | `run.parallel(run.agent(...) for ...)` | One batch. The dispatcher decides how many run at once (15.8, 18.2) | 15.8 open |

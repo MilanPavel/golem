@@ -61,7 +61,18 @@ async def upgrade_dependencies(run: Run) -> None: ...
 - Helpers start only through `start_helper` and `helper_results`, and only from one place: `D/workflows/agents.py` (the seam). Workflow code never reaches into dispatcher or session internals.
 - ADR-059 does not change. A small refactor moves the part of `start_helpers` that does not need the chat graph's state into a function that both paths call (ticket A.6).
 
-### No model names in workflow files
+### No model names in workflow files (amended 2026-11-27, step 3.13.7)
+
+**Amendment.** A workflow file now names its model, and the rule above no longer holds for a workflow's own steps. A person has to be able to read from the file which model runs, and to pick one. The rule is:
+
+- `@workflow(model="<name>")` is the workflow's default model. `model="<name>"` on `run.llm`, `run.agent` and `run.skill` overrides it for that step. A name is a model you have set up, as the chat's model picker shows it: a profile, or `provider/model`.
+- The order is this run's choice (`workflow.start {model}`, `golem workflow run --model`), then the step's, then the workflow's, then golem's default model (the one a new chat starts with). `[routing.roles]` plays no part for a workflow.
+- The old wish words (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`) keep working as they did, in files that have them. They are no longer offered in the UI, and the check suggests a model name instead.
+- A model that is not set up on this machine is not an error and does not refuse the run: the check says so beside the line, and the step that cannot get its model stops with that reason. golem informs; it does not block up front.
+- Privacy and budget still win. In a local-only folder a hosted model is not used and the step stops and says why. A spent budget cap stops a paid model as before. These are the guards that already exist; the amendment adds none.
+- A bundled starter is rewritten to name a model in its own step (3.13.14), not here.
+
+The text below is the original decision. Read "A `model=` argument is a wish, never a model name" with the amendment in mind: it is still true of the wish words, and no longer true of a name.
 
 An agent file says what it wishes (`cheapest`, `stronger`). Routing picks the real model on the run's machine ([ADR-055](055-model-routing.md)). A `model=` argument is a wish for one step, never a model name. `run.llm` takes a dispatcher `job` slot, the same as a title or a summary ([ADR-060](060-dispatcher-and-engine-profile.md)). The same file runs free in a local-only folder and works on a cloud-only laptop. Each agent-step ticket has a local-only and a cloud-only test.
 
@@ -179,7 +190,7 @@ Other decisions of 2026-11-23: start now, engine first; Workflows gets one imple
 - **Cons**: Chat approvals come from the event log of a live run. A review must wait days with no run.
 - **Why not**: A new row with the same `PendingItem` shape gives both.
 
-### Alternative 5: Put model names in the file
+### Alternative 5: Put model names in the file (taken up by the 2026-11-27 amendment)
 
 - **Pros**: Predictable.
 - **Cons**: Breaks on a machine without that model, and breaks the local-only and cloud-only promise.

@@ -212,13 +212,13 @@ An output that is an absolute path to a text file can be read with `workflow.rea
 ### Asking an agent
 
 ```python
-found = await run.agent("explorer", "List the TODOs in src/", model="cheapest")
+found = await run.agent("explorer", "List the TODOs in src/", model="qwen3.5:9b")
 print(found["answer"])
 ```
 
 `run.agent(type, brief, model=None, key=None, gets=(), budget=None, worktree=None)` runs one agent of that type (the same agents `delegate` uses) as a helper of the run's session, with golem's permissions. It returns `{"status", "answer", "session_id"}`; open `session_id` to see everything the agent did. The step has kind `agent` and the key `key` or `agent:<type>`; give two agents of one type their own `key=`.
 
-- `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name. Without it the agent's own wish is used. A local-only folder keeps the agent local.
+- `model=` is the name of a model you have set up, as the chat's model picker shows it. See [Which model](#which-model). Without a model written in the step, the run or the workflow, the agent's own wish is used. A local-only folder never gets a hosted model: the step stops and says why.
 - An approval the agent needs shows on the run's session, so the run shows "needs you".
 - An agent that fails or is stopped fails the step, and the error says why.
 - After a restart the run continues and waits for the same agent. It never starts a second one.
@@ -263,17 +263,41 @@ The result is saved as the step's JSON, so a run that is executed again gets it 
 
 ```python
 summary = await run.llm(f"Summarise in one line:\n{text}")
-facts = await run.llm(text, schema=Facts, model="stronger")
+facts = await run.llm(text, schema=Facts, model="deepseek/chat")
 ```
 
 `run.llm(prompt, schema=None, model=None, key=None)` makes one model call, with no tools and no agent loop, and saves it as a step of kind `llm`.
 
 - Without `schema` it returns the text. With `schema` (a Pydantic model class or a JSON-schema dict) the model is asked for a JSON object and the call returns it as a dict. An answer that does not fit fails the step.
-- `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name; a name fails the step. Routing picks the model. The default is the cheapest model that is ready.
-- In a local-only folder the call always uses a local model, whatever the wish says. If there is none, the step fails. On a laptop with only cloud models, the same file works.
+- `model=` is the name of a model you have set up (see [Which model](#which-model)). Without one the workflow's model is used, then golem's default model, the one a new chat starts with. `[routing.roles]` plays no part.
+- In a local-only folder a hosted model is not used: the step stops and says why. A spent budget cap stops a paid model the same way it stops a chat.
 - The call takes a slot from the dispatcher, like a title, so it waits behind a chat on the same local model.
 - The step saves the model that answered and what the call cost (`workflow.status` shows both on the step). A run that is executed again does not ask again.
 - The step key is `key` or `llm:<short hash of the prompt>`. Two calls with the same prompt in one run need their own `key=`.
+
+### Which model
+
+```python
+@workflow(model="qwen3.5:9b")            # the default of this workflow
+async def briefing(run):
+    facts = await run.llm("Collect the facts")                 # qwen3.5:9b
+    text = await run.llm(facts, model="deepseek/chat")         # this step's own
+    await run.skill("tidy", text, model="qwen3.5:9b")
+```
+
+A model step (`run.llm`, `run.agent`, `run.skill`) uses the first of these:
+
+1. This run's choice: `golem workflow run <name> --model NAME`, or the model asked for in `workflow.start` (and `workflow.resume`) by the Run dialog.
+2. The step's own `model="..."`.
+3. The workflow's `@workflow(model="...")`.
+4. golem's default model: the one a new chat starts with.
+
+A name is a model you have set up, as the chat's model picker shows it: a profile, or `provider/model`. `[routing.roles]` is for chats and plays no part here.
+
+- **Not set up on this machine.** The check says so beside the line. The run is not refused when it starts; the step that cannot get its model stops with that reason, and the steps before it are kept.
+- **Local-only folders.** A hosted model is never used there. The step stops and says the folder stays on this Mac. A spent budget cap stops a paid model as it does in a chat.
+- **Old wish words.** `cheapest`, `same`, `stronger`, `local`, `budget` and `frontier` keep working exactly as before in files that have them. The editor does not offer them any more, and the check suggests a model name instead.
+- **The editor.** The header shows the workflow's model (`Model golem's default model · now ...`, or the name written in the file). A model step has a Model field. Both write `model=` into the code as an unsaved edit.
 
 ### Calling a tool
 
@@ -401,15 +425,16 @@ Each line says the line of the file, the step (from the outline) and the problem
 | The file parses and the outline reads | error |
 | `run.*` calls: unknown method or keyword argument | error |
 | `budget=` is money text such as `"$0.50"` | error |
-| `model=` is a wish (`cheapest`, `same`, `stronger`, `local`, `budget`, `frontier`), never a model name | error |
 | The agent named in `run.agent` exists for the folder (the message lists the known ones) | error |
 | `schedule(...)` and `on_file(...)` are valid, with the same parser routines use | error |
-| A wish that would use a paid model in a local-only folder | warning: a run would stop at that step |
+| A model name that is not set up on this machine | warning: the step would stop with that reason; the run is not refused |
+| A model name that is hosted, in a local-only folder | warning: a run would stop at that step |
+| An old wish word (when golem has a default model) | warning: it still works; a model name is suggested |
 | A wish that does not resolve with your models | warning |
 
 The editor uses the same check while you type (`workflow.check` with the text), and saves with `workflow.save`. A save is refused when the text has an error, when the file changed on disk since you opened it, and for a folder that is not trusted.
 
-The selected step has fields: brief, agent, model (a wish), budget and key. Changing one calls `workflow.edit_step`, which replaces exactly that argument in the text (or adds `name=value` when the call lacks it) and leaves comments and formatting alone. It returns the new text, its outline and its problems, and writes nothing: the editor keeps the text as an unsaved edit until you save. A value the code computes (a name, a call, an f-string with expressions) is shown as its source and is set in code; a code step has no fields.
+The selected step has fields: brief, agent, model (a model you have set up), budget and key. `workflow.edit_step` with the step id `@workflow` sets `model=` on the decorator. Changing one calls `workflow.edit_step`, which replaces exactly that argument in the text (or adds `name=value` when the call lacks it) and leaves comments and formatting alone. It returns the new text, its outline and its problems, and writes nothing: the editor keeps the text as an unsaved edit until you save. A value the code computes (a name, a call, an f-string with expressions) is shown as its source and is set in code; a code step has no fields.
 
 ## Ask golem
 
