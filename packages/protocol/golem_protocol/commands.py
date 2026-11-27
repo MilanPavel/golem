@@ -6597,6 +6597,8 @@ class DataColumn(BaseModel):
     min: str | None = None
     max: str | None = None
     distinct: int | None = Field(default=None, ge=0)
+    distinct_estimate: bool = False
+    """True when ``distinct`` is an estimate, not an exact count."""
     null_fraction: float | None = Field(default=None, ge=0, le=1)
 
 

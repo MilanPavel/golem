@@ -509,3 +509,13 @@ async def test_the_section_fills_in_counts_after_the_first_call(
             break
     second = section(context)
     assert second is not None and "- shop  1 table · 1 file · 3 rows · rows local" in second
+
+
+def test_an_estimated_distinct_count_starts_with_a_tilde() -> None:
+    from golem.data.sources import ColumnInfo
+    from golem.data.tools import _stats  # pyright: ignore[reportPrivateUsage]
+
+    exact = ColumnInfo("a", "BIGINT", distinct=891)
+    guess = ColumnInfo("a", "BIGINT", distinct=891, distinct_estimate=True)
+    assert "891 distinct" in _stats(exact, "full") and "~" not in _stats(exact, "full")
+    assert "~891 distinct" in _stats(guess, "full")

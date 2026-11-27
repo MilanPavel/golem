@@ -17,6 +17,11 @@
           "default": null,
           "title": "Distinct"
         },
+        "distinct_estimate": {
+          "default": false,
+          "title": "Distinct Estimate",
+          "type": "boolean"
+        },
         "max": {
           "anyOf": [
             {

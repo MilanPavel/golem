@@ -74,6 +74,7 @@ class ColumnInfo:
     min: str | None = None
     max: str | None = None
     distinct: int | None = None
+    distinct_estimate: bool = False
     null_fraction: float | None = None
 
 
@@ -1038,6 +1039,7 @@ def _table_info(name: str, answer: dict[str, Any]) -> TableInfo:
                 min=_text(column.get("min")),
                 max=_text(column.get("max")),
                 distinct=_whole(column.get("distinct")),
+                distinct_estimate=bool(column.get("distinct_estimate", False)),
                 null_fraction=_fraction(column.get("null_percent")),
             )
             for column in answer["columns"]

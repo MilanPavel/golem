@@ -53,6 +53,8 @@ _FILE_KINDS = {
     ".ndjson": "json",
     ".xlsx": "excel",
 }
+EXACT_DISTINCT_ROWS = 1_000_000
+"""Up to this many rows a table's distinct counts are exact; above, DuckDB's estimates."""
 _DATABASE_SUFFIXES = {
     ".sqlite": "sqlite",
     ".sqlite3": "sqlite",
@@ -213,6 +215,9 @@ class Source:
         try:
             rows = cursor.execute(f"summarize {_ident(table)}").fetchall()
             count = cursor.execute(f"select count(*) from {_ident(table)}").fetchone()
+            total = int(count[0]) if count else 0
+            small = total <= EXACT_DISTINCT_ROWS
+            exact = self._exact_distinct(cursor, table, rows) if small else None
         finally:
             cursor.close()
         columns = [
@@ -221,12 +226,25 @@ class Source:
                 "type": str(row[1]),
                 "min": _json(row[2]),
                 "max": _json(row[3]),
-                "distinct": _json(row[4]),
+                "distinct": _json(row[4]) if exact is None else exact[at],
+                "distinct_estimate": exact is None,
                 "null_percent": _json(row[-1]),
             }
-            for row in rows
+            for at, row in enumerate(rows)
         ]
-        return {"table": table, "rows": int(count[0]) if count else 0, "columns": columns}
+        return {"table": table, "rows": total, "columns": columns}
+
+    @staticmethod
+    def _exact_distinct(cursor: Any, table: str, summary: list[Any]) -> list[int] | None:
+        """Exact ``count(distinct ...)`` of each column, or ``None`` if one cannot be counted."""
+        if not summary:
+            return []
+        counts = ", ".join(f"count(distinct {_ident(str(row[0]))})" for row in summary)
+        try:
+            answer = cursor.execute(f"select {counts} from {_ident(table)}").fetchone()
+        except duckdb.Error:
+            return None
+        return None if answer is None else [int(n) for n in answer]
 
     def _describe_remote(self, table: str) -> dict[str, Any]:
         """The columns of a database table from the catalog. It reads no rows of the table."""
@@ -244,6 +262,7 @@ class Source:
                 "min": None,
                 "max": None,
                 "distinct": None,
+                "distinct_estimate": False,
                 "null_percent": None,
             }
             for column, kind in rows

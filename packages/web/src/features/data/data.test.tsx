@@ -90,6 +90,75 @@ test("a rows-local source shows its columns, and its sample under the local capt
   expect(screen.getByRole("table", { name: "Columns of transactions" }).textContent).toContain("DECIMAL(10,2)");
 });
 
+const LONG_NAME = "Cumings, Mrs. John Bradley (Florence Briggs Thayer)";
+
+function withFiles(files: string[], over: { min: string; max: string }): SourcePageProps {
+  const described = {
+    ...SAMPLE_BANK_DESCRIBED,
+    tables: [
+      {
+        name: "passengers",
+        rows: files.length,
+        columns: [
+          { name: "id", type: "BIGINT", distinct: 891, distinct_estimate: false },
+          { name: "name", type: "VARCHAR", distinct: 1045, distinct_estimate: true },
+          { name: "file", type: "VARCHAR", min: over.min, max: over.max, distinct: 1 },
+        ],
+      },
+    ],
+    sample: { passengers: files.map((file, at) => [at + 1, LONG_NAME, file]) },
+  };
+  return page({ described });
+}
+
+test("the header and the tab bar stick together, and the sample table's header sticks in its own box", () => {
+  const { container } = render(<SourcePage {...page()} />);
+  const sticky = container.querySelector('[data-sticky="source-header"]');
+  expect(sticky?.className).toContain("sticky");
+  expect(sticky?.className).toContain("-top-5");
+  expect(sticky?.className).toContain("bg-bg");
+  expect(within(sticky as HTMLElement).getByRole("tablist")).toBeTruthy();
+  expect(within(sticky as HTMLElement).getByRole("heading", { level: 1 })).toBeTruthy();
+  const sample = screen.getByRole("table", { name: "Sample rows of transactions" });
+  expect(sample.querySelector("th")?.className).toContain("sticky");
+  expect(sample.parentElement?.className).toContain("overflow-auto");
+});
+
+test("a table from one file hides its file column in the stats and the sample", () => {
+  render(<SourcePage {...withFiles(["/data/titanic.csv", "/data/titanic.csv"], { min: "/data/titanic.csv", max: "/data/titanic.csv" })} />);
+  expect(screen.getByRole("table", { name: "Sample rows of passengers" }).textContent).not.toContain("titanic.csv");
+  expect(within(screen.getByRole("table", { name: "Sample rows of passengers" })).queryByRole("columnheader", { name: "file" })).toBeNull();
+  expect(within(screen.getByRole("table", { name: "Columns of passengers" })).queryByText("file")).toBeNull();
+});
+
+test("a table from several files shows the file name, with the whole path on hover", () => {
+  render(<SourcePage {...withFiles(["/data/a/jan.csv", "/data/a/feb.csv"], { min: "/data/a/feb.csv", max: "/data/a/jan.csv" })} />);
+  const sample = screen.getByRole("table", { name: "Sample rows of passengers" });
+  expect(within(sample).getByRole("columnheader", { name: "file" })).toBeTruthy();
+  const cell = within(sample).getByText("jan.csv");
+  expect(cell.getAttribute("title")).toBe("/data/a/jan.csv");
+  expect(sample.textContent).not.toContain("/data/a/");
+});
+
+test("a long text cell is one line cut at a width, with the whole value in its title; numbers stay right-aligned", () => {
+  render(<SourcePage {...withFiles(["/data/a.csv"], { min: "/data/a.csv", max: "/data/a.csv" })} />);
+  const sample = screen.getByRole("table", { name: "Sample rows of passengers" });
+  const long = within(sample).getByText(LONG_NAME);
+  expect(long.getAttribute("title")).toBe(LONG_NAME);
+  expect(long.getAttribute("tabindex")).toBe("0");
+  expect(long.className).toContain("truncate");
+  expect(long.className).toContain("max-w-64");
+  expect(within(sample).getByText("1").closest("td")?.className).toContain("text-right");
+});
+
+test("an estimated distinct count starts with a tilde and an exact one does not", () => {
+  render(<SourcePage {...withFiles(["/data/a.csv"], { min: "/data/a.csv", max: "/data/a.csv" })} />);
+  const columns = screen.getByRole("table", { name: "Columns of passengers" });
+  expect(columns.textContent).toContain("891 distinct");
+  expect(columns.textContent).not.toContain("~891");
+  expect(columns.textContent).toMatch(/~1\s045 distinct/);
+});
+
 test("a schema-only source does not fetch its sample until asked", async () => {
   const onLoadSample = vi.fn().mockResolvedValue([[1, "a@example.test"]]);
   render(<SourcePage {...page({ source: SAMPLE_SHOP_PROD, described: SAMPLE_PROD_DESCRIBED, onLoadSample })} />);
@@ -185,7 +254,8 @@ test("Notes and Queries say what to do when the notes methods are missing or the
   const { rerender } = render(<SourcePage {...page({ tab: "notes", notes: { state: "missing" } })} />);
   expect(screen.getByText("Notes come in a later version of golem.")).toBeTruthy();
   rerender(<SourcePage {...page({ tab: "queries", described: { ...SAMPLE_BANK_DESCRIBED, queries: [] } })} />);
-  expect(screen.getByText("Save a query from a chat result and it shows here.")).toBeTruthy();
+  expect(screen.getByText("A saved query is a named question you ask often, like spending by month.")).toBeTruthy();
+  expect(screen.getByText("Run it again in one click, use it in a routine, or let golem reuse it.")).toBeTruthy();
 });
 
 test("Queries: Run hands the query to the chat", async () => {
