@@ -149,6 +149,8 @@ export type { WorkflowProposeResult } from "../../protocol/gen/workflow-propose-
 export type { WorkflowGetResult } from "../../protocol/gen/workflow-get-result.ts";
 export type { WorkflowProblem } from "../../protocol/gen/workflow-problem.ts";
 export type { WorkflowSaveResult } from "../../protocol/gen/workflow-save-result.ts";
+export type { WorkflowCreateResult } from "../../protocol/gen/workflow-create-result.ts";
+export type { WorkflowDraftResult } from "../../protocol/gen/workflow-draft-result.ts";
 export type { WorkflowInputInfo } from "../../protocol/gen/workflow-input-info.ts";
 export type { WorkflowModelInfo } from "../../protocol/gen/workflow-model-info.ts";
 export type { WorkflowOutlineStep } from "../../protocol/gen/workflow-outline-step.ts";
