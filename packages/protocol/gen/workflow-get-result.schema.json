@@ -33,6 +33,18 @@
           "title": "Inputs",
           "type": "array"
         },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
         "name": {
           "title": "Name",
           "type": "string"
@@ -134,6 +146,55 @@
         "name"
       ],
       "title": "WorkflowInputInfo",
+      "type": "object"
+    },
+    "WorkflowModelInfo": {
+      "additionalProperties": false,
+      "description": "The workflow's own model (``@workflow(model=)``), for the header of the editor.\n\n``model`` is as written (null: the file names none). ``now`` is what a model step with no\n``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is false when\n``now`` is not set up on this machine; ``note`` then says so, in words.",
+      "properties": {
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "now": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Now"
+        },
+        "ready": {
+          "default": true,
+          "title": "Ready",
+          "type": "boolean"
+        }
+      },
+      "title": "WorkflowModelInfo",
       "type": "object"
     },
     "WorkflowOutlineStep": {
@@ -324,6 +385,42 @@
           "title": "Lines",
           "type": "array"
         },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_now": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Now"
+        },
+        "model_ready": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Ready"
+        },
         "title": {
           "title": "Title",
           "type": "string"
@@ -481,6 +578,17 @@
     },
     "workflow": {
       "$ref": "#/$defs/WorkflowEntryInfo"
+    },
+    "workflow_model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkflowModelInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

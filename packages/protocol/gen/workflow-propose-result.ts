@@ -40,8 +40,15 @@ export type Kind1 = string;
  * @maxItems 2
  */
 export type Lines = [unknown, unknown];
+export type Model1 = string | null;
+export type ModelNow = string | null;
+export type ModelReady = boolean | null;
 export type Title = string;
 export type Steps = WorkflowOutlineStep[];
+export type Model2 = string | null;
+export type Note1 = string | null;
+export type Now = string | null;
+export type Ready = boolean;
 
 /**
  * The proposed file, one or two sentences on what changed and why, its outline steps, the
@@ -58,6 +65,7 @@ export interface WorkflowProposeResult {
   note: Note;
   problems?: Problems;
   steps?: Steps;
+  workflow_model?: WorkflowModelInfo | null;
 }
 /**
  * One finding of ``workflow.check``, with the line it is on and the outline step it belongs
@@ -103,6 +111,9 @@ export interface WorkflowOutlineStep {
   key?: Key;
   kind: Kind1;
   lines: Lines;
+  model?: Model1;
+  model_now?: ModelNow;
+  model_ready?: ModelReady;
   title: Title;
 }
 /**
@@ -125,4 +136,20 @@ export interface WorkflowStepArg {
   name: Name;
   source: Source;
   value?: Value;
+}
+/**
+ * The workflow's own model (``@workflow(model=)``), for the header of the editor.
+ *
+ * ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+ * ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is false when
+ * ``now`` is not set up on this machine; ``note`` then says so, in words.
+ *
+ * This interface was referenced by `WorkflowProposeResult`'s JSON-Schema
+ * via the `definition` "WorkflowModelInfo".
+ */
+export interface WorkflowModelInfo {
+  model?: Model2;
+  note?: Note1;
+  now?: Now;
+  ready?: Ready;
 }

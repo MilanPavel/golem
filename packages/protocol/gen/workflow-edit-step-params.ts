@@ -10,7 +10,8 @@ export type Value = string | number | boolean;
  * ``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor holds).
  *
  * ``name`` is the argument (``type``, ``brief``, ``model``, ``budget``, ``key``, ...) and
- * ``value`` its new literal. Only that argument's source span is replaced, or ``name=value`` is
+ * ``value`` its new literal. ``step_id`` ``@workflow`` stands for the decorator: only ``model``
+ * can be set there. Only that argument's source span is replaced, or ``name=value`` is
  * added when the call lacks it. Refused for a code step, an argument the code computes and a
  * value that is not valid for it.
  */

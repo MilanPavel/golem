@@ -7,6 +7,7 @@ export type Default = string | null;
 export type Name = string;
 export type Type = string | null;
 export type Inputs = WorkflowInputInfo[];
+export type Model = string | null;
 export type Name1 = string;
 export type Path = string;
 export type Project = string | null;
@@ -38,6 +39,7 @@ export interface WorkflowEntryInfo {
   error?: Error;
   id: Id;
   inputs?: Inputs;
+  model?: Model;
   name: Name1;
   path: Path;
   project?: Project;

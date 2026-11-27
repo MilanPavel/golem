@@ -29,6 +29,9 @@ export type Kind = string;
  * @maxItems 2
  */
 export type Lines = [unknown, unknown];
+export type Model = string | null;
+export type ModelNow = string | null;
+export type ModelReady = boolean | null;
 export type Title = string;
 
 /**
@@ -57,6 +60,9 @@ export interface WorkflowOutlineStep {
   key?: Key;
   kind: Kind;
   lines: Lines;
+  model?: Model;
+  model_now?: ModelNow;
+  model_ready?: ModelReady;
   title: Title;
 }
 /**

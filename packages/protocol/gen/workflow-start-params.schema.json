@@ -12,6 +12,18 @@
       "title": "Inputs",
       "type": "object"
     },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model"
+    },
     "trigger": {
       "default": "manual",
       "enum": [
