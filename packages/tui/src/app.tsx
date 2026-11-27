@@ -202,6 +202,7 @@ import {
   consentShowable,
   reviewItemsOf,
   workerBlocks,
+  resultKind,
 } from "@golem/view";
 import { compactWaiting, runCompact } from "./compact.ts";
 import { contextKeyLine, contextRowForPress, readContextActions } from "./context-actions.ts";
@@ -503,7 +504,9 @@ import {
   layoutWorkflowRun,
   openWorkflowRun,
   pressWorkflowRun,
+  resultPagerText,
   workflowRunKeyOf,
+  type OutputFile,
   type WorkflowRunAction,
   type WorkflowRunData,
   type WorkflowRunManagerState,
@@ -1801,7 +1804,7 @@ export function App({
       : undefined;
   const pickedWorkflowId = pickedWorkflow?.state === "ok" ? pickedWorkflow.id : null;
   const pickedWorkflowName = pickedWorkflow?.name ?? "";
-  const pickedLastRunId = pickedWorkflowId === null ? null : (workflowRunsOf(runList.runs ?? [], pickedWorkflowName)[0]?.workflow_run_id ?? null);
+  const pickedLastRunId = pickedWorkflowId === null ? null : (workflowRunsOf(runList.runs ?? [], pickedWorkflowName, pickedWorkflow?.id)[0]?.workflow_run_id ?? null);
   useEffect(() => {
     if (pickedWorkflowId === null) {
       return;
@@ -1811,7 +1814,7 @@ export function App({
       let data: WorkflowDetailData;
       try {
         const got = await client.getWorkflow(pickedWorkflowId);
-        data = { id: pickedWorkflowId, steps: got.steps ?? [], lastRun: null, error: null };
+        data = { id: pickedWorkflowId, steps: got.steps ?? [], lastRun: null, workflowModel: got.workflow_model ?? null, error: null };
       } catch (error) {
         data = { id: pickedWorkflowId, steps: [], lastRun: null, error: messageOf(error) };
       }
@@ -2827,6 +2830,7 @@ export function App({
       showWorkflowsManager(openWorkflowsManager());
       loadWorkflows();
       loadRuns();
+      loadRoutines();
       return;
     }
     if (outcome.kind === "data") {
@@ -5119,6 +5123,21 @@ export function App({
     } else if (action.kind === "open-chat" || action.kind === "open-review") {
       showWorkflowRunState(closedWorkflowRun);
       session.switchTo(action.sessionId);
+    } else if (action.kind === "show-result") {
+      const width = Math.min(100, Math.max(20, stepsSizeRef.current.columns - 2));
+      void (async () => {
+        const files = new Map<number, OutputFile>();
+        for (const output of action.outputs) {
+          if (output.index === null || resultKind(output.value) !== "file") continue;
+          try {
+            const read = await client.readWorkflowOutput(id, output.index);
+            files.set(output.index, { path: read.path, text: read.text, truncated: read.truncated === true });
+          } catch (error) {
+            files.set(output.index, { error: messageOf(error) });
+          }
+        }
+        await showInPager(resultPagerText(action.outputs, files, width), suspendTerminal);
+      })().catch((error: unknown) => said(messageOf(error)));
     } else if (action.kind === "answer") {
       client.answerWorkflowReview(id, action.key, action.verdict).then(
         () => loadWorkflowRun(id),
@@ -6751,7 +6770,7 @@ export function App({
         />
       ) : workflowsManager.open ? (
         <Box flexDirection="column" width={columns} height={budget.body} flexShrink={0} overflow="hidden">
-          {layoutWorkflowsManager({ state: workflowsManager, list: workflowList, columns, rows: budget.body, detail: workflowDetail, runs: runList.runs ?? [], now: Date.now() }).map((line, index) => (
+          {layoutWorkflowsManager({ state: workflowsManager, list: workflowList, columns, rows: budget.body, detail: workflowDetail, runs: runList.runs ?? [], routines: routineList.routines ?? [], now: Date.now() }).map((line, index) => (
             <McpManagerRow key={index} line={line} />
           ))}
         </Box>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { RunInfo, WorkflowEntryInfo } from "@golem/client";
+import type { RoutineInfo, RunInfo, WorkflowEntryInfo } from "@golem/client";
 
 import type { Press } from "./keys.ts";
 import {
@@ -11,6 +11,7 @@ import {
   openWorkflowsManager,
   orderedWorkflows,
   pressWorkflowsManager,
+  workflowRunsOf,
   workflowsManagerKeyOf,
   workflowsManagerTyping,
   type WorkflowDetailData,
@@ -61,7 +62,7 @@ test("the list groups This project first, then Yours, with the broken error and 
   assert.equal(lines[1], "4 workflows · 1 broken · 1 not trusted");
   assert.ok(lines.includes("  This project"));
   assert.ok(lines.includes("  Yours"));
-  assert.ok(lines.some((line) => line.startsWith("❯ ✔ pr-digest") && line.includes("pr-digest does things")));
+  assert.ok(lines.some((line) => line.startsWith("❯ ✔ pr-digest") && line.includes("Not scheduled") && !line.includes("pr-digest does things")));
   assert.ok(lines.some((line) => line.startsWith("  ✘ release-check") && line.endsWith("ImportError: no module named gh")));
   assert.ok(lines.some((line) => line.startsWith("  ! new-one") && line.endsWith("not trusted")));
   assert.equal(lines.at(-1), "↑/↓ to navigate · e edit · r run · Enter last run · h runs · Esc to close");
@@ -220,18 +221,19 @@ test("the outline shows a step's item after its title, and its group in words", 
     { id: "b", kind: "llm", title: "Ask the model", group: "parallel-2", lines: [12, 12], after: [] },
   ];
   const lines = outline(openWorkflowsManager(), { ...SEEN, steps, lastRun: null } as unknown as WorkflowDetailData);
-  assert.ok(lines.includes("1  Check folder golem  step · Once for each f in folders · Both folders"));
-  assert.ok(lines.includes("2  Ask the model  llm · At the same time"));
+  assert.ok(lines.includes("1  Check folder golem  Python · Once for each f in folders · Both folders"));
+  assert.ok(lines.includes("2  Ask the model  Model · At the same time"));
 });
 
 test("the selected workflow shows its outline below the list, with last-run times and the header", () => {
   const lines = outline(openWorkflowsManager());
   const at = lines.indexOf("pr-digest");
   assert.ok(at > 0);
-  assert.equal(lines[at + 1], "last run 08:30 · done · $0.04");
-  assert.equal(lines[at + 2], "1  08:30  List pull requests  tool");
-  assert.equal(lines[at + 3], "2  08:31  Write a note  agent · agent writer · Once for each prs · if prs");
-  assert.equal(lines[at + 4], "3         Look it over  review");
+  assert.equal(lines[at + 1], "pr-digest does things");
+  assert.equal(lines[at + 2], "Not scheduled · it runs only when you press Run · last run running today 11:00 · 60m 00s");
+  assert.equal(lines[at + 3], "1  08:30  List pull requests  Tool");
+  assert.equal(lines[at + 4], "2  08:31  Write a note  Agent · agent writer · Once for each prs · if prs");
+  assert.equal(lines[at + 5], "3         Look it over  Review");
   assert.ok(outline(openWorkflowsManager(), null).includes("reading the file…"));
   assert.ok(outline(openWorkflowsManager(), { ...SEEN, steps: [], lastRun: null }).includes("No steps found in the file."));
   assert.ok(outline(openWorkflowsManager(), { ...SEEN, error: "boom" }).includes("✘ boom"));
@@ -269,7 +271,7 @@ test("e edits the file, r opens the form, Enter opens the newest run, h lists th
   const lines = outline(history);
   assert.equal(lines[0], "pr-digest: runs");
   assert.ok(lines.includes("❯ 11:00 · running"));
-  assert.ok(lines.includes("  08:30 · succeeded"));
+  assert.ok(lines.includes("  08:30 · finished"));
   assert.deepEqual(pressed("enter", pressed("down", history).state).action, { kind: "open-run", workflowRunId: "wr1" });
   assert.deepEqual(pressed("back", history).state.view, { kind: "list", selected: 0 });
 });
@@ -309,4 +311,39 @@ test("a narrow terminal cuts every line, and a short one keeps the hint", () => 
   assert.equal(lines.length, 6);
   for (const line of lines) assert.ok((line.prefix?.length ?? 0) + (line.mark ? line.mark.text.length + 1 : 0) + line.text.length <= 30);
   assert.ok(lines.at(-1)?.text.startsWith("↑/↓"));
+});
+
+const ROUTINES = [{ config: { name: "weekday-digest", workflow: "pr-digest", schedule: "30 7 * * 1-5" }, next_at: null }] as unknown as RoutineInfo[];
+
+test("the list reads in words: the title, the routine or not scheduled, the model; the file's schedule text is gone", () => {
+  const titled = [{ ...digest, title: "Morning PR digest", model: "qwen3.5:9b", trigger: { kind: "schedule", expr: "0 8 * * *" } }, mine] as WorkflowEntryInfo[];
+  const lines = layoutWorkflowsManager({ state: openWorkflowsManager(), list: { workflows: titled, error: null }, columns: 100, rows: 24, routines: ROUTINES, now: NOW }).map((line) => line.text);
+  const row = lines.find((line) => line.startsWith("Morning PR digest"));
+  assert.ok(row?.includes("qwen3.5:9b"));
+  assert.ok(row?.includes("07:30"));
+  assert.ok(!row?.includes("0 8 * * *"));
+  const none = layoutWorkflowsManager({ state: openWorkflowsManager(), list: { workflows: titled, error: null }, columns: 100, rows: 24, now: NOW }).map((line) => line.text);
+  assert.ok(none.some((line) => line.startsWith("Morning PR digest") && line.includes("Not scheduled · qwen3.5:9b")));
+  assert.ok(none.some((line) => line.startsWith("morning") && line.endsWith("Not scheduled")));
+});
+
+test("the outline names the model of a step, what it does, and the workflow's routine and model", () => {
+  const steps = [{ id: "a", kind: "llm", title: "Write the briefing", does: "Writes the morning note", model: "qwen3.5:9b", model_now: "llama3.1:8b", lines: [10, 10], after: [] }];
+  const detail = { ...SEEN, steps, lastRun: null, workflowModel: { model: "qwen3.5:9b", now: "llama3.1:8b" } } as unknown as WorkflowDetailData;
+  const lines = layoutWorkflowsManager({ state: openWorkflowsManager(), list: LIST, columns: 140, rows: 40, detail, runs: RUNS, routines: ROUTINES, now: NOW }).map((line) => line.text);
+  assert.ok(lines.some((line) => line.startsWith("Not scheduled") === false && line.includes("07:30") && line.includes("model llama3.1:8b")));
+  assert.ok(lines.includes("1  Write the briefing  Writes the morning note · Model · llama3.1:8b"));
+});
+
+test("a workflow's runs are matched by its id, and a run says what came out", () => {
+  const runs = [
+    { kind: "workflow", workflow_id: digest.id, origin: "workflow:pr-digest", workflow_run_id: "a", session_id: null, status: "succeeded", started_at: "2026-11-26T08:30:00", summary: "12 PRs, 2 need you" },
+    { kind: "workflow", workflow_id: "/other/pr-digest.py::pr-digest", origin: "workflow:pr-digest", workflow_run_id: "b", session_id: null, status: "succeeded", started_at: "2026-11-26T08:00:00" },
+  ] as unknown as RunInfo[];
+  assert.deepEqual(workflowRunsOf(runs, "pr-digest", digest.id).map((run) => run.workflow_run_id), ["a"]);
+  assert.deepEqual(workflowRunsOf(runs, "pr-digest").map((run) => run.workflow_run_id), ["a", "b"]);
+  const history = pressWorkflowsManager(openWorkflowsManager(), WORKFLOWS, "history", runs).state;
+  const lines = layoutWorkflowsManager({ state: history, list: LIST, columns: 100, rows: 24, runs, now: NOW }).map((line) => line.text);
+  assert.ok(lines.includes("08:30 · 12 PRs, 2 need you"));
+  assert.equal(lines.filter((line) => line.includes("08:00")).length, 0);
 });

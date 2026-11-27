@@ -1,13 +1,17 @@
-import type { RunInfo, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowStatusResult } from "@golem/client";
+import type { RoutineInfo, RunInfo, WorkflowEntryInfo, WorkflowOutlineStep, WorkflowStatusResult } from "@golem/client";
 import {
   errorLine,
   fieldProblem,
   initialValues,
   inputFields,
-  lastRunLine,
+  lastRunWords,
   outlineRows,
+  routinePillWords,
+  runResultLine,
   runStartedText,
+  runsOfWorkflow,
   startInputs,
+  stepKindWords,
   stepRanTimes,
   workflowGroups,
   workflowRowLine,
@@ -53,6 +57,8 @@ export type WorkflowDetailData = {
   steps: readonly WorkflowOutlineStep[];
   /** The newest run with its steps, or null when it never ran or could not be read. */
   lastRun: Pick<WorkflowStatusResult, "run" | "steps"> | null;
+  /** The model the workflow file names for all its model steps (`workflow_model.model`), and the one in use now (`now`). */
+  workflowModel?: { model?: string | null; now?: string | null } | null;
   error: string | null;
 };
 
@@ -125,15 +131,19 @@ export function orderedWorkflows(workflows: readonly WorkflowEntryInfo[]): Workf
   return workflowGroups(workflows).flatMap((group) => group.workflows);
 }
 
-/** This workflow's runs from the Runs list, including the ones a routine started. Newest first, as the list is. */
-export function workflowRunsOf(runs: readonly RunInfo[], name: string): RunInfo[] {
-  return runs.filter(
-    (run) =>
-      (run.kind === "workflow" || run.kind === "routine") &&
-      run.origin === `workflow:${name}` &&
-      typeof run.workflow_run_id === "string" &&
-      run.workflow_run_id !== "",
-  );
+/**
+ * This workflow's runs from the Runs list, including the ones a routine started. Newest first, as the list is. With the
+ * workflow's `id` a row is matched by the id it carries (two workflows of one name in two folders are told apart); a row
+ * with none is matched by `workflow:<name>` in its origin.
+ */
+export function workflowRunsOf(runs: readonly RunInfo[], name: string, id?: string): RunInfo[] {
+  const mine = id === undefined ? runs.filter((run) => run.origin === `workflow:${name}`) : runsOfWorkflow(runs, id);
+  return mine.filter((run) => (run.kind === "workflow" || run.kind === "routine") && typeof run.workflow_run_id === "string" && run.workflow_run_id !== "");
+}
+
+/** The routines whose `workflow` is this one, in the daemon's order. */
+export function routinesOf(routines: readonly RoutineInfo[], name: string): RoutineInfo[] {
+  return routines.filter((routine) => routine.config.workflow === name);
 }
 
 const TRUST_FIRST = "Not trusted: add this project to trusted_projects in your config first. Until then nothing runs.";
@@ -220,7 +230,7 @@ export function pressWorkflowsManager(
   if (view.kind === "form") return pressForm(state, view, key);
   const items = orderedWorkflows(workflows);
   if (view.kind === "runs") {
-    const mine = workflowRunsOf(runs, view.name);
+    const mine = workflowRunsOf(runs, view.name, view.id);
     const at = clamp(view.selected, mine.length);
     if (key === "back") return { state: { ...state, view: { kind: "list", selected: Math.max(0, items.findIndex((item) => item.id === view.id)) } }, action: NONE };
     if (key === "up" || key === "down") return { state: { ...state, view: { ...view, selected: clamp(at + (key === "up" ? -1 : 1), mine.length) } }, action: NONE };
@@ -237,7 +247,7 @@ export function pressWorkflowsManager(
   if (key === "edit") return { state: stay(null), action: { kind: "edit", path: picked.path, name: picked.name } };
   if (picked.state === "untrusted" && (key === "run" || key === "enter" || key === "history")) return { state: stay(TRUST_FIRST), action: NONE };
   if (key === "run") return { state: { ...state, view: startForm(picked) }, action: NONE };
-  const mine = workflowRunsOf(runs, picked.name);
+  const mine = workflowRunsOf(runs, picked.name, picked.id);
   if (key === "history") {
     return mine.length === 0
       ? { state: stay(`${picked.name} has not run yet.`), action: NONE }
@@ -271,11 +281,24 @@ function fit(text: string, width: number): string {
   return text.length <= width ? text : `${text.slice(0, Math.max(0, width - 1))}…`;
 }
 
-function listLines(workflows: readonly WorkflowEntryInfo[], selected: number): McpManagerLine[] {
+/** The name a workflow goes by on screen: its title, else its name. */
+function titleOf(workflow: Pick<WorkflowEntryInfo, "name" | "title">): string {
+  return workflow.title !== null && workflow.title !== undefined && workflow.title !== "" ? workflow.title : workflow.name;
+}
+
+/** The right of a row: its routine or that it is not scheduled, then the model. A file that cannot run says why. */
+function rowWords(workflow: WorkflowEntryInfo, routines: readonly RoutineInfo[], now: number): string {
+  if (workflow.state !== "ok") return workflowRowLine(workflow);
+  const mine = routinesOf(routines, workflow.name);
+  const schedule = mine.length === 0 ? routinePillWords(mine, now).split(" · ")[0] : routinePillWords(mine, now);
+  return [schedule, workflow.model ?? ""].filter((part) => part !== undefined && part !== "").join(" · ");
+}
+
+function listLines(workflows: readonly WorkflowEntryInfo[], selected: number, routines: readonly RoutineInfo[], now: number): McpManagerLine[] {
   const groups = workflowGroups(workflows);
   if (groups.length === 0) return [{ text: "Workflows", bold: true }, { text: "no workflows", dim: true }, { text: "" }, { text: NO_WORKFLOWS }, { text: NO_WORKFLOWS_STARTERS }];
   const items = groups.flatMap((group) => group.workflows);
-  const nameWidth = Math.max(...items.map((workflow) => workflow.name.length));
+  const nameWidth = Math.max(...items.map((workflow) => titleOf(workflow).length));
   const broken = items.filter((workflow) => workflow.state === "broken").length;
   const untrusted = items.filter((workflow) => workflow.state === "untrusted").length;
   const counts = [`${items.length} ${items.length === 1 ? "workflow" : "workflows"}`];
@@ -290,7 +313,7 @@ function listLines(workflows: readonly WorkflowEntryInfo[], selected: number): M
       lines.push({
         prefix: index === chosen ? "❯ " : "  ",
         mark: workflowMark(workflow),
-        text: `${workflow.name.padEnd(nameWidth)}  ${workflowRowLine(workflow)}`,
+        text: `${titleOf(workflow).padEnd(nameWidth)}  ${rowWords(workflow, routines, now)}`,
         selected: index === chosen,
         dim: workflow.state === "untrusted",
       });
@@ -343,8 +366,8 @@ function formLines(form: WorkflowForm, rows: number): McpManagerLine[] {
 const READING = "reading the file…";
 
 /** The outline below the list: the steps, the traceback of a broken file, or why an untrusted one is not read. */
-export function outlineLines(workflow: WorkflowEntryInfo, detail: WorkflowDetailData | null, runs: readonly RunInfo[], now: number): McpManagerLine[] {
-  const head: McpManagerLine = { text: workflow.name, bold: true };
+export function outlineLines(workflow: WorkflowEntryInfo, detail: WorkflowDetailData | null, runs: readonly RunInfo[], now: number, routines: readonly RoutineInfo[] = []): McpManagerLine[] {
+  const head: McpManagerLine = { text: titleOf(workflow), bold: true };
   if (workflow.state === "untrusted") return [head, { text: TRUST_FIRST, mark: { text: "!", tone: "wait" } }];
   if (workflow.state === "broken") {
     const tail = (workflow.error ?? "").split("\n").filter((line) => line.trim() !== "").slice(-6);
@@ -355,27 +378,40 @@ export function outlineLines(workflow: WorkflowEntryInfo, detail: WorkflowDetail
   if (detail.error !== null) return [head, { text: detail.error, mark: { text: "✘", tone: "bad" } }];
   const last = detail.lastRun;
   const lines: McpManagerLine[] = [head];
-  const when = lastRunLine(last === null ? null : last.run, last?.steps ?? [], now);
-  if (when !== "") lines.push({ text: when, dim: true });
+  if (workflow.description !== undefined && workflow.description !== "") lines.push({ text: workflow.description.split("\n").find((row) => row.trim() !== "")?.trim() ?? "" });
+  const newest = workflowRunsOf(runs, workflow.name, workflow.id)[0];
+  const model = detail.workflowModel?.now ?? detail.workflowModel?.model ?? workflow.model ?? null;
+  lines.push({
+    text: [routinePillWords(routinesOf(routines, workflow.name), now), newest === undefined ? "" : `last run ${lastRunWords(newest, now)}`, model === null ? "" : `model ${model}`].filter((part) => part !== "").join(" · "),
+    dim: true,
+  });
   const rows = outlineRows(detail.steps);
   if (rows.length === 0) return [...lines, { text: "No steps found in the file.", dim: true }];
   const ran = stepRanTimes(last?.steps ?? [], now);
   const timeOf = (key: string | null): string => (key === null ? "" : (ran.get(key) ?? ""));
   const timeWidth = Math.max(0, ...rows.map((row) => timeOf(row.key).length));
   const numberWidth = String(rows.length).length;
-  for (const row of rows) {
+  for (const [at, row] of rows.entries()) {
     const time = timeWidth > 0 ? `${timeOf(row.key).padEnd(timeWidth)}  ` : "";
-    lines.push({ text: `${String(row.number).padStart(numberWidth)}  ${time}${row.title}${row.item === null ? "" : ` ${row.item}`}  ${[...row.notes, ...(row.group === null ? [] : [row.group])].join(" · ")}` });
+    const step = detail.steps[at];
+    const modelUsed = step === undefined ? null : (step.model_now ?? step.model ?? null);
+    // The kind in words, then what the step does when the file says, the model it uses, what repeats or guards it, its group.
+    const notes = [stepKindWords(step?.kind ?? ""), ...row.notes.slice(1)];
+    if (modelUsed !== null && modelUsed !== "") notes.splice(1, 0, modelUsed);
+    const says = [...(step?.does ? [step.does] : []), notes.join(" · "), ...(row.group === null ? [] : [row.group])];
+    lines.push({ text: `${String(row.number).padStart(numberWidth)}  ${time}${row.title}${row.item === null ? "" : ` ${row.item}`}  ${says.join(" · ")}` });
   }
   return lines;
 }
 
 function runsLines(view: WorkflowRunsView, runs: readonly RunInfo[], now: number): McpManagerLine[] {
-  const mine = workflowRunsOf(runs, view.name);
+  const mine = workflowRunsOf(runs, view.name, view.id);
   const lines: McpManagerLine[] = [{ text: `${view.name}: runs`, bold: true }, { text: `${mine.length} ${mine.length === 1 ? "run" : "runs"}, newest first`, dim: true }, { text: "" }];
   const at = clamp(view.selected, mine.length);
   for (const [index, run] of mine.entries()) {
-    const words = [runStartedText(run, now), workflowRunWords(run.status)].filter((part) => part !== "");
+    // One line each, saying what came out: the run's summary, or how it ended.
+    const said = runResultLine(run);
+    const words = [runStartedText(run, now), said === "" ? workflowRunWords(run.status) : said].filter((part) => part !== "");
     lines.push({ prefix: index === at ? "❯ " : "  ", text: words.join(" · "), selected: index === at });
   }
   return lines;
@@ -398,8 +434,11 @@ export function layoutWorkflowsManager(input: {
   detail?: WorkflowDetailData | null;
   /** The Runs list, for `h` and the last run. */
   runs?: readonly RunInfo[];
+  /** The routines, for each workflow's schedule. */
+  routines?: readonly RoutineInfo[];
   now?: number;
 }): McpManagerLine[] {
+  const routines = input.routines ?? [];
   const width = Math.max(1, input.columns);
   const room = Math.max(0, input.rows - 2);
   const view = input.state.view;
@@ -419,10 +458,10 @@ export function layoutWorkflowsManager(input: {
     hint = RUNS_HINT;
   } else {
     const picked = orderedWorkflows(input.list.workflows)[clamp(view.selected, input.list.workflows.length)];
-    const outline = picked === undefined ? [] : outlineLines(picked, input.detail ?? null, runs, now);
+    const outline = picked === undefined ? [] : outlineLines(picked, input.detail ?? null, runs, now, routines);
     const outlineRoom = Math.min(outline.length, Math.floor(room / 2));
     const listRoom = outline.length === 0 ? room : Math.max(1, room - outlineRoom - 1);
-    body = scrollToSelected(listLines(input.list.workflows, view.selected), listRoom);
+    body = scrollToSelected(listLines(input.list.workflows, view.selected, routines, now), listRoom);
     if (outline.length > 0) body = [...body, { text: "" }, ...outline.slice(0, outlineRoom)];
     if (view.notice) body = [...body.slice(0, Math.max(0, room - 1)), { text: view.notice, mark: { text: "!", tone: "wait" } }];
     if (picked?.state === "untrusted") hint = LOCKED_HINT;
