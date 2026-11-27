@@ -420,7 +420,8 @@ async def test_the_briefing_does_not_read_trusted_projects(
 
 def test_the_briefing_outline_reads_in_words() -> None:
     [flow] = outline(starter("morning_briefing").read_text(encoding="utf-8"))
-    shown = [(s.group_title, s.title, s.item) for s in flow.steps if s.kind != "code"]
+    assert [s for s in flow.steps if s.kind == "code"] == []
+    shown = [(s.group_title, s.title, s.item) for s in flow.steps]
     assert shown == [
         (None, "Work out the time window", None),
         (None, "List your project folders", None),

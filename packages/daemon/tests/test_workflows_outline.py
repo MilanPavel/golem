@@ -361,3 +361,32 @@ def test_syntax_error_has_a_line() -> None:
         outline("@workflow\nasync def w(run):\n    await run.step(\n")
     assert e.value.line is not None
     assert "line" in str(e.value)
+
+
+OUTPUTS = """\
+from golem.workflow import Run, workflow
+
+@workflow()
+async def report(run: Run) -> str:
+    await run.output("started", title="Start")
+    one = await run.step("Make it", make)
+    await run.output(one, title="Made")
+    if one:
+        await run.output("extra")
+    two = await run.step("Check it", check_it, one)
+    await run.output(two, title="Checked", summary="all fine")
+    return two
+"""
+
+
+def test_run_output_is_not_a_step_and_changes_nothing_around_it() -> None:
+    from golem.workflows.check import check
+
+    [flow] = outline(OUTPUTS)
+    assert [(s.kind, s.title, s.lines) for s in flow.steps] == [
+        ("step", "Make it", (6, 6)),
+        ("step", "Check it", (10, 10)),
+    ]
+    assert [s.id for s in flow.steps] == ["step:make-it", "step:check-it"]
+    assert flow.steps[1].after == ("step:make-it",)
+    assert [p for p in check(OUTPUTS, None) if p.severity == "error"] == []
