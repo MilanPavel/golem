@@ -30,8 +30,7 @@ The only module user code imports is `golem.workflow` (`D/workflow/__init__.py`)
 
 | Name | Meaning |
 |---|---|
-| `@workflow(trigger=, inputs=)` | Marks an async function as a workflow. |
-| `schedule("mon 06:00")` | A trigger, parsed by `D/routines.py`. |
+| `@workflow(inputs=)` | Marks an async function as a workflow. `trigger=` is still accepted but never used; a routine is the only "when". |
 | `Run` | The object each workflow receives. |
 | `run.step(name, fn, *args, key=)` | A plain function. The result is saved. |
 | `run.parallel(...)` | Steps or agents at once. |
@@ -54,10 +53,11 @@ Rules:
 
 ```python
 # workflows/upgrade_dependencies.py
-from golem.workflow import Run, schedule, workflow
+from golem.workflow import Run, workflow
 from .packages import list_outdated, open_pull_request
 
-@workflow(trigger=schedule("mon 06:00"))
+# A routine (`weekly mon 06:00`) starts it.
+@workflow()
 async def upgrade_dependencies(run: Run) -> None:
     outdated = await run.step("list outdated", list_outdated, run.repo)
     if not outdated:
@@ -108,7 +108,7 @@ The outline of the same file, read from the code by fixed rules:
 
 Flow:
 
-1. `workflow.start` (or a trigger) makes a `workflow_runs` row. The headless session `workflow:<name>` is made later, the first time a step needs one (an agent, a skill, a tool that reads the session); a run of plain steps has none.
+1. `workflow.start` (a person, or a routine) makes a `workflow_runs` row. The headless session `workflow:<name>` is made later, the first time a step needs one (an agent, a skill, a tool that reads the session); a run of plain steps has none.
 2. The engine calls the function. Each `run.*` call becomes a `workflow_steps` row, keyed by its step key.
 3. A step that is already `done` returns its saved result and does not run.
 4. After a restart, the engine calls the function again from the top. Finished steps return saved results. Running agents continue from their last saved turn (`reconcile_helpers`, `resume_helper`).
