@@ -2390,7 +2390,8 @@ function PanelBody({ theme, prefix }: { theme: "slip" | "kiln"; prefix: string }
         ))}
         {(
           [
-            ["Workflow detail, one routine", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE], undefined],
+            ["Workflow detail, one routine", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE], { problems: [] }],
+            ["Workflow detail, no check yet", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE], undefined],
             ["Workflow detail, two routines", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [SAMPLE_WORKFLOW_ROUTINE, SAMPLE_WORKFLOW_WATCH_ROUTINE], undefined],
             ["Workflow detail, not scheduled", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, SAMPLE_WORKFLOW_RUNS, [], undefined],
             ["Workflow detail, never run", SAMPLE_PR_DIGEST, SAMPLE_PR_DIGEST_STEPS, SAMPLE_PR_DIGEST_CODE, [], [], undefined],

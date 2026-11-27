@@ -178,13 +178,22 @@ test("the All runs pill counts the runs and opens the Runs page filtered by this
   expect(onNavigate).toHaveBeenCalledWith(`/runs?workflow=${encodeURIComponent(SAMPLE_PR_DIGEST.id)}`);
 });
 
-test("the Checks pill says the checks pass, or counts the problems", () => {
+test("there is no Checks pill before a check has come back, and none for a file with no code shown", () => {
   const { unmount } = render(detail());
-  expect(screen.getByText(/checks pass/)).toBeTruthy();
+  expect(screen.queryByText(/checks pass|problem/)).toBeNull();
+  unmount();
+  render(detail({ workflow: SAMPLE_BROKEN, steps: [], code: null }));
+  expect(screen.queryByText(/checks pass|problem/)).toBeNull();
+});
+
+test("the Checks pill says the checks pass after a clean check, or counts the problems", () => {
+  const { unmount } = render(detail({ initialEditor: { problems: [] } }));
+  expect(within(screen.getByRole("group", { name: "About this workflow" })).getByText(/checks pass/)).toBeTruthy();
   unmount();
   render(detail({ initialEditor: { problems: SAMPLE_PR_DIGEST_PROBLEMS } }));
-  expect(screen.getByText(`${SAMPLE_PR_DIGEST_PROBLEMS.length === 1 ? "1 problem" : `${SAMPLE_PR_DIGEST_PROBLEMS.length} problems`}`, { selector: "span" })).toBeTruthy();
-  expect(screen.queryByText(/checks pass/)).toBeNull();
+  const pills = within(screen.getByRole("group", { name: "About this workflow" }));
+  expect(pills.getByText(`${SAMPLE_PR_DIGEST_PROBLEMS.length} problems`)).toBeTruthy();
+  expect(pills.queryByText(/checks pass/)).toBeNull();
 });
 
 test("the Code tab shows the file read only with a dot on each step's line, and Show in Finder reveals it", async () => {

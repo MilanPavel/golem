@@ -71,7 +71,7 @@ function ErrorBox({ error }: { error: string }) {
 const PILL = "inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-meta text-muted";
 const PILL_LINK = `${PILL} outline-offset-2 outline-clay hover:border-line-strong focus-visible:outline-2`;
 
-function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, onProblemsChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onProblemsChange: (count: number) => void; onOpenAgent: (name: string) => void }) {
+function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, onProblemsChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onProblemsChange: (count: number | null) => void; onOpenAgent: (name: string) => void }) {
   if (code === null) {
     return (
       <div className="flex flex-col gap-2">
@@ -147,7 +147,7 @@ function RoutinePill({ workflow, routines, now, onNavigate }: { workflow: Workfl
 }
 
 /** The pills under the title: the routine, the last run, all the runs, and the checks. */
-function Pills({ workflow, routines, runs, problems, now, onNavigate }: { workflow: WorkflowEntryInfo; routines: readonly RoutineInfo[]; runs: readonly RunInfo[]; problems: number; now: number; onNavigate: (path: string) => void }) {
+function Pills({ workflow, routines, runs, problems, now, onNavigate }: { workflow: WorkflowEntryInfo; routines: readonly RoutineInfo[]; runs: readonly RunInfo[]; problems: number | null; now: number; onNavigate: (path: string) => void }) {
   const last = runs[0];
   return (
     <div aria-label="About this workflow" role="group" className="flex flex-wrap items-center gap-2">
@@ -167,9 +167,11 @@ function Pills({ workflow, routines, runs, problems, now, onNavigate }: { workfl
           <span aria-hidden="true">→</span>
         </Link>
       )}
-      <span className={cn(PILL, problems === 0 ? "text-allow" : "text-deny")}>
-        <span aria-hidden="true">{problems === 0 ? "✓" : "✕"}</span> {checksWords(problems)}
-      </span>
+      {problems === null ? null : (
+        <span className={cn(PILL, problems === 0 ? "text-allow" : "text-deny")}>
+          <span aria-hidden="true">{problems === 0 ? "✓" : "✕"}</span> {checksWords(problems)}
+        </span>
+      )}
     </div>
   );
 }
@@ -183,9 +185,9 @@ function fileName(path: string): string {
 export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false }: WorkflowDetailProps) {
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   const [dirty, setDirty] = useState(false);
-  const [problems, setProblems] = useState(initialEditor?.problems?.length ?? 0);
+  const [problems, setProblems] = useState<number | null>(initialEditor?.problems?.length ?? null);
   const onDirtyChange = useCallback((next: boolean) => setDirty(next), []);
-  const onProblemsChange = useCallback((next: number) => setProblems(next), []);
+  const onProblemsChange = useCallback((next: number | null) => setProblems(next), []);
   // Leaving with code that is not saved asks first.
   const onNavigate = (path: string) => {
     if (dirty && !window.confirm("The code has changes that are not saved. Leave and lose them?")) return;

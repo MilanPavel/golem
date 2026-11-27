@@ -28,7 +28,8 @@ export function allRunsWords(count: number): string {
   return count === 1 ? "1 run" : `All ${count} runs`;
 }
 
-/** The Checks pill: that they pass, or how many problems there are. */
-export function checksWords(problems: number): string {
+/** The Checks pill: that they pass, or how many problems there are. Empty before a check has come back (`null`): nothing is claimed. */
+export function checksWords(problems: number | null): string {
+  if (problems === null) return "";
   return problems === 0 ? "checks pass" : problems === 1 ? "1 problem" : `${problems} problems`;
 }

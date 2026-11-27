@@ -22,8 +22,10 @@ test("the gallery's Workflows section shows the panels and the detail header in 
   expect(detail("not scheduled").getByRole("link", { name: /Not scheduled/ }).getAttribute("href")).toContain("/routines?new&workflow=");
   expect(detail("never run").getByText("never run")).toBeTruthy();
   expect(detail("last run failed").getByRole("link", { name: /Last run/ }).textContent).toContain("failed");
-  expect(detail("checks failing").getByText(/problems?$/, { selector: "span" })).toBeTruthy();
+  expect(within(detail("checks failing").getByRole("group", { name: "About this workflow" })).getByText(/problems?$/)).toBeTruthy();
   expect(detail("one routine").queryByRole("tab")).toBeNull();
+  expect(within(detail("one routine").getByRole("group", { name: "About this workflow" })).getByText(/checks pass/)).toBeTruthy();
+  expect(within(detail("no check yet").getByRole("group", { name: "About this workflow" })).queryByText(/checks pass/)).toBeNull();
   expect(within(screen.getByRole("region", { name: "Workflow detail, broken, slip" })).getByRole("alert").textContent).toContain("ImportError");
 });
 

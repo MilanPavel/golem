@@ -21,6 +21,7 @@ test("the Last run pill gives the state, when and how long", () => {
 test("the run and check counts", () => {
   assert.equal(allRunsWords(4), "All 4 runs");
   assert.equal(allRunsWords(1), "1 run");
+  assert.equal(checksWords(null), "");
   assert.equal(checksWords(0), "checks pass");
   assert.equal(checksWords(1), "1 problem");
   assert.equal(checksWords(3), "3 problems");

@@ -45,8 +45,8 @@ export type WorkflowEditorProps = {
   onReveal?: (path: string) => Promise<void>;
   /** Told whenever the text differs from the saved one, or stops doing so. */
   onDirtyChange?: (dirty: boolean) => void;
-  /** Told how many problems the last check found, for the page header's Checks pill. */
-  onProblemsChange?: (count: number) => void;
+  /** Told how many problems the last check found, or null before any check has come back, for the page header's Checks pill. */
+  onProblemsChange?: (count: number | null) => void;
   /** A state to start in, for the gallery and tests. */
   initial?: { text?: string; steps?: readonly WorkflowOutlineStep[]; problems?: readonly WorkflowProblem[]; selected?: string; view?: EditorView; saveError?: string; ask?: string; asked?: string; proposal?: WorkflowProposeResult; writing?: boolean; proposeError?: string; refusedField?: { name: string; message: string } };
 };
@@ -442,7 +442,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
-  const problemCount = problems.length;
+  const problemCount = checked || problems.length > 0 ? problems.length : null;
   useEffect(() => {
     onProblemsChange?.(problemCount);
   }, [problemCount, onProblemsChange]);
