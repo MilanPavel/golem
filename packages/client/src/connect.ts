@@ -929,16 +929,16 @@ export interface GolemClient {
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
   /** Asks golem for a change to `code` (workflow.propose): one model call, checked, never saved. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
   proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
-  /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. */
-  startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult>;
+  /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. `model` is this one run's choice of model: it beats the steps' and the workflow's. */
+  startWorkflow(id: string, inputs?: Record<string, unknown>, model?: string): Promise<WorkflowStartResult>;
   /** `workflow.status`: a run and its steps. */
   workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
   /** `workflow.cancel`: stop a run. `cancelled` is false when it had already ended. */
   cancelWorkflow(workflowRunId: string): Promise<WorkflowCancelResult>;
   /** `workflow.read_output`: the text of output `index` of a run, when it is a file path the run marked. Cut at a limit; `truncated` says so. Rejects with the daemon's reason (a secret folder, a file that is gone). */
   readWorkflowOutput(workflowRunId: string, index: number): Promise<WorkflowReadOutputResult>;
-  /** `workflow.resume`: continue a stopped (`running`, `waiting` or `failed`) run; finished steps are not run again. */
-  resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult>;
+  /** `workflow.resume`: continue a stopped (`running`, `waiting` or `failed`) run; finished steps are not run again. `model` is the run's choice of model from now on. */
+  resumeWorkflow(workflowRunId: string, model?: string): Promise<WorkflowResumeResult>;
   /** `workflow.review.answer`: answer the review `key` of a waiting run. `text` is required for `edit`; the run continues once none of its reviews waits. */
   answerWorkflowReview(workflowRunId: string, key: string, verdict: "approve" | "edit" | "reject", text?: string): Promise<WorkflowReviewAnswerResult>;
   /** `workflow.run.*` and `workflow.step.*`: a run or one of its steps changed. */
@@ -3200,9 +3200,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async startWorkflow(id: string, inputs?: Record<string, unknown>): Promise<WorkflowStartResult> {
+    async startWorkflow(id: string, inputs?: Record<string, unknown>, model?: string): Promise<WorkflowStartResult> {
       await ready;
-      const result = await call("workflow.start", inputs === undefined ? { id } : { id, inputs });
+      const result = await call("workflow.start", { id, ...(inputs === undefined ? {} : { inputs }), ...(model === undefined ? {} : { model }) });
       if (!isWorkflowStartResult(result)) {
         throw new Error("invalid workflow.start result");
       }
@@ -3224,9 +3224,9 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult> {
+    async resumeWorkflow(workflowRunId: string, model?: string): Promise<WorkflowResumeResult> {
       await ready;
-      const result = await call("workflow.resume", { workflow_run_id: workflowRunId });
+      const result = await call("workflow.resume", { workflow_run_id: workflowRunId, ...(model === undefined ? {} : { model }) });
       if (!isWorkflowResumeResult(result)) {
         throw new Error("invalid workflow.resume result");
       }
