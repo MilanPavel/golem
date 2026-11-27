@@ -157,6 +157,88 @@ test("a data_query tool block opens into the table, and paging in it calls data.
   await waitFor(() => expect(screen.getByRole("status").textContent).toContain("51–100"));
 });
 
+test("Export opens a dialog with the format and a path in Downloads, and writes with those", async () => {
+  const user = userEvent.setup();
+  const onExport = vi.fn(async ({ path }: { path: string }) => ({ path: `/home/you/${path.slice(2)}`, rows: 9 }));
+  render(<ResultTable table={SAMPLE_SUBSCRIPTIONS} onExport={onExport} />);
+  await user.click(screen.getByRole("button", { name: /Export/ }));
+  const dialog = await screen.findByRole("dialog", { name: "Export the result" });
+  const path = within(dialog).getByLabelText("Path") as HTMLInputElement;
+  expect(path.value).toMatch(/^~\/Downloads\/bank-\d{4}-\d{2}-\d{2}\.csv$/);
+  await user.selectOptions(within(dialog).getByLabelText("Format"), "parquet");
+  expect(path.value).toMatch(/^~\/Downloads\/bank-\d{4}-\d{2}-\d{2}\.parquet$/);
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
+  expect(onExport).toHaveBeenCalledWith({ result_id: "r_7f2", path: path.value, format: "parquet" });
+  expect((await within(dialog).findByRole("status")).textContent).toMatch(/^✓ Wrote 9 rows to \/home\/you\/Downloads\/bank-/);
+  await user.click(within(dialog).getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("a typed path keeps its name when the format changes, and its own ending wins over the picker", async () => {
+  const user = userEvent.setup();
+  const onExport = vi.fn(async ({ path }: { path: string }) => ({ path, rows: 9 }));
+  render(<ResultTable table={SAMPLE_SUBSCRIPTIONS} onExport={onExport} />);
+  await user.click(screen.getByRole("button", { name: /Export/ }));
+  const dialog = await screen.findByRole("dialog");
+  const path = within(dialog).getByLabelText("Path");
+  await user.clear(path);
+  await user.type(path, "~/Documents/subs.csv");
+  await user.selectOptions(within(dialog).getByLabelText("Format"), "json");
+  expect((path as HTMLInputElement).value).toBe("~/Documents/subs.json");
+  await user.clear(path);
+  await user.type(path, "~/Documents/subs.parquet");
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  await waitFor(() => expect(onExport).toHaveBeenCalledWith({ result_id: "r_7f2", path: "~/Documents/subs.parquet", format: "parquet" }));
+});
+
+test("a refused export says why in a sentence and can be tried again", async () => {
+  const user = userEvent.setup();
+  const onExport = vi.fn().mockRejectedValueOnce(new Error("/a.csv already exists. golem does not overwrite a file.")).mockResolvedValueOnce({ path: "/b.csv", rows: 9 });
+  render(<ResultTable table={SAMPLE_SUBSCRIPTIONS} onExport={onExport} />);
+  await user.click(screen.getByRole("button", { name: /Export/ }));
+  const dialog = await screen.findByRole("dialog");
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  expect((await within(dialog).findByRole("alert")).textContent).toBe("/a.csv already exists. golem does not overwrite a file.");
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  await within(dialog).findByRole("status");
+  expect(onExport).toHaveBeenCalledTimes(2);
+});
+
+test("Excel without its add-on shows the one-time download, and Export works again after it", async () => {
+  const user = userEvent.setup();
+  const onExport = vi.fn().mockResolvedValueOnce({ path: "", rows: 0, needs_extension: "excel" }).mockResolvedValueOnce({ path: "/a.xlsx", rows: 9 });
+  const onInstall = vi.fn(async () => {});
+  render(<ResultTable table={SAMPLE_SUBSCRIPTIONS} onExport={onExport} onInstallExtension={onInstall} />);
+  await user.click(screen.getByRole("button", { name: /Export/ }));
+  const dialog = await screen.findByRole("dialog");
+  await user.selectOptions(within(dialog).getByLabelText("Format"), "xlsx");
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  const get = await within(dialog).findByRole("button", { name: "Get it (one-time download)" });
+  expect(within(dialog).getByRole("button", { name: "Export" }).hasAttribute("disabled")).toBe(true);
+  expect(onInstall).not.toHaveBeenCalled();
+  await user.click(get);
+  await waitFor(() => expect(onInstall).toHaveBeenCalledWith("excel"));
+  await waitFor(() => expect(within(dialog).queryByRole("button", { name: "Get it (one-time download)" })).toBeNull());
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  await within(dialog).findByRole("status");
+  expect(onExport).toHaveBeenCalledTimes(2);
+});
+
+test("a result with no connection has no Export button, and a tool block's table exports through the page's client", async () => {
+  const user = userEvent.setup();
+  const { unmount } = render(<ResultTable table={SAMPLE_SUBSCRIPTIONS} />);
+  expect(screen.queryByRole("button", { name: /Export/ })).toBeNull();
+  unmount();
+  const fake = inPage(<ul><ToolLine tool={tool()} defaultOpen /></ul>, ({ raw }) => {
+    raw.exportDataResult.mockResolvedValue({ path: "/home/you/Downloads/a.csv", rows: 18302 });
+  });
+  await user.click(screen.getByRole("button", { name: /Export/ }));
+  const dialog = await screen.findByRole("dialog");
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  await waitFor(() => expect(fake.raw.exportDataResult).toHaveBeenCalledWith("r_a91", expect.stringMatching(/^~\/Downloads\/bank-/), "csv"));
+});
+
 test("a tool block without a table keeps showing its preview", () => {
   render(<ul><ToolLine tool={tool({ table: undefined })} defaultOpen /></ul>);
   expect(screen.getByText("id | payee")).toBeTruthy();

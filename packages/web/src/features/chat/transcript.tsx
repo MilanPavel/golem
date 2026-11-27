@@ -76,7 +76,13 @@ function Label({ children }: { children: string }) {
 /** The table of a `data_query` call, paging through the daemon when the page has a connection. */
 function LiveResultTable({ tool, table }: { tool: ToolBlock; table: NonNullable<ToolBlock["table"]> }) {
   const actions = usePageActionsOrNull();
-  return <ResultTable table={table} rowsWithheld={tool.rowsWithheld === true} {...(actions === null ? {} : { onPage: actions.dataResultPage })} />;
+  return (
+    <ResultTable
+      table={table}
+      rowsWithheld={tool.rowsWithheld === true}
+      {...(actions === null ? {} : { onPage: actions.dataResultPage, onExport: actions.dataExportResult, onInstallExtension: actions.dataInstallExtension })}
+    />
+  );
 }
 
 function ToolOutput({ tool, mode }: { tool: ToolBlock; mode: DiffMode }) {

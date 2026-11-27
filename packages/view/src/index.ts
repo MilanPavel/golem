@@ -38,6 +38,20 @@ export {
   type DataStatus,
 } from "./data.ts";
 export {
+  defaultExportPath,
+  EXPORT_BUTTON,
+  EXPORT_EXCEL_NOTE,
+  EXPORT_FORMATS,
+  EXPORT_NEW_FILE_NOTE,
+  EXPORT_TITLE,
+  exportHeading,
+  exportedText,
+  formatOfPath,
+  withFormat,
+  type ExportFormat,
+  type ExportFormatChoice,
+} from "./data-export.ts";
+export {
   CELL_CUT,
   EXTENSION_BUTTON,
   extensionDownloading,

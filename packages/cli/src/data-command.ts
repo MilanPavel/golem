@@ -1,10 +1,13 @@
-// `golem data`: list the data sources, describe one, and run a query on it.
+// `golem data`: list the data sources, describe one, run a query on it, and write a result to a file.
 
 export const DATA_FORMATS = ["table", "csv", "json"] as const;
 export type DataFormat = (typeof DATA_FORMATS)[number];
 
+export const EXPORT_FORMATS = ["csv", "parquet", "json", "xlsx"] as const;
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+
 export const DATA_USAGE =
-  "usage: golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data notes <source> [--edit] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json]";
+  "usage: golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data notes <source> [--edit] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] [--out <file>] | golem data export <result_id> <file> [--format csv|parquet|json|xlsx]";
 
 /** The text of `golem data --help` and `golem help data`. */
 export const DATA_HELP = [
@@ -22,6 +25,11 @@ export const DATA_HELP = [
   "        echo 'select 1' | golem data query golem -",
   "      --limit N      at most N rows",
   "      --format       table (the default, with a count and the time), csv or json (only the rows, for scripts)",
+  "      --out FILE     write the whole result to a new file instead of printing it (.csv, .parquet, .json, .jsonl or .xlsx)",
+  "  golem data export <result_id> <file> [--format csv|parquet|json|xlsx]",
+  "      Writes a result of an earlier query to a new file. A query prints its result id on stderr.",
+  "      The format follows the end of the file name unless --format says. golem never overwrites a file,",
+  "      and never writes into a data source.",
   "",
   "Ctrl-C stops a running query and exits with 130. An error from golem goes to stderr and the exit code is 1.",
 ].join("\n");
@@ -31,7 +39,8 @@ export type DataArgs =
   | { kind: "describe"; source: string; table: string | null; json: boolean }
   | { kind: "notes"; source: string; edit: boolean }
   /** `sql` is null when it comes from stdin. */
-  | { kind: "query"; source: string; sql: string | null; limit: number | null; format: DataFormat }
+  | { kind: "query"; source: string; sql: string | null; limit: number | null; format: DataFormat; out?: string }
+  | { kind: "export"; resultId: string; path: string; format: ExportFormat | null }
   | { kind: "help" }
   | { kind: "error"; message: string };
 
@@ -50,6 +59,7 @@ export function parseDataArgs(args: readonly string[]): DataArgs {
   if (first === "describe") return parseDescribe(rest);
   if (first === "notes") return parseNotes(rest);
   if (first === "query") return parseQuery(rest);
+  if (first === "export") return parseExport(rest);
   return fail(DATA_USAGE);
 }
 
@@ -71,14 +81,44 @@ function parseNotes(args: readonly string[]): DataArgs {
   return { kind: "notes", source, edit };
 }
 
-function parseQuery(args: readonly string[]): DataArgs {
-  const usage = "usage: golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json]";
+function parseExport(args: readonly string[]): DataArgs {
+  const usage = "usage: golem data export <result_id> <file> [--format csv|parquet|json|xlsx]";
   const words: string[] = [];
-  let limit: number | null = null;
-  let format: DataFormat = "table";
+  let format: ExportFormat | null = null;
   for (let index = 0; index < args.length; index += 1) {
     const word = args[index] ?? "";
-    if (word === "--limit" || word === "--format") {
+    if (word === "--format") {
+      const value = args[index + 1];
+      if (value === undefined || value.length === 0) return fail("--format needs a value");
+      index += 1;
+      const known = EXPORT_FORMATS.find((each) => each === value);
+      if (known === undefined) return fail(`--format is ${EXPORT_FORMATS.join(", ")}`);
+      format = known;
+    } else if (!word.startsWith("-")) {
+      words.push(word);
+    } else {
+      return fail(`unknown option ${word}\n${usage}`);
+    }
+  }
+  const [resultId, path, ...extra] = words;
+  if (resultId === undefined || path === undefined || extra.length > 0) return fail(usage);
+  return { kind: "export", resultId, path, format };
+}
+
+function parseQuery(args: readonly string[]): DataArgs {
+  const usage = "usage: golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] [--out <file>]";
+  const words: string[] = [];
+  let limit: number | null = null;
+  let format: DataFormat | null = null;
+  let out: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const word = args[index] ?? "";
+    if (word === "--out") {
+      const value = args[index + 1];
+      if (value === undefined || value.length === 0) return fail("--out needs a file name");
+      index += 1;
+      out = value;
+    } else if (word === "--limit" || word === "--format") {
       const value = args[index + 1];
       if (value === undefined || value.length === 0) return fail(`${word} needs a value`);
       index += 1;
@@ -100,5 +140,6 @@ function parseQuery(args: readonly string[]): DataArgs {
   const [source, sql, ...extra] = words;
   if (source === undefined || source === "-" || extra.length > 0) return fail(usage);
   if (sql !== undefined && sql !== "-" && sql.trim().length === 0) return fail("the SQL is empty");
-  return { kind: "query", source, sql: sql === undefined || sql === "-" ? null : sql, limit, format };
+  if (out !== undefined && format !== null) return fail("--out writes a file whose format follows its name, so it does not take --format");
+  return { kind: "query", source, sql: sql === undefined || sql === "-" ? null : sql, limit, format: format ?? "table", ...(out === undefined ? {} : { out }) };
 }

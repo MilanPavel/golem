@@ -32,7 +32,7 @@ from golem.data.draft import SAMPLE_ROWS as DRAFT_ROWS
 from golem.data.notes import MAX_BYTES, TOO_LONG, write_notes
 from golem.data.results import KIND, table_record, wire_rows
 from golem.data.sources import DataSources, SourceInfo, TableInfo
-from golem.data.types import DataError
+from golem.data.types import DataError, NeedsExtension
 from golem.models.errors import BudgetSpent, ModelUnreachable
 from golem.models.router import ModelConfigError
 from golem.server.dispatcher import (
@@ -54,6 +54,8 @@ from golem_protocol.commands import (
     DataColumn,
     DataDescribeParams,
     DataDescribeResult,
+    DataExportParams,
+    DataExportResult,
     DataExtensionInstallParams,
     DataExtensionInstallResult,
     DataInspectParams,
@@ -215,6 +217,20 @@ async def data_result_page(ctx: RequestContext, params: DataResultPageParams) ->
         truncated=False,
         elapsed_ms=0,
     )
+
+
+async def data_export(ctx: RequestContext, params: DataExportParams) -> DataExportResult:
+    """Write a kept result to a new file. You are asking, so there is no approval card."""
+    root = await _root(ctx, params.session_id)
+    sources = _sources(ctx)
+    try:
+        plan = await sources.plan_export(root, params.result_id, params.path, params.format)
+        written = await sources.export(plan)
+    except NeedsExtension as exc:
+        return DataExportResult(path="", rows=0, needs_extension=exc.extension)  # type: ignore[arg-type]
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return DataExportResult(path=str(plan.path), rows=written)
 
 
 async def data_cancel(ctx: RequestContext, params: DataCancelParams) -> DataCancelResult:

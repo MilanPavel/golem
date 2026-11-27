@@ -1,7 +1,23 @@
 {
   "additionalProperties": false,
-  "description": "The file written.",
+  "description": "The file written. With ``needs_extension`` nothing was written: that add-on is not here.",
   "properties": {
+    "needs_extension": {
+      "anyOf": [
+        {
+          "enum": [
+            "excel",
+            "sqlite"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Needs Extension"
+    },
     "path": {
       "title": "Path",
       "type": "string"

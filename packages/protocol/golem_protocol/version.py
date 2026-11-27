@@ -6,4 +6,4 @@ which connection receives an event is a break too.
 """
 
 PROTOCOL_MAJOR = 2
-PROTOCOL_MINOR = 171
+PROTOCOL_MINOR = 172

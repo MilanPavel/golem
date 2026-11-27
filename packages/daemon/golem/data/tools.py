@@ -1,8 +1,12 @@
-"""``data_sources``, ``data_describe`` and ``data_query``: the model reads data it never holds.
+"""``data_sources``, ``data_describe``, ``data_query`` and ``data_export``: the model works with
+data it never holds.
 
-All three only read, so the default rules allow them, and the subject of a call is the source's
-name, so a rule can say ``tool = "data_query", match = "shop"``. Rows are outside content: they
-go inside ``<data_rows>`` after a note, so a cell that says "ignore your rules" stays data.
+The first three only read, so the default rules allow them, and the subject of a call is the
+source's name, so a rule can say ``tool = "data_query", match = "shop"``. Rows are outside
+content: they go inside ``<data_rows>`` after a note, so a cell that says "ignore your rules"
+stays data.
+``data_export`` writes a kept result to a new file on the person's disk, so it asks first, every
+time. It sends no row to a model, so a source's privacy level does not limit it.
 The tools node gives a call its :class:`DataAccess`, so this file knows nothing of the graph.
 """
 
@@ -24,13 +28,22 @@ from golem.data.sources import (
     ColumnInfo,
     DataAccess,
     Description,
+    ExportPlan,
     QueryResult,
     SourceInfo,
     TableInfo,
 )
-from golem.data.types import DataError
+from golem.data.types import DataError, NeedsExtension
 from golem.memory.privacy import ChatPrivacy, Target
-from golem.tools.registry import DataRead, TableRead, Tool, ToolContext, ToolError, ToolResult
+from golem.tools.registry import (
+    DataRead,
+    Preview,
+    TableRead,
+    Tool,
+    ToolContext,
+    ToolError,
+    ToolResult,
+)
 from golem.tools.untrusted import wrap
 
 NOT_HERE = "Data sources are not available here."
@@ -79,6 +92,24 @@ class DataQueryArgs(BaseModel):
             f"How many rows you read: {SHOWN_ROWS} by default, at most {MAX_SHOWN_ROWS}. "
             "The user keeps the whole result."
         ),
+    )
+
+
+class DataExportArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    result: str = Field(
+        min_length=1, description="The result id data_query gave you, such as res_1a2b3c4d5e6f."
+    )
+    path: str = Field(
+        min_length=1,
+        description=(
+            "The new file. ~ is the home folder; a relative path is relative to the project "
+            "folder. It must not exist yet."
+        ),
+    )
+    format: Literal["csv", "parquet", "json", "xlsx"] | None = Field(
+        default=None, description="Left out, it follows the end of the path."
     )
 
 
@@ -365,6 +396,57 @@ async def _explain(access: DataAccess, source: str, message: str) -> str:
     return f"{message}\nTables and columns of {source}: {shown}"
 
 
+_CHANGED = "the export changed after the user approved it, so it was not written; ask again"
+_SQL_SHOWN = 60
+
+
+def _short_sql(sql: str) -> str:
+    one = " ".join(sql.split())
+    return one if len(one) <= _SQL_SHOWN else one[: _SQL_SHOWN - 1] + "…"
+
+
+def export_lines(plan: ExportPlan) -> str:
+    """What an export would do, as the approval shows it."""
+    what = _short_sql(plan.sql)
+    named = f"{what}, {count(plan.rows, 'row')}" if what else count(plan.rows, "row")
+    return "\n".join(
+        [
+            f"query   {plan.result_id} ({named})",
+            f"format  {plan.format}",
+            f"path    {plan.path}   new file",
+            f"source  @{plan.source} stays as it is: read-only",
+        ]
+    )
+
+
+async def _plan_export(args: DataExportArgs, ctx: ToolContext) -> ExportPlan:
+    try:
+        return await _access(ctx).plan_export(args.result, args.path, args.format)
+    except NeedsExtension as exc:
+        raise ToolError(f"{exc} The user can get it from the Data screen.") from exc
+    except DataError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+async def _export(args: DataExportArgs, ctx: ToolContext) -> ToolResult:
+    plan = await _plan_export(args, ctx)
+    if ctx.approved_diff is not None and export_lines(plan) != ctx.approved_diff:
+        raise ToolError(_CHANGED)
+    try:
+        written = await _access(ctx).export(plan)
+    except DataError as exc:
+        raise ToolError(str(exc)) from exc
+    return ToolResult(
+        output=f"wrote {count(written, 'row')} to {plan.path}",
+        summary=f"{count(written, 'row')} to {plan.path.name}",
+    )
+
+
+async def _preview_export(args: DataExportArgs, ctx: ToolContext) -> Preview:
+    plan = await _plan_export(args, ctx)
+    return Preview(diff=export_lines(plan), path=plan.path, after="")
+
+
 def _subject(raw: Mapping[str, object], root: Path | None) -> str | None:
     del root
     source = raw.get("source")
@@ -410,18 +492,37 @@ DATA_QUERY = Tool(
     subject=_subject,
 )
 
-DATA_TOOLS = [DATA_SOURCES, DATA_DESCRIBE, DATA_QUERY]
+DATA_EXPORT = Tool(
+    name="data_export",
+    description=(
+        "Write a whole data_query result to a new file: csv, parquet, json (an array of "
+        "objects, or lines when the name ends .jsonl) or xlsx. The user is asked first, for "
+        "each call. The file must not exist: golem never overwrites one, and never writes to a "
+        "data source. Give the result id from data_query. You get back the row count, no rows, "
+        "so it works for every source whatever its privacy level: the file goes to the user's "
+        "own disk and no model reads it."
+    ),
+    args=DataExportArgs,
+    run=_export,
+    path_arg="path",
+    preview=_preview_export,
+)
+
+DATA_TOOLS = [DATA_SOURCES, DATA_DESCRIBE, DATA_QUERY, DATA_EXPORT]
 
 __all__ = [
     "DATA_DESCRIBE",
+    "DATA_EXPORT",
     "DATA_QUERY",
     "DATA_SOURCES",
     "DATA_TOOLS",
     "NOT_HERE",
     "DataDescribeArgs",
+    "DataExportArgs",
     "DataQueryArgs",
     "DataSourcesArgs",
     "count",
+    "export_lines",
     "privacy_text",
     "render_table",
     "size_parts",

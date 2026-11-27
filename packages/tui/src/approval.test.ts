@@ -39,6 +39,22 @@ test("a diff sits between the question and the rule, with a tone per row", () =>
   );
 });
 
+test("a data export asks to write a file and shows the lines of what it writes", () => {
+  const lines = [
+    "query   r_7f2 (select 1, 9 rows)",
+    "format  csv",
+    "path    /Users/you/a.csv   new file",
+    "source  @bank stays as it is: read-only",
+  ];
+  const approval = pending({ name: "data_export", args: { result: "r_7f2", path: "~/a.csv" }, diff: lines.join("\n") });
+  const rows = approvalRows(approval, 40);
+  assert.equal(rows, APPROVAL_ROWS + 4);
+  const shown = approvalLines(approval, 80, rows).map((line) => line.text);
+  assert.equal(shown[0], "golem wants to write a file");
+  assert.deepEqual(shown.slice(1, 5), lines);
+  assert.equal(shown[5], "asked by built-in default");
+});
+
 test("a long diff gets at most half the screen and scrolls by offset", () => {
   const approval = pending({ diff: DIFF });
   const rows = approvalRows(approval, 12);

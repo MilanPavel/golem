@@ -5,7 +5,9 @@ is written by a second, throwaway DuckDB database that holds no source: it gets 
 one finished query as plain values, and its ``allowed_paths`` names the one file it writes
 (a temporary name next to the result, renamed when it is whole). It is locked the same way
 a source is, so even a statement that got this far could write nowhere else. A page is read
-by a database of the same kind, which may read only the one result file.
+by a database of the same kind, which may read only the one result file. An export is written
+the same way: a database that may read only the result file and write only ``<target>.part``,
+renamed to the target when it is whole, and never over a file that is there.
 """
 
 from __future__ import annotations
@@ -18,8 +20,8 @@ from typing import Any
 
 import duckdb
 
-from golem.data.engine import json_value, unique_names
-from golem.data.types import DataError
+from golem.data.engine import extension_installed, json_value, unique_names
+from golem.data.types import DataError, NeedsExtension
 
 
 def _quote(name: str) -> str:
@@ -96,6 +98,74 @@ def write(
         temp.unlink(missing_ok=True)
 
 
+def _literal(text: str) -> str:
+    return "'" + text.replace("'", "''") + "'"
+
+
+def _copy_options(fmt: str, target: Path) -> str:
+    if fmt == "csv":
+        return "format csv, header true"
+    if fmt == "parquet":
+        return "format parquet"
+    if fmt == "xlsx":
+        return "format xlsx, header true"
+    lines = target.suffix.lower() in (".jsonl", ".ndjson")
+    return f"format json, array {'false' if lines else 'true'}"
+
+
+def export(
+    source: Path, target: Path, fmt: str, extension_dir: Path | None = None
+) -> dict[str, Any]:
+    """Write all rows of the kept result ``source`` to the new file ``target``.
+
+    Whole or not at all: the rows go to ``<target>.part`` first. Raises :class:`DataError` for
+    a target that is there, a result that is gone, or a write that failed. Returns ``rows``.
+    """
+    if not source.is_file():
+        raise DataError("That result is gone. Run the query again.")
+    if os.path.lexists(target):
+        raise DataError(f"{target} already exists. golem does not overwrite a file.")
+    temp = target.with_name(target.name + ".part")
+    con = duckdb.connect(":memory:")
+    try:
+        if fmt == "xlsx":
+            if extension_dir is None or not extension_installed(extension_dir, "excel"):
+                raise NeedsExtension("excel")
+            con.execute("set autoinstall_known_extensions = false")
+            con.execute("set extension_directory = ?", [str(extension_dir)])
+            con.execute("load excel")
+        con.execute("set allowed_paths = ?", [[str(source), str(temp)]])
+        con.execute("set enable_external_access = false")
+        con.execute("set lock_configuration = true")
+        counted = con.execute("select count(*) from read_parquet(?)", [str(source)]).fetchone()
+        rows = int(counted[0]) if counted else 0
+        con.execute(
+            f"copy (select * from read_parquet({_literal(str(source))})) "
+            f"to {_literal(str(temp))} ({_copy_options(fmt, target)})"
+        )
+        _place(temp, target)
+    except duckdb.Error as exc:
+        raise DataError(f"Could not write {target}: {str(exc).splitlines()[0]}") from exc
+    except OSError as exc:
+        raise DataError(f"Could not write {target}: {exc.strerror or exc}") from exc
+    finally:
+        con.close()
+        temp.unlink(missing_ok=True)
+    return {"rows": rows}
+
+
+def _place(temp: Path, target: Path) -> None:
+    """Give ``temp`` the name ``target`` unless a file has it by now."""
+    try:
+        os.link(temp, target)
+    except FileExistsError:
+        raise DataError(f"{target} already exists. golem does not overwrite a file.") from None
+    except OSError:
+        if os.path.lexists(target):
+            raise DataError(f"{target} already exists. golem does not overwrite a file.") from None
+        os.replace(temp, target)
+
+
 def page(
     path: Path, offset: int, limit: int, sort_column: str | None, sort_desc: bool
 ) -> dict[str, Any]:
@@ -129,4 +199,4 @@ def page(
     return {"columns": columns, "rows": rows, "total_rows": total, "meta": meta}
 
 
-__all__ = ["page", "write"]
+__all__ = ["export", "page", "write"]

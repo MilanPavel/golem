@@ -148,6 +148,34 @@ async def test_data_result_page_pages_a_kept_result_of_any_source(short_home: Pa
         assert error_code(bad) == INVALID_PARAMS
 
 
+async def test_data_export_writes_a_new_file_and_refuses_what_it_should(short_home: Path) -> None:
+    shop = _shop(short_home)
+    short_home.mkdir(exist_ok=True)
+    (short_home / "config.toml").write_text(
+        f'[data.shop]\npath = "{shop}/*.csv"\nprivacy = "schema"\n', encoding="utf-8"
+    )
+    async with _daemon(short_home) as (_app, client):
+        sql = "select id, total from orders order by id"
+        await _call(client, "data.query", source="shop", sql=sql, result_id="res_exp1")
+        out = short_home / "out.csv"
+        done = await _call(client, "data.export", result_id="res_exp1", path=str(out))
+        assert (done["path"], done["rows"]) == (str(out), 2)
+        assert out.read_text() == "id,total\n1,10.0\n2,32.5\n"
+        again = await client.call("data.export", {"result_id": "res_exp1", "path": str(out)})
+        assert error_code(again) == INVALID_PARAMS and "already exists" in str(again["error"])
+        inside = await client.call(
+            "data.export", {"result_id": "res_exp1", "path": str(shop / "copy.csv")}
+        )
+        assert error_code(inside) == INVALID_PARAMS and "never written to" in str(inside["error"])
+        gone = await client.call("data.export", {"result_id": "res_nope", "path": "/tmp/x.csv"})
+        assert error_code(gone) == INVALID_PARAMS
+        sheet = await _call(
+            client, "data.export", result_id="res_exp1", path=str(short_home / "out.xlsx")
+        )
+        assert sheet == {"path": "", "rows": 0, "needs_extension": "excel"}
+        assert not (short_home / "out.xlsx").exists()
+
+
 async def test_data_cancel_stops_a_slow_query_by_its_result_id(short_home: Path) -> None:
     async with _daemon(short_home) as (_, client):
         await _call(client, "data.list")  # open the built-in source first

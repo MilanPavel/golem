@@ -243,7 +243,12 @@ export function ApprovalBar({
           </div>
           {details ? (
             <div id={detailsId} className="border-t border-line">
-              {tool.diff ? (
+              {tool.diff && tool.name === "data_export" ? (
+                // The lines of a file the call would write: what, how, where, and what stays as it is.
+                <pre aria-label="What would be written" className="max-h-60 overflow-auto bg-code-bg px-3 py-2 font-mono text-xs whitespace-pre-wrap wrap-anywhere">
+                  {tool.diff}
+                </pre>
+              ) : tool.diff ? (
                 <>
                   <div className="flex justify-end px-3 pt-2">
                     <DiffModeSwitch mode={mode} onChange={setMode} />

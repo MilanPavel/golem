@@ -5,7 +5,7 @@ import { resetThemeAfterEach, showTheme } from "./gallery-test-utils.ts";
 
 resetThemeAfterEach();
 
-test("the gallery's Data result section shows the table, a page, a sort, both charts, the withheld line and the add-on, in both themes", () => {
+test("the gallery's Data result section shows the table, a page, a sort, both charts, the withheld line, the export form and its approval, and the add-on, in both themes", () => {
   for (const theme of ["slip", "kiln"] as const) {
     showTheme(theme);
     const { unmount } = render(<Gallery only="data-result" />);
@@ -20,6 +20,12 @@ test("the gallery's Data result section shows the table, a page, a sort, both ch
     expect(region("Result, empty").getByText("The query returned no rows.")).toBeTruthy();
     expect(region("Result, page failed").getByRole("alert")).toBeTruthy();
     expect(region("Add-on to download").getByRole("button", { name: "Get it (one-time download)" })).toBeTruthy();
+    expect((region("Export, start").getByLabelText("Path") as HTMLInputElement).value).toBe("~/Downloads/bank-2026-11-26.csv");
+    expect(region("Export, Excel needs the add-on").getByRole("button", { name: "Get it (one-time download)" })).toBeTruthy();
+    expect(region("Export, file exists").getByRole("alert").textContent).toContain("already exists");
+    expect(region("Export, written").getByRole("status").textContent).toContain("Wrote 9 rows to /Users/you/Downloads/bank-2026-11-26.csv.");
+    expect(region("Export approval").getByText("golem wants to write a file")).toBeTruthy();
+    expect(region("Export approval").getByText(/@bank stays as it is: read-only/)).toBeTruthy();
     unmount();
   }
 });

@@ -19,7 +19,7 @@ import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExpor
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
-import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
+import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -75,6 +75,7 @@ export type PageClient = Pick<
   | "describeData"
   | "inspectData"
   | "pageDataResult"
+  | "exportDataResult"
   | "installDataExtension"
   | "addData"
   | "updateData"
@@ -422,6 +423,8 @@ export type PageActions = {
   dataInspect(location: string): Promise<DataInspectResult>;
   /** One page of a kept query result. Rejects with the daemon's reason, such as a result that is no longer kept. */
   dataResultPage(params: DataResultPageParams): Promise<DataResult>;
+  /** Writes a kept result to a new file. The answer has `needs_extension` and no file when the Excel add-on is not here. Rejects with the reason, such as a file that exists. */
+  dataExportResult(params: DataExportParams): Promise<DataExportResult>;
   /** Downloads the Excel or SQLite add-on, once. The sources are read again. Rejects with the reason, such as no network. */
   dataInstallExtension(name: DataExtensionName): Promise<void>;
   /** Adds a source. The list is read again. Rejects with the daemon's reason. */
@@ -987,6 +990,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       dataInspect: (location) => client.inspectData(location),
       dataResultPage: (params) => client.pageDataResult(params.result_id, params.offset, params.limit),
+      dataExportResult: (params) => client.exportDataResult(params.result_id, params.path, params.format),
       async dataInstallExtension(name) {
         try {
           await client.installDataExtension(name);

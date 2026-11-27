@@ -1,6 +1,6 @@
-import { RpcError, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
+import { RpcError, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
 
-export type { DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
+export type { DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
 
 /** The query key of `data.list`. A pushed `data.changed` and every action below mark it stale. */
 export const DATA_LIST_KEY = ["data.list"] as const;
@@ -53,6 +53,9 @@ export type { DataExtensionName } from "@golem/view";
 
 /** What a page of a kept result is asked by. */
 export type DataResultPageParams = { result_id: string; offset: number; limit: number };
+
+/** What a file is written by: the result, the new file's path, and its format. */
+export type DataExportParams = { result_id: string; path: string; format: "csv" | "parquet" | "json" | "xlsx" };
 
 /** The sample rows of one table. */
 export type DataSampleRows = readonly (readonly (string | number | boolean | null)[])[];

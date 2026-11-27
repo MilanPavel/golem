@@ -159,6 +159,17 @@ class DataWorker:
         }
         return await self.request("result_page", args, timeout=self._settings.query_timeout_seconds)
 
+    async def export(self, path: Path, target: Path, fmt: str) -> int:
+        """Write all rows of the kept result file ``path`` to the new file ``target``."""
+        args = {
+            "path": str(path),
+            "target": str(target),
+            "format": fmt,
+            "extension_dir": str(self._paths.data_extensions_dir),
+        }
+        answer = await self.request("export", args, timeout=self._settings.query_timeout_seconds)
+        return int(answer["rows"])
+
     async def load_table(
         self,
         source: str,

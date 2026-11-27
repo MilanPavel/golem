@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { isAbsolute, resolve } from "node:path";
 
 import { RpcError, type DataDescribeResult, type DataListResult, type DataResult, type GolemClient } from "@golem/client";
 
-import type { DataArgs } from "./data-command.ts";
+import type { DataArgs, ExportFormat } from "./data-command.ts";
 import {
   formatDataDescribe,
   formatDataList,
@@ -27,6 +28,8 @@ export interface DataDeps {
   edit?: (text: string, fileName: string) => Promise<string | null>;
   /** A new id for a query, so it can be cancelled by it. */
   newId?: () => string;
+  /** The folder a relative file name is relative to. The process folder by default. */
+  cwd?: () => string;
 }
 
 export const NO_DATA_METHODS = "This golem daemon does not know data sources yet. Update golem.";
@@ -41,7 +44,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T> {
   }
 }
 
-type Client = Pick<GolemClient, "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes">;
+type Client = Pick<GolemClient, "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult">;
 
 /** `golem data list`. */
 export async function runDataList(client: Client, json: boolean, deps: DataDeps): Promise<number> {
@@ -120,11 +123,35 @@ export async function runDataQuery(client: Client, args: Extract<DataArgs, { kin
       deps.error("Cancelled.");
       return 130;
     }
+    if (args.out !== undefined) return await exportResult(client, outcome.result_id, args.out, null, deps);
     printQuery(outcome, args.format, deps);
+    if (args.format === "table") deps.error(`result ${outcome.result_id}: write it to a file with golem data export ${outcome.result_id} <file>`);
     return 0;
   } finally {
     unhook();
   }
+}
+
+/** The path as the daemon should read it: `~` stays for the daemon, a relative name is made absolute here. */
+function pathForDaemon(path: string, deps: DataDeps): string {
+  return path.startsWith("~") || isAbsolute(path) ? path : resolve((deps.cwd ?? (() => process.cwd()))(), path);
+}
+
+async function exportResult(client: Client, resultId: string, path: string, format: ExportFormat | null, deps: DataDeps): Promise<number> {
+  const result = await guarded(() => client.exportDataResult(resultId, pathForDaemon(path, deps), format ?? undefined));
+  if (result.needs_extension !== undefined && result.needs_extension !== null) {
+    deps.error(
+      `Writing Excel needs a one-time download (2 MB) from extensions.duckdb.org. Nothing was written. Get it in the app, under Data, then run this again.`,
+    );
+    return 1;
+  }
+  deps.write(`Wrote ${result.rows} ${result.rows === 1 ? "row" : "rows"} to ${result.path}\n`);
+  return 0;
+}
+
+/** `golem data export`: write a result of an earlier query to a new file. */
+export async function runDataExport(client: Client, args: Extract<DataArgs, { kind: "export" }>, deps: DataDeps): Promise<number> {
+  return exportResult(client, args.resultId, args.path, args.format, deps);
 }
 
 function printQuery(result: DataResult, format: "table" | "csv" | "json", deps: DataDeps): void {

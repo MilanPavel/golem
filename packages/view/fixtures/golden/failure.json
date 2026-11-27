@@ -72,7 +72,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4871,
+        "estimated_tokens": 5208,
         "index": 1,
         "message_bytes": [
           5
@@ -104,9 +104,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15747,
-        "tools_chars": 15747,
-        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
+        "tools_bytes": 16871,
+        "tools_chars": 16871,
+        "tools_sha": "68b980daf74d9f4715e50771ef6cd0319165f22c45251fb16b3c6e48d17f7b27",
         "window_estimated": false,
         "window_planned": false
       },
@@ -227,7 +227,7 @@
       "data": {
         "cleared_ids": [],
         "context_window": null,
-        "estimated_tokens": 4871,
+        "estimated_tokens": 5208,
         "index": 1,
         "message_bytes": [
           5
@@ -259,9 +259,9 @@
           }
         ],
         "tier": null,
-        "tools_bytes": 15747,
-        "tools_chars": 15747,
-        "tools_sha": "a1706f7e39bca1c6a1261db4f99baad2d5703e6789498b1ada4950b9d17fcb9a",
+        "tools_bytes": 16871,
+        "tools_chars": 16871,
+        "tools_sha": "68b980daf74d9f4715e50771ef6cd0319165f22c45251fb16b3c6e48d17f7b27",
         "window_estimated": false,
         "window_planned": false
       },

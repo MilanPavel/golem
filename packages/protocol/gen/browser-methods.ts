@@ -33,6 +33,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "data.add",
   "data.cancel",
   "data.describe",
+  "data.export",
   "data.extension.install",
   "data.inspect",
   "data.list",

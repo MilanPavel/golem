@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { RpcError, type DataDescribeResult, type DataQueryParams, type DataResult } from "@golem/client";
 
-import { parseDataArgs } from "./data-command.ts";
+import { DATA_HELP, parseDataArgs } from "./data-command.ts";
 import {
   formatDataDescribe,
   formatDataList,
@@ -12,7 +12,7 @@ import {
   formatQueryTable,
   truncatedNote,
 } from "./data-format.ts";
-import { NO_DATA_METHODS, runDataDescribe, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
+import { NO_DATA_METHODS, runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
 import { explainDaemonDown } from "./daemon-down.ts";
 
 const GOLEM = { name: "golem", kind: "builtin", scope: "builtin", location: "golem", privacy: "open", status: "ready", tables: 2, rows: 1204 } as const;
@@ -163,7 +163,7 @@ function harness(options: { tty?: boolean; stdin?: string } = {}): Harness {
   };
 }
 
-function client(overrides: Partial<Record<"listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes", (...args: never[]) => unknown>> = {}) {
+function client(overrides: Partial<Record<"listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult", (...args: never[]) => unknown>> = {}) {
   return {
     listData: async () => ({ sources: [GOLEM] }),
     describeData: async () => ({ source: GOLEM, tables: [], sample: {} }),
@@ -279,6 +279,79 @@ test("the daemon's sentence reaches the caller, and a daemon without the methods
   });
   await assert.rejects(runDataList(old, false, run.deps), new RegExp(NO_DATA_METHODS));
   await assert.rejects(runDataQuery(old, { kind: "query", source: "golem", sql: "select 1", limit: null, format: "table" }, run.deps), new RegExp(NO_DATA_METHODS));
+});
+
+test("export and --out: the arguments", () => {
+  assert.deepEqual(parseDataArgs(["export", "r1", "out.csv"]), { kind: "export", resultId: "r1", path: "out.csv", format: null });
+  assert.deepEqual(parseDataArgs(["export", "r1", "out.txt", "--format", "json"]), { kind: "export", resultId: "r1", path: "out.txt", format: "json" });
+  assert.deepEqual(parseDataArgs(["query", "golem", "select 1", "--out", "~/a.parquet"]), {
+    kind: "query",
+    source: "golem",
+    sql: "select 1",
+    limit: null,
+    format: "table",
+    out: "~/a.parquet",
+  });
+  assert.deepEqual(parseDataArgs(["export", "r1", "a.csv", "--format", "xml"]), { kind: "error", message: "--format is csv, parquet, json, xlsx" });
+  assert.deepEqual(parseDataArgs(["query", "golem", "select 1", "--out"]), { kind: "error", message: "--out needs a file name" });
+  assert.equal(parseDataArgs(["query", "golem", "select 1", "--out", "a.csv", "--format", "csv"]).kind, "error");
+  for (const bad of [["export"], ["export", "r1"], ["export", "r1", "a", "b"], ["export", "r1", "a", "--wat"]]) {
+    assert.equal(parseDataArgs(bad).kind, "error", bad.join(" "));
+  }
+  assert.match(DATA_HELP, /golem data export <result_id> <file>/);
+});
+
+test("export sends the id, a path made absolute here, and the format, and says how many rows it wrote", async () => {
+  const asked: unknown[][] = [];
+  const fake = client({
+    exportDataResult: async (...args: unknown[]) => {
+      asked.push(args);
+      return { path: String(args[1]), rows: 9 };
+    },
+  });
+  const run = harness();
+  run.deps.cwd = () => "/work";
+  assert.equal(await runDataExport(fake, { kind: "export", resultId: "r1", path: "out.csv", format: null }, run.deps), 0);
+  assert.equal(await runDataExport(fake, { kind: "export", resultId: "r1", path: "~/a.json", format: "json" }, run.deps), 0);
+  assert.deepEqual(asked, [
+    ["r1", "/work/out.csv", undefined],
+    ["r1", "~/a.json", "json"],
+  ]);
+  assert.deepEqual(run.out, ["Wrote 9 rows to /work/out.csv\n", "Wrote 9 rows to ~/a.json\n"]);
+});
+
+test("query --out runs the query, writes the file and prints no rows", async () => {
+  const asked: unknown[][] = [];
+  const fake = client({
+    exportDataResult: async (...args: unknown[]) => {
+      asked.push(args);
+      return { path: "/tmp/a.csv", rows: 3 };
+    },
+  });
+  const run = harness();
+  assert.equal(await runDataQuery(fake, { kind: "query", source: "golem", sql: "select 1", limit: null, format: "table", out: "/tmp/a.csv" }, run.deps), 0);
+  assert.deepEqual(asked, [["r1", "/tmp/a.csv", undefined]]);
+  assert.deepEqual(run.out, ["Wrote 3 rows to /tmp/a.csv\n"]);
+});
+
+test("export says plainly when the Excel add-on is missing, and when the daemon is old", async () => {
+  const missing = client({ exportDataResult: async () => ({ path: "", rows: 0, needs_extension: "excel" }) });
+  const run = harness();
+  assert.equal(await runDataExport(missing, { kind: "export", resultId: "r1", path: "/tmp/a.xlsx", format: null }, run.deps), 1);
+  assert.match(run.err.join(""), /one-time download.*Nothing was written/);
+  assert.deepEqual(run.out, []);
+  const old = client({
+    exportDataResult: async () => {
+      throw new RpcError(-32601, "Method not found");
+    },
+  });
+  await assert.rejects(runDataExport(old, { kind: "export", resultId: "r1", path: "/tmp/a.csv", format: null }, run.deps), new RegExp(NO_DATA_METHODS));
+});
+
+test("a printed query tells its result id on stderr", async () => {
+  const run = harness();
+  assert.equal(await runDataQuery(client(), { kind: "query", source: "golem", sql: "select 1", limit: null, format: "table" }, run.deps), 0);
+  assert.match(run.err.join(""), /result r1: write it to a file with golem data export r1 <file>/);
 });
 
 test("notes prints the notes, or says how to write some", async () => {
