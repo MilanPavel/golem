@@ -57,3 +57,10 @@ test("a memory.changed payload is not a chat event", () => {
   assert.equal(asChatEvent({ id: "mem_1", change: "created", scope: "you", folder: null }), undefined);
   assert.equal(asChatEvent({ type: "memory.changed", seq: 1, session_id: "s_test", run_id: null, ts: "t", data: {} }), undefined);
 });
+
+test("a run.list answer with a workflow run is accepted", async () => {
+  const { isRunListResult } = await import("./guards.ts");
+  const row = { session_id: "s_1", kind: "workflow", origin: "workflow:morning_briefing", status: "succeeded", approvals: 0, steps: 7, workflow_run_id: "wr_1" };
+  assert.equal(isRunListResult({ runs: [row] }), true);
+  assert.equal(isRunListResult({ runs: [{ ...row, kind: "chat" }] }), false);
+});
