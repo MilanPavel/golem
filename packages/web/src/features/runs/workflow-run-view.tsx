@@ -1,14 +1,14 @@
-import { stepMetaLine, stepOutputLine, stepOutputText, workerResult, workflowRunTook, workflowStepsList, type StepLike } from "@golem/view";
+import { stepMetaLine, stepOutputLine, workflowRunTook, workflowStepsList, type StepLike } from "@golem/view";
 import { useState, type ReactNode } from "react";
 import { actionErrorText } from "../../store/errors.ts";
 import { runsPath } from "../../store/router.ts";
 import type { ReviewVerdict, WorkflowReviewInfo, WorkflowRunInfo, WorkflowStepInfo } from "../../store/workflows.ts";
 import { Badge, type BadgeProps } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
-import { Code } from "../../ui/code.tsx";
 import { Link } from "../../ui/link.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { StepsView, type StepExtra } from "../workbench/index.ts";
+import { ResultView } from "./result-view.tsx";
 import { ReviewCard } from "./review-card.tsx";
 
 const STATUS: Record<WorkflowRunInfo["status"], { word: string; tone: NonNullable<BadgeProps["tone"]> }> = {
@@ -39,38 +39,6 @@ export type WorkflowRunViewProps = {
   initialTab?: "steps" | "trace";
 };
 
-function Output({ step }: { step: WorkflowStepInfo }) {
-  const text = stepOutputText(step.result);
-  if (text === "") return null;
-  return (
-    <pre aria-label={`Output of ${step.title}`} className="m-0 max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-code text-ink">
-      {text}
-    </pre>
-  );
-}
-
-function WorkerBlock({ step }: { step: WorkflowStepInfo }) {
-  const worker = workerResult(step.result);
-  if (worker === null) return null;
-  return (
-    <dl className="m-0 grid cols-label-value gap-x-3 gap-y-0.5 text-meta">
-      <dt className="text-faint">Copy</dt>
-      <dd className="m-0 min-w-0 truncate">
-        <Code>{worker.worktree}</Code>
-      </dd>
-      <dt className="text-faint">Changed</dt>
-      <dd className="m-0">
-        {worker.files} {worker.files === 1 ? "file" : "files"}, +{worker.added} −{worker.removed}
-      </dd>
-      <dt className="text-faint">Checks</dt>
-      <dd className="m-0">
-        {worker.checks}
-        {worker.checksNote === null ? "" : `: ${worker.checksNote}`}
-      </dd>
-    </dl>
-  );
-}
-
 /** The detail line under a step's bar, and what the step unfolds: its output, its chat, its error. */
 function stepExtra(step: WorkflowStepInfo, props: Pick<WorkflowRunViewProps, "run" | "chatPath" | "onNavigate" | "onResume">, resume: ReactNode): StepExtra {
   const output = stepOutputLine(step);
@@ -90,8 +58,7 @@ function stepExtra(step: WorkflowStepInfo, props: Pick<WorkflowRunViewProps, "ru
     open: (
       <div className="flex flex-col gap-2">
         {failed && step.error !== null && step.error !== undefined ? <p className="m-0 text-sm break-words text-deny">{step.error}</p> : null}
-        <WorkerBlock step={step} />
-        <Output step={step} />
+        <ResultView result={step.result} label={`Output of ${step.title}`} />
         <div className="flex flex-wrap items-center gap-3">
           {child === null || child === undefined ? null : (
             <Link href={props.chatPath(child)} onNavigate={props.onNavigate} className={LINK}>

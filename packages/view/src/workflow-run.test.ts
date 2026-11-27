@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { reviewDraftText, reviewTitle, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
+import { resultKind, reviewDraftText, reviewTitle, stepMetaLine, stepOutputLine, toolAsk, workerLine, workerResult, workflowRunTook, workflowStepsList } from "./workflow-run.ts";
 
 const T = (s: number) => new Date(Date.UTC(2026, 10, 26, 8, 0, s)).toISOString();
 const step = (key: string, extra: Record<string, unknown> = {}) => ({ key, kind: "step", title: key, status: "done", started_at: T(0), finished_at: T(10), ...extra });
@@ -39,6 +39,25 @@ test("the one line of an output", () => {
   assert.equal(stepOutputLine({ kind: "review", result: { verdict: "approve", text: "x" } }), "approved");
   assert.equal(stepOutputLine({ kind: "step", result: [1, 2] }), "[1,2]");
   assert.equal(stepOutputLine({ kind: "step", result: null }), "");
+});
+
+test("a result has a kind by its shape", () => {
+  const worker = { worktree: "wf-1", files: [], added: 0, removed: 0 };
+  assert.deepEqual(
+    ["hello", "/Users/you/a.md", "~/notes/a.md", "https://example.com/x", "see /tmp/a", { a: 1 }, [{ a: 1 }], worker, null, "", [], {}, [1, 2], 7].map(resultKind),
+    ["text", "file", "file", "link", "text", "record", "table", "changes", "empty", "empty", "empty", "empty", "other", "other"],
+  );
+});
+
+test("the one line says each kind in words", () => {
+  assert.equal(stepOutputLine({ kind: "step", result: [] }), "Nothing found");
+  assert.equal(stepOutputLine({ kind: "step", result: {} }), "Nothing found");
+  assert.equal(stepOutputLine({ kind: "step", result: new Array(8).fill({ a: 1 }) }), "8 rows");
+  assert.equal(stepOutputLine({ kind: "step", result: [{ a: 1 }] }), "1 row");
+  assert.equal(stepOutputLine({ kind: "step", result: { branch: "main", commits: ["a"], files: 3, dirty: false, extra: 1 } }), "branch main · files 3 · dirty false");
+  assert.equal(stepOutputLine({ kind: "step", result: { list: [1], inner: { a: 1 } } }), "2 fields");
+  assert.equal(stepOutputLine({ kind: "step", result: "~/.golem/briefings/2026-11-27.md" }), "~/.golem/briefings/2026-11-27.md");
+  assert.equal(stepOutputLine({ kind: "step", result: "https://example.com/a" }), "https://example.com/a");
 });
 
 test("model and cost", () => {

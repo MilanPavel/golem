@@ -368,6 +368,8 @@ export {
   type StepsList,
 } from "./steps-list.ts";
 export {
+  EMPTY_RESULT_WORDS,
+  resultKind,
   reviewDraftText,
   reviewTitle,
   stepMetaLine,
@@ -380,6 +382,7 @@ export {
   workflowRunTook,
   workflowStepsList,
   workflowStepSpans,
+  type ResultKind,
   type StepLike,
   type ToolAsk,
   type WorkerResult,
