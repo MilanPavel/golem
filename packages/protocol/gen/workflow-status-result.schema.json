@@ -37,7 +37,7 @@
     },
     "WorkflowRunInfo": {
       "additionalProperties": false,
-      "description": "One run of a workflow, from its ``workflow_runs`` row.\n\nThe times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null until a step needs one.\n``error`` says why a ``failed`` run failed.",
+      "description": "One run of a workflow, from its ``workflow_runs`` row.\n\nThe times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null\nuntil a step needs one. ``error`` says why a ``failed`` run failed.",
       "properties": {
         "error": {
           "anyOf": [
