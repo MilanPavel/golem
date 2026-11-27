@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "``workflow.add_starter``. Write the starter ``id`` as a workflow file.\n\nA ``needs_folder`` starter needs ``folder`` (a trusted project folder); the others go in the\nuser's folder. Refused for an unknown id, an untrusted folder and a file that exists.",
+  "properties": {
+    "folder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Folder"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "WorkflowAddStarterParams",
+  "type": "object"
+}

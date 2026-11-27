@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
-import { useAgentList, useFolderDialog, useNavigate, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList } from "../../store/page-context.tsx";
+import { useAgentList, useFolderDialog, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
+import { workflowPath } from "../../store/router.ts";
 import { WorkflowDetail } from "./workflow-detail.tsx";
+import { WorkflowStarters, WorkflowsEmpty, starterStillToAdd } from "./workflows-empty.tsx";
 import { routinesStarting, workflowRuns } from "./text.ts";
 
 function Frame({ children }: { children: ReactNode }) {
@@ -13,9 +15,13 @@ function Frame({ children }: { children: ReactNode }) {
   );
 }
 
-/** `/workflows`: what a workflow is, and a hint to pick one from the panel. */
+/** `/workflows`: the starters when there are no workflows, else a hint to pick one from the panel and the starters not added yet. */
 export function WorkflowsScreen() {
   const list = useWorkflowList();
+  const starters = useWorkflowStarters();
+  const actions = usePageActions();
+  const navigate = useNavigate();
+  const [folder] = useNewSessionFolder();
   if (list.data === undefined) {
     return (
       <Frame>
@@ -25,6 +31,22 @@ export function WorkflowsScreen() {
   }
   const workflows = list.data.workflows;
   const broken = workflows.filter((workflow) => workflow.state === "broken").length;
+  const known = starters.data?.starters ?? [];
+  // A starter that reads a project goes in the folder a new session would start in.
+  const add = async (starter: { id: string; needs_folder: boolean }) => {
+    try {
+      navigate(workflowPath(await actions.addWorkflowStarter(starter.id, starter.needs_folder ? folder : null)));
+    } catch (error) {
+      throw new Error(actionErrorText(error, "The workflow could not be added."));
+    }
+  };
+  if (workflows.length === 0 && known.length > 0) {
+    return (
+      <Frame>
+        <WorkflowsEmpty starters={known} folder={folder} onAdd={add} />
+      </Frame>
+    );
+  }
   return (
     <Frame>
       <div className="flex max-w-2xl flex-col gap-1">
@@ -39,6 +61,7 @@ export function WorkflowsScreen() {
             : "Pick one from the list to see what it does."}
         </p>
       </div>
+      <WorkflowStarters starters={starterStillToAdd(known, workflows, folder)} folder={folder} onAdd={add} />
     </Frame>
   );
 }

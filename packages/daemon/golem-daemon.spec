@@ -35,6 +35,7 @@ datas = (
     + collect_data_files("golem.mcp")
     + collect_data_files("golem.agents")
     + collect_data_files("golem.evals")
+    + collect_data_files("golem.workflows", include_py_files=True, subdir="starters")
 )
 for distribution in (
     "golem",

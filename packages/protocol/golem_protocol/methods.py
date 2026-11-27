@@ -114,6 +114,8 @@ METHOD_ACCESS: Final[Mapping[str, Access]] = {
     "workflow.get": "browser",
     "workflow.check": "browser",
     "workflow.save": "browser",
+    "workflow.starters": "browser",
+    "workflow.add_starter": "browser",
     "workflow.propose": "browser",
     "workflow.edit_step": "browser",
     "workflow.start": "browser",

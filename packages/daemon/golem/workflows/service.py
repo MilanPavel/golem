@@ -29,6 +29,7 @@ from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
 from golem.workflows.propose import Proposal, propose
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
+from golem.workflows.starter import StarterError, add_starter
 from golem.workflows.tools import WorkflowTools
 from golem_protocol import rpc
 from golem_protocol.commands import PendingItem, WorkflowRunEvent, WorkflowStepEvent
@@ -149,6 +150,8 @@ class WorkflowService:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._recovery: asyncio.Task[None] | None = None
         self._user_file = user_file
+        self._trusted = trusted
+        self._user_dir = user_dir
         self.registry = WorkflowRegistry(
             user_dir=user_dir, projects=self._projects, trusted=trusted
         )
@@ -366,6 +369,20 @@ class WorkflowService:
         self._folders.update(folders)
         await asyncio.to_thread(self.registry.refresh)
         return self.registry.entries()
+
+    async def add_starter(self, starter_id: str, folder: Path | None) -> WorkflowEntry:
+        """Copy a starter into ``folder`` (or the user's folder) and reload the registry.
+
+        Raises :class:`~golem.workflows.starter.StarterError`.
+        """
+        path = await asyncio.to_thread(
+            add_starter, starter_id, folder, user_dir=self._user_dir, trusted=self._trusted
+        )
+        entries = await self.refresh([] if folder is None else [folder])
+        for entry in entries:
+            if entry.path == path:
+                return entry
+        raise StarterError(f"{path} was written, but the registry does not list it")
 
     def check_code(self, code: str, entry: WorkflowEntry) -> list[Problem]:
         """The problems of ``code`` as the file of ``entry`` (its folder decides the agents and

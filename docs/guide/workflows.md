@@ -71,6 +71,15 @@ To try it, copy the file into your workflows folder:
 cp examples/workflows/hello.py ~/.golem/workflows/
 ```
 
+## Start from a starter
+
+```bash
+golem workflow starters
+golem workflow add morning_briefing
+```
+
+`morning_briefing` goes in `~/.golem/workflows` and runs every weekday at 07:30: it reads your project folders, logs and feeds, and leaves one short briefing in the Inbox and in `~/.golem/briefings`. Adding it turns its schedule on. The Workflows page offers the same starters, and says when each one runs before you add it. An existing file is never overwritten.
+
 ## Run it
 
 ```bash

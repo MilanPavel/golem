@@ -6309,6 +6309,55 @@ class WorkflowSaveResult(BaseModel):
     code_hash: str = Field(min_length=1)
 
 
+class WorkflowStarterInfo(BaseModel):
+    """One starter workflow golem ships. ``needs_folder`` says it reads a project, so it goes
+    in that project's ``workflows`` folder; the others go in the user's."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    title: str
+    line: str
+    needs_folder: bool
+    schedule: str | None = None
+    """When it runs by itself, as a line to show before it is added. Null for never."""
+
+
+class WorkflowStartersParams(BaseModel):
+    """``workflow.starters``. The starter workflows."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class WorkflowStartersResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    starters: list[WorkflowStarterInfo]
+
+
+class WorkflowAddStarterParams(BaseModel):
+    """``workflow.add_starter``. Write the starter ``id`` as a workflow file.
+
+    A ``needs_folder`` starter needs ``folder`` (a trusted project folder); the others go in the
+    user's folder. Refused for an unknown id, an untrusted folder and a file that exists.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    folder: str | None = None
+
+
+class WorkflowAddStarterResult(BaseModel):
+    """The new workflow: ``id`` is the one ``workflow.get`` takes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+
+
 class WorkflowStartParams(BaseModel):
     """``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.
 
@@ -7370,6 +7419,8 @@ __all__ = [
     "TraceTokens",
     "TraceToolSpan",
     "WishResolution",
+    "WorkflowAddStarterParams",
+    "WorkflowAddStarterResult",
     "WorkflowCancelParams",
     "WorkflowCancelResult",
     "WorkflowEditStepParams",
@@ -7396,6 +7447,9 @@ __all__ = [
     "WorkflowStartParams",
     "WorkflowStartResult",
     "WorkflowStartTrigger",
+    "WorkflowStarterInfo",
+    "WorkflowStartersParams",
+    "WorkflowStartersResult",
     "WorkflowState",
     "WorkflowStatusParams",
     "WorkflowStatusResult",

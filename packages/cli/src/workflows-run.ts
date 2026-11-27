@@ -1,7 +1,9 @@
-import type { GolemClient, WorkflowEntryInfo, WorkflowNotice, WorkflowProblem, WorkflowStatusResult } from "@golem/client";
+import { resolve } from "node:path";
+
+import type { GolemClient, WorkflowEntryInfo, WorkflowNotice, WorkflowProblem, WorkflowStarterInfo, WorkflowStatusResult } from "@golem/client";
 
 /** What `golem workflow` needs from the daemon: a fake stands in for it in the tests. */
-export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "checkWorkflow" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "answerWorkflowReview" | "onWorkflowEvent">;
+export type WorkflowClient = Pick<GolemClient, "listWorkflows" | "listWorkflowStarters" | "addWorkflowStarter" | "checkWorkflow" | "startWorkflow" | "workflowStatus" | "cancelWorkflow" | "resumeWorkflow" | "answerWorkflowReview" | "onWorkflowEvent">;
 
 /** What the commands need from outside: the folder, the terminal, and Ctrl-C. */
 export interface WorkflowDeps {
@@ -13,10 +15,12 @@ export interface WorkflowDeps {
   onInterrupt(handler: () => void): () => void;
 }
 
-export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
+export const WORKFLOW_USAGE = "usage: golem workflow [list] | golem workflow starters | golem workflow add <starter> [--folder PATH] | golem workflow check <name|id> | golem workflow run <name|id> [--input k=v]… | golem workflow status <workflow_run_id> | golem workflow resume <workflow_run_id> | golem workflow answer <workflow_run_id> [--key K] [--edit TEXT | --reject]";
 
 export type WorkflowParse =
   | { kind: "list" }
+  | { kind: "starters" }
+  | { kind: "add"; id: string; folder: string | null }
   | { kind: "check"; name: string }
   | { kind: "run"; name: string; inputs: Record<string, string> }
   | { kind: "status"; runId: string }
@@ -29,6 +33,25 @@ export function parseWorkflowArgs(given: readonly string[]): WorkflowParse {
   const fail = (message: string = WORKFLOW_USAGE): WorkflowParse => ({ kind: "error", message });
   const [sub, ...rest] = given;
   if (sub === undefined || sub === "list") return rest.length === 0 ? { kind: "list" } : fail();
+  if (sub === "starters") return rest.length === 0 ? { kind: "starters" } : fail();
+  if (sub === "add") {
+    let id: string | undefined;
+    let folder: string | null = null;
+    for (let i = 0; i < rest.length; i += 1) {
+      const arg = rest[i] as string;
+      if (arg === "--folder") {
+        const value = rest[i + 1];
+        if (value === undefined || value === "") return fail("--folder takes the project folder, for example --folder ~/work/app");
+        folder = value;
+        i += 1;
+      } else if (arg.startsWith("-") || id !== undefined) {
+        return fail();
+      } else {
+        id = arg;
+      }
+    }
+    return id === undefined ? fail() : { kind: "add", id, folder };
+  }
   if (sub === "status" || sub === "resume") {
     const [runId, ...extra] = rest;
     return runId === undefined || runId.startsWith("-") || extra.length > 0 ? fail() : { kind: sub, runId };
@@ -146,6 +169,46 @@ export async function runWorkflowCheck(client: WorkflowClient, args: { name: str
     for (const problem of problems) deps.write(problemLine(problem));
     if (problems.length === 0) deps.write(`${picked.name}: no problems`);
     return problems.some((problem) => problem.severity === "error") ? 1 : 0;
+  } catch (error) {
+    deps.error(message(error));
+    return 1;
+  }
+}
+
+/** The table of `golem workflow starters`: id, what it needs, and its one line. */
+export function formatStarters(starters: readonly WorkflowStarterInfo[]): string {
+  const rows = starters.map((s) => [s.id, s.needs_folder ? "project" : "(user)", s.line]);
+  const head = ["STARTER", "GOES IN", "WHAT IT DOES"];
+  const widths = head.map((title, col) => Math.max(title.length, ...rows.map((row) => (row[col] as string).length)));
+  const line = (cells: readonly string[]): string => cells.map((cell, col) => (col === cells.length - 1 ? cell : cell.padEnd(widths[col] as number))).join("  ").trimEnd();
+  return [line(head), ...rows.map(line)].join("\n");
+}
+
+/** `golem workflow starters`. */
+export async function runWorkflowStarters(client: WorkflowClient, deps: WorkflowDeps): Promise<number> {
+  try {
+    deps.write(formatStarters((await client.listWorkflowStarters()).starters));
+    deps.write("Add one with: golem workflow add <starter>");
+    return 0;
+  } catch (error) {
+    deps.error(message(error));
+    return 1;
+  }
+}
+
+/** `golem workflow add <starter> [--folder PATH]`: a starter that reads a project goes in `--folder` (the current folder when not given). */
+export async function runWorkflowAdd(client: WorkflowClient, args: { id: string; folder: string | null }, deps: WorkflowDeps): Promise<number> {
+  try {
+    const known = (await client.listWorkflowStarters()).starters.find((s) => s.id === args.id);
+    if (known === undefined) {
+      deps.error(`there is no starter called ${args.id}. See: golem workflow starters`);
+      return 1;
+    }
+    const folder = known.needs_folder ? resolve(deps.cwd, args.folder ?? ".") : undefined;
+    const added = await client.addWorkflowStarter(known.id, folder);
+    deps.write(`added ${added.name}: ${added.path}`);
+    deps.write(`Run it with: golem workflow run ${added.name}`);
+    return 0;
   } catch (error) {
     deps.error(message(error));
     return 1;

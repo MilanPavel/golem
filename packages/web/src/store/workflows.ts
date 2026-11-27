@@ -1,6 +1,6 @@
-import type { WorkflowCancelResult, WorkflowCheckResult, WorkflowEditStepResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowResumeResult, WorkflowSaveResult, WorkflowStatusResult, WorkflowStepArg, WorkflowTriggerInfo } from "@golem/client";
+import type { WorkflowAddStarterResult, WorkflowCancelResult, WorkflowCheckResult, WorkflowEditStepResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowResumeResult, WorkflowSaveResult, WorkflowStarterInfo, WorkflowStartersResult, WorkflowStatusResult, WorkflowStepArg, WorkflowTriggerInfo } from "@golem/client";
 
-export type { WorkflowCancelResult, WorkflowCheckResult, WorkflowEditStepResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowResumeResult, WorkflowSaveResult, WorkflowStatusResult, WorkflowStepArg, WorkflowTriggerInfo };
+export type { WorkflowAddStarterResult, WorkflowCancelResult, WorkflowCheckResult, WorkflowEditStepResult, WorkflowEntryInfo, WorkflowGetResult, WorkflowInputInfo, WorkflowListResult, WorkflowOutlineStep, WorkflowProblem, WorkflowProposeResult, WorkflowResumeResult, WorkflowSaveResult, WorkflowStarterInfo, WorkflowStartersResult, WorkflowStatusResult, WorkflowStepArg, WorkflowTriggerInfo };
 
 /** One run of a workflow, from `workflow.status`. */
 export type WorkflowRunInfo = WorkflowStatusResult["run"];
@@ -13,6 +13,9 @@ export type ReviewVerdict = "approve" | "edit" | "reject";
 
 /** The query key of `workflow.list`; the folders it asked for follow. */
 export const WORKFLOW_LIST_KEY = ["workflow.list"] as const;
+
+/** The query key of `workflow.starters`: the starters golem ships. They do not change while it runs. */
+export const WORKFLOW_STARTERS_KEY = ["workflow.starters"] as const;
 
 /** The query key of `workflow.get`, one workflow with its steps and code. */
 export const WORKFLOW_GET_KEY = ["workflow.get"] as const;

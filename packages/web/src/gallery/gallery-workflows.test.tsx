@@ -134,3 +134,24 @@ test("the gallery's Workflow run section shows each state, in both themes", () =
     expect(within(region(`Workflow run, failed, ${theme}`)).getByRole("button", { name: "Resume" })).toBeTruthy();
   }
 });
+
+test("the gallery's starter stories show the empty page, a project starter, no folder, a refusal and the section, in both themes", () => {
+  for (const theme of ["slip", "kiln"] as const) {
+    showTheme(theme);
+    const { container, unmount } = render(<Gallery />);
+    const story = (name: string) => {
+      const region = container.querySelector<HTMLElement>(`[role="region"][aria-label="${name}, ${theme}"]`);
+      if (region === null) throw new Error(`no story ${name}`);
+      return within(region);
+    };
+    const nothing = story("Workflows, nothing yet");
+    expect(nothing.getByRole("heading", { name: "No workflows yet" })).toBeTruthy();
+    expect(nothing.getByText(/Every weekday at 07:30/)).toBeTruthy();
+    expect(story("Workflows, nothing yet, project starter").getAllByRole("button", { name: "Use this starter" }).every((button) => !(button as HTMLButtonElement).disabled)).toBe(true);
+    const noFolder = story("Workflows, nothing yet, no folder");
+    expect(noFolder.getAllByRole("button", { name: "Use this starter" }).filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(1);
+    expect(story("Workflows, nothing yet, add refused").getByRole("alert").textContent).toContain("exists already");
+    expect(story("Workflows, starters left").getByRole("heading", { name: "Starters" })).toBeTruthy();
+    unmount();
+  }
+});

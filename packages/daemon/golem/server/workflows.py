@@ -22,7 +22,10 @@ from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.propose import ProposeError
 from golem.workflows.registry import WorkflowEntry
 from golem.workflows.service import ResumeError, ReviewError, SaveError, WorkflowService
+from golem.workflows.starter import STARTERS, StarterError
 from golem_protocol.commands import (
+    WorkflowAddStarterParams,
+    WorkflowAddStarterResult,
     WorkflowCancelParams,
     WorkflowCancelResult,
     WorkflowCheckParams,
@@ -47,6 +50,9 @@ from golem_protocol.commands import (
     WorkflowRunInfo,
     WorkflowSaveParams,
     WorkflowSaveResult,
+    WorkflowStarterInfo,
+    WorkflowStartersParams,
+    WorkflowStartersResult,
     WorkflowStartParams,
     WorkflowStartResult,
     WorkflowStatusParams,
@@ -224,6 +230,38 @@ async def workflow_save(ctx: RequestContext, params: WorkflowSaveParams) -> Work
         problems=[_problem(p) for p in warnings],
         code_hash=digest or hashlib.sha256(params.code.encode("utf-8")).hexdigest(),
     )
+
+
+async def workflow_starters(
+    ctx: RequestContext, params: WorkflowStartersParams
+) -> WorkflowStartersResult:
+    """The starter workflows golem ships."""
+    del ctx, params
+    return WorkflowStartersResult(
+        starters=[
+            WorkflowStarterInfo(
+                id=s.id,
+                title=s.title,
+                line=s.line,
+                needs_folder=s.needs_folder,
+                schedule=s.schedule,
+            )
+            for s in STARTERS
+        ]
+    )
+
+
+async def workflow_add_starter(
+    ctx: RequestContext, params: WorkflowAddStarterParams
+) -> WorkflowAddStarterResult:
+    """Write a starter as a workflow file, and reload the registry."""
+    service = _service(ctx)
+    folder = None if params.folder is None else _folders([params.folder])[0]
+    try:
+        entry = await service.add_starter(params.id, folder)
+    except StarterError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    return WorkflowAddStarterResult(id=entry.id, name=entry.name, path=str(entry.path))
 
 
 async def workflow_propose(

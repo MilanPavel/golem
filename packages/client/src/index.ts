@@ -139,6 +139,9 @@ export type { WorkflowInputInfo } from "../../protocol/gen/workflow-input-info.t
 export type { WorkflowOutlineStep } from "../../protocol/gen/workflow-outline-step.ts";
 export type { WorkflowTriggerInfo } from "../../protocol/gen/workflow-trigger-info.ts";
 export type { WorkflowListResult } from "../../protocol/gen/workflow-list-result.ts";
+export type { WorkflowStartersResult } from "../../protocol/gen/workflow-starters-result.ts";
+export type { WorkflowStarterInfo } from "../../protocol/gen/workflow-starter-info.ts";
+export type { WorkflowAddStarterResult } from "../../protocol/gen/workflow-add-starter-result.ts";
 export type { WorkflowResumeResult } from "../../protocol/gen/workflow-resume-result.ts";
 export type { WorkflowReviewAnswerResult } from "../../protocol/gen/workflow-review-answer-result.ts";
 export type { WorkflowRunEvent } from "../../protocol/gen/workflow-run-event.ts";
