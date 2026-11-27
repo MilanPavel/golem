@@ -102,7 +102,7 @@ async function settled(client: RoutinesClient, name: string, folder: string | un
 }
 
 /**
- * `golem routines run <name> [--wait]`: fires it now and prints the session id. With `--wait` it waits for the firing,
+ * `golem routines run <name> [--wait]`: fires it now and prints the session id (the firing id for a workflow run that has no session). With `--wait` it waits for the firing,
  * like `golem ask`: the summary on stdout and 0, or the reason on stderr and 1 when it failed or was skipped,
  * or the question and how to answer it and 3 when it stops for an approval.
  */
@@ -110,17 +110,22 @@ export async function runRoutinesRun(client: RoutinesClient, args: { name: strin
   try {
     const started = await client.runRoutine(args.name, args.folder);
     if (!args.wait) {
-      deps.write(started.session_id);
+      deps.write(started.session_id ?? started.routine_run_id);
       return 0;
     }
-    deps.error(`session: ${started.session_id}`);
+    // A workflow run has no session until a step needs one; the firing's id names it then.
+    deps.error(started.session_id === undefined || started.session_id === null ? `run: ${started.routine_run_id}` : `session: ${started.session_id}`);
     let run = await settled(client, args.name, args.folder, started.routine_run_id);
     while (run === null) {
       await deps.sleep(WAIT_POLL_MS);
       run = await settled(client, args.name, args.folder, started.routine_run_id);
     }
     if (run.status === "waiting") {
-      deps.error(formatApproval(started.session_id, { name: args.name }).join("\n"));
+      deps.error(
+        started.session_id === undefined || started.session_id === null
+          ? `${args.name} is waiting for your answer. Answer it on the Runs page, or in /runs in the terminal.`
+          : formatApproval(started.session_id, { name: args.name }).join("\n"),
+      );
       return EXIT_APPROVAL;
     }
     if (run.status === "succeeded") {

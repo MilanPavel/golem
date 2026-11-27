@@ -216,6 +216,16 @@ async def test_test_posts_a_sample() -> None:
     assert poster.notices[0].body == "Notifications work."
 
 
+async def test_a_run_with_no_session_is_keyed_by_the_run_and_has_no_open_hint() -> None:
+    notifier, _bus, poster = _setup()
+    await notifier.tell("T", "hello", None, "wr_1")
+    await notifier.tell("T", "again", "s1", "wr_2")
+    first, second = poster.notices
+    assert (first.session_id, second.session_id) == ("run:wr_1", "s1")
+    assert with_open_hint(first) == "hello"
+    assert with_open_hint(second) == "again\ngolem open s1"
+
+
 def test_only_the_real_golem_home_gets_a_real_poster(tmp_path: Path) -> None:
     assert isinstance(default_poster(tmp_path), NullPoster)
     assert isinstance(default_poster(tmp_path / ".golem"), NullPoster)

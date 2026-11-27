@@ -20,6 +20,13 @@ export interface HelperSession extends StateSession {
   created_at?: string;
   /** Set once the daemon has trimmed a finished helper to its receipt. An older daemon never sends it. */
   trimmed_at?: string | null;
+  /** `workflow:<name>` for the headless session of a workflow run. Such a session is never a row. */
+  origin?: string | null;
+}
+
+/** True for the headless session of a workflow run: it opens by its id, and the Sessions list skips it. */
+export function isWorkflowSession(session: { origin?: string | null }): boolean {
+  return typeof session.origin === "string" && session.origin.startsWith("workflow:");
 }
 
 /** True for a helper whose steps the daemon has trimmed: it is no row. */
@@ -106,7 +113,8 @@ export function groupHelpers<T extends HelperSession>(sessions: readonly T[], op
   for (const session of sessions) {
     const lead = session.parent_session_id;
     if (lead === undefined || lead === null) {
-      rows.push(session);
+      // The daemon leaves these out of `session.list`, but a pushed summary can still bring one.
+      if (!isWorkflowSession(session)) rows.push(session);
       continue;
     }
     if (!ids.has(lead)) continue;

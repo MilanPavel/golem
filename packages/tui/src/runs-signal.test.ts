@@ -17,6 +17,13 @@ const run = (id: string, extra: Partial<RunLike> = {}): RunLike => ({
 
 const none = new Set<string>();
 
+test("a workflow run with no session is dismissed and pruned by its run id", () => {
+  const bare = { kind: "workflow", origin: "workflow:daily", workflow_run_id: "wr_1", status: "waiting" } as RunLike;
+  assert.equal(runsSignal([bare], null, none).banner?.key, "wr_1");
+  assert.equal(runsSignal([bare], null, new Set(["wr_1"])).banner, null);
+  assert.equal(pruneDismissed(new Set(["wr_1"]), [bare]).has("wr_1"), true);
+});
+
 test("the banner says which routine needs you and where to go", () => {
   assert.equal(runsBannerText(run("a")), "● sentry-triage needs you · /runs");
   assert.equal(runsBannerText(run("a", { routine: null, kind: "ask" })), "● golem ask needs you · /runs");
@@ -35,7 +42,7 @@ test("the banner is the newest waiting run, and the count is all of them", () =>
   const runs = [run("old", { routine: "one", started_at: "2026-11-17T08:00:00.000Z" }), run("new", { routine: "two" })];
   const signal = runsSignal(runs, null, none);
   assert.equal(signal.count, 2);
-  assert.equal(signal.banner?.sessionId, "new");
+  assert.equal(signal.banner?.key, "new");
   assert.equal(signal.banner?.text, "● two needs you · /runs");
 });
 
@@ -43,7 +50,7 @@ test("Esc dismisses one session: the next shows, and the count stays", () => {
   const runs = [run("old", { routine: "one", started_at: "2026-11-17T08:00:00.000Z" }), run("new", { routine: "two" })];
   const signal = runsSignal(runs, null, new Set(["new"]));
   assert.equal(signal.count, 2);
-  assert.equal(signal.banner?.sessionId, "old");
+  assert.equal(signal.banner?.key, "old");
   assert.equal(runsSignal(runs, null, new Set(["new", "old"])).banner, null);
 });
 
@@ -54,7 +61,7 @@ test("a dismissed session comes back only after it stops waiting and waits again
   assert.equal(runsSignal(waiting, null, dismissed).banner, null);
   dismissed = pruneDismissed(dismissed, [run("a", { status: "running" })]);
   assert.equal(dismissed.size, 0);
-  assert.equal(runsSignal(waiting, null, dismissed).banner?.sessionId, "a");
+  assert.equal(runsSignal(waiting, null, dismissed).banner?.key, "a");
   // Before the first list arrives nothing is forgotten.
   assert.equal(pruneDismissed(new Set(["a"]), null).size, 1);
 });

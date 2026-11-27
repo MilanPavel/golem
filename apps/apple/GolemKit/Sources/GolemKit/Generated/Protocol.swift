@@ -20707,12 +20707,14 @@ public enum RoutineFiredNotificationMethod: String, Codable {
 }
 
 /// A routine started a run. ``scope`` is ``user`` or the project folder.
+///
+/// ``session_id`` is null for a workflow run that has no session yet.
 // MARK: - RoutineFiredNotificationParams
 public struct RoutineFiredNotificationParams: Codable {
     public let routine: String
     public let routineRunID: String
     public let scope: String
-    public let sessionID: String
+    public let sessionID: String?
     public let trigger: ParamsTrigger
 
     public enum CodingKeys: String, CodingKey {
@@ -20723,7 +20725,7 @@ public struct RoutineFiredNotificationParams: Codable {
         case trigger = "trigger"
     }
 
-    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: ParamsTrigger) {
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String?, trigger: ParamsTrigger) {
         self.routine = routine
         self.routineRunID = routineRunID
         self.scope = scope
@@ -20740,12 +20742,14 @@ public enum ParamsTrigger: String, Codable {
 }
 
 /// A routine started a run. ``scope`` is ``user`` or the project folder.
+///
+/// ``session_id`` is null for a workflow run that has no session yet.
 // MARK: - RoutineFired
 public struct RoutineFired: Codable {
     public let routine: String
     public let routineRunID: String
     public let scope: String
-    public let sessionID: String
+    public let sessionID: String?
     public let trigger: ParamsTrigger
 
     public enum CodingKeys: String, CodingKey {
@@ -20756,7 +20760,7 @@ public struct RoutineFired: Codable {
         case trigger = "trigger"
     }
 
-    public init(routine: String, routineRunID: String, scope: String, sessionID: String, trigger: ParamsTrigger) {
+    public init(routine: String, routineRunID: String, scope: String, sessionID: String?, trigger: ParamsTrigger) {
         self.routine = routine
         self.routineRunID = routineRunID
         self.scope = scope
@@ -21498,17 +21502,21 @@ public struct RoutineRunParams: Codable {
 }
 
 /// The firing ``routine.run`` started, and the session it runs in.
+///
+/// ``session_id`` is null for a workflow routine whose run has no session yet: a run gets
+/// one
+/// only when a step needs it.
 // MARK: - RoutineRunResult
 public struct RoutineRunResult: Codable {
     public let routineRunID: String
-    public let sessionID: String
+    public let sessionID: String?
 
     public enum CodingKeys: String, CodingKey {
         case routineRunID = "routine_run_id"
         case sessionID = "session_id"
     }
 
-    public init(routineRunID: String, sessionID: String) {
+    public init(routineRunID: String, sessionID: String?) {
         self.routineRunID = routineRunID
         self.sessionID = sessionID
     }
@@ -24756,7 +24764,10 @@ public enum RunFailedEventType: String, Codable {
 
 /// One row of the Runs list: a headless session and how its run is going (ADR-050).
 ///
-/// One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+/// One row for each session whose origin is not ``user``, and one for each workflow run that
+/// has no session (``session_id`` is null: a run gets a session only when a step needs one,
+/// so
+/// a client keys a workflow run by ``workflow_run_id``). ``kind`` is ``routine`` for a
 /// routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
 /// (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
 /// ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of
@@ -24782,7 +24793,7 @@ public struct RunInfo: Codable {
     public let reason: String?
     public let routine: String?
     public let routineRunID: String?
-    public let sessionID: String
+    public let sessionID: String?
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let steps: Int?
@@ -24810,7 +24821,7 @@ public struct RunInfo: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: ParamsTrigger?, watchPath: String?, workflowRunID: String?) {
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: ParamsTrigger?, watchPath: String?, workflowRunID: String?) {
         self.approvals = approvals
         self.endedAt = endedAt
         self.folder = folder
@@ -24872,7 +24883,10 @@ public struct RunListResult: Codable {
 
 /// One row of the Runs list: a headless session and how its run is going (ADR-050).
 ///
-/// One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+/// One row for each session whose origin is not ``user``, and one for each workflow run that
+/// has no session (``session_id`` is null: a run gets a session only when a step needs one,
+/// so
+/// a client keys a workflow run by ``workflow_run_id``). ``kind`` is ``routine`` for a
 /// routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
 /// (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
 /// ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of
@@ -24898,7 +24912,7 @@ public struct RunElement: Codable {
     public let reason: String?
     public let routine: String?
     public let routineRunID: String?
-    public let sessionID: String
+    public let sessionID: String?
     public let startedAt: String?
     public let status: RoutineFinishedStatus
     public let steps: Int?
@@ -24926,7 +24940,7 @@ public struct RunElement: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: ParamsTrigger?, watchPath: String?, workflowRunID: String?) {
+    public init(approvals: Int?, endedAt: String?, folder: String?, kind: RunInfoKind, origin: String, reason: String?, routine: String?, routineRunID: String?, sessionID: String?, startedAt: String?, status: RoutineFinishedStatus, steps: Int?, summary: String?, trigger: ParamsTrigger?, watchPath: String?, workflowRunID: String?) {
         self.approvals = approvals
         self.endedAt = endedAt
         self.folder = folder
@@ -33524,8 +33538,8 @@ public struct WorkflowResumeResult: Codable {
 
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
-/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
-/// ``error`` says why a ``failed`` run failed.
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowResumeResultRun
 public struct WorkflowResumeResultRun: Codable {
     public let error: String?
@@ -33626,8 +33640,8 @@ public struct WorkflowReviewAnswerResult: Codable {
 
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
-/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
-/// ``error`` says why a ``failed`` run failed.
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowReviewAnswerResultRun
 public struct WorkflowReviewAnswerResultRun: Codable {
     public let error: String?
@@ -33936,8 +33950,8 @@ public struct WorkflowRunFailedNotificationParams: Codable {
 
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
-/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
-/// ``error`` says why a ``failed`` run failed.
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowRunInfo
 public struct WorkflowRunInfo: Codable {
     public let error: String?
@@ -34073,6 +34087,74 @@ public enum WorkflowRunStartedNotificationMethod: String, Codable {
 /// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
 // MARK: - WorkflowRunStartedNotificationParams
 public struct WorkflowRunStartedNotificationParams: Codable {
+    public let error: String?
+    public let finishedAt: String?
+    public let name: String
+    public let sessionID: String?
+    public let startedAt: String?
+    public let status: WorkflowRunEventStatus
+    public let trigger: String?
+    public let workflowID: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case error = "error"
+        case finishedAt = "finished_at"
+        case name = "name"
+        case sessionID = "session_id"
+        case startedAt = "started_at"
+        case status = "status"
+        case trigger = "trigger"
+        case workflowID = "workflow_id"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(error: String?, finishedAt: String?, name: String, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, trigger: String?, workflowID: String, workflowRunID: String) {
+        self.error = error
+        self.finishedAt = finishedAt
+        self.name = name
+        self.sessionID = sessionID
+        self.startedAt = startedAt
+        self.status = status
+        self.trigger = trigger
+        self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Server → every connection: ``workflow.run.updated``. Not stored.
+///
+/// A field of the run changed while it goes on, such as its ``session_id`` once a step
+/// needed one.
+// MARK: - WorkflowRunUpdatedNotification
+public struct WorkflowRunUpdatedNotification: Codable {
+    public let jsonrpc: Jsonrpc?
+    public let method: WorkflowRunUpdatedNotificationMethod?
+    public let params: WorkflowRunUpdatedNotificationParams
+
+    public enum CodingKeys: String, CodingKey {
+        case jsonrpc = "jsonrpc"
+        case method = "method"
+        case params = "params"
+    }
+
+    public init(jsonrpc: Jsonrpc?, method: WorkflowRunUpdatedNotificationMethod?, params: WorkflowRunUpdatedNotificationParams) {
+        self.jsonrpc = jsonrpc
+        self.method = method
+        self.params = params
+    }
+}
+
+public enum WorkflowRunUpdatedNotificationMethod: String, Codable {
+    case workflowRunUpdated = "workflow.run.updated"
+}
+
+/// The params of ``workflow.run.started|waiting|resumed|done|failed|cancelled``.
+///
+/// The method names the change, ``status`` is the run's state after it. ``error`` is set for
+/// ``workflow.run.failed``. The name is ``workflow.run.*``, never ``run.*`` (ADR-050).
+// MARK: - WorkflowRunUpdatedNotificationParams
+public struct WorkflowRunUpdatedNotificationParams: Codable {
     public let error: String?
     public let finishedAt: String?
     public let name: String
@@ -34636,8 +34718,8 @@ public struct ReviewElement: Codable {
 
 /// One run of a workflow, from its ``workflow_runs`` row.
 ///
-/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
-/// ``error`` says why a ``failed`` run failed.
+/// The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
+/// until a step needs one. ``error`` says why a ``failed`` run failed.
 // MARK: - WorkflowStatusResultRun
 public struct WorkflowStatusResultRun: Codable {
     public let error: String?

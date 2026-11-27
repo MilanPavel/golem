@@ -590,6 +590,9 @@ private func event(_ type: String, seq: Int, session: String = "s1", run: String
     let info = try JSONDecoder().decode(RunInfo.self, from: Data(
         #"{"kind":"ask","origin":"cli","session_id":"s","status":"running","started_at":"2026-01-01T00:00:00Z"}"#.utf8))
     #expect(try RunLike(info: info).status == .running)
+    let bare = try JSONDecoder().decode(RunInfo.self, from: Data(
+        #"{"kind":"workflow","origin":"workflow:a","status":"running","workflow_run_id":"wr_1"}"#.utf8))
+    #expect(try RunLike(info: bare).sessionId == "wr_1")
 }
 
 // MARK: - The badge

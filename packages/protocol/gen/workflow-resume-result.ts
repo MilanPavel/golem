@@ -19,8 +19,8 @@ export interface WorkflowResumeResult {
 /**
  * One run of a workflow, from its ``workflow_runs`` row.
  *
- * The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
- * ``error`` says why a ``failed`` run failed.
+ * The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
+ * until a step needs one. ``error`` says why a ``failed`` run failed.
  *
  * This interface was referenced by `WorkflowResumeResult`'s JSON-Schema
  * via the `definition` "WorkflowRunInfo".

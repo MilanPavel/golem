@@ -190,7 +190,7 @@ export function RoutineDetail({ routine, runs, now, onNavigate, onRun, onRemove,
     onRun().then(
       (result) => {
         setRunning(false);
-        setStarted(result.session_id);
+        setStarted(result.session_id ?? null);
       },
       (err: unknown) => {
         setRunning(false);

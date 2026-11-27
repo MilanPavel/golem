@@ -52,7 +52,7 @@ class Rig:
         (folder / "pr_digest.py").write_text(DIGEST, encoding="utf-8")
         self.sessions = 0
 
-        async def create_session(origin: str, cwd: str | None) -> str:
+        async def create_session(origin: str, cwd: str | None, title: str) -> str:
             self.sessions += 1
             return f"s_wf{self.sessions}"
 
@@ -118,13 +118,16 @@ async def test_a_schedule_routine_starts_its_workflow_and_an_answer_finishes_it(
     rig.clock.now = rig.clock.now.replace(hour=9, minute=30, second=5)
     await rig.scheduler.tick()
     [row] = await rig.runs.recent("digest", "user")
-    assert (row.trigger, row.session_id) == ("schedule", "s_wf1")
+    assert (row.trigger, row.session_id) == ("schedule", None)  # plain steps make no session
     assert row.workflow_run_id is not None
 
     run = await rig.store.get_run(row.workflow_run_id)
     assert run is not None
+    [listed] = await rig.runs.sessionless(10)  # the Runs list reads the run by its id
+    assert (listed.session_id, listed.workflow_run_id) == (None, row.workflow_run_id)
+    assert (listed.routine, listed.routine_run_id) == ("digest", row.routine_run_id)
     assert run.trigger == "routine:digest"
-    assert run.session_id == "s_wf1"
+    assert run.session_id is None and rig.sessions == 0
     assert json.loads(run.inputs_json or "{}") == {"repo": "acme/api", "limit": 5}
 
     async def waiting() -> bool:

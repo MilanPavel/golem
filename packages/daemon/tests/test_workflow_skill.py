@@ -203,7 +203,9 @@ def _digest_service(
     router = _Router(BIG)
     router.replies = ["Fixes a.", "Adds b."]
 
-    async def tell(title: str, text: str, session_id: str | None) -> None:
+    async def tell(
+        title: str, text: str, session_id: str | None, workflow_run_id: str | None
+    ) -> None:
         told.append(text)
 
     return WorkflowService(

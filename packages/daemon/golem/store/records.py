@@ -333,10 +333,12 @@ class SessionRecords:
     async def recent(self, limit: int, cwd: str | None = None) -> list[SessionActivity]:
         """Open sessions with the newest activity first. Closed ones stay in the log.
 
-        With ``cwd``, only the sessions in that folder.
+        With ``cwd``, only the sessions in that folder. The headless session of a workflow run
+        (origin ``workflow:*``) is never listed; it opens by its id.
         """
         rows = await self._database.fetch_all(
             f"{_ACTIVITY} WHERE s.closed_at IS NULL AND s.parent_session_id IS NULL"
+            " AND COALESCE(s.origin, 'user') NOT LIKE 'workflow:%'"
             " AND (? IS NULL OR s.cwd = ?)"
             " ORDER BY s.updated_at DESC, s.session_id DESC LIMIT ?",
             (cwd, cwd, limit),

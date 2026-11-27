@@ -1,13 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { groupHelpers, helperCountWords, helperLabel, helperRowState, helperSquare, helperWords, isHelperSession, isTrimmedHelper, type HelperSession } from "./helper-rows.ts";
+import { groupHelpers, helperCountWords, helperLabel, helperRowState, helperSquare, helperWords, isHelperSession, isTrimmedHelper, isWorkflowSession, type HelperSession } from "./helper-rows.ts";
 
 function s(id: string, status: string, extra: Partial<HelperSession> = {}): HelperSession {
   return { session_id: id, status, ...extra };
 }
 
 const LEAD = s("lead", "running");
+
+test("the session of a workflow run is not a row, but its helpers still group under it", () => {
+  const list = [s("wf", "idle", { origin: "workflow:daily" }), s("h1", "running", { parent_session_id: "wf" }), LEAD];
+  const { rows, squares } = groupHelpers(list);
+  assert.deepEqual(rows.map((r) => r.session_id), ["lead"]);
+  assert.deepEqual(squares.get("wf"), ["working"]);
+  assert.equal(isWorkflowSession({ origin: "workflow:daily" }), true);
+  assert.equal(isWorkflowSession({ origin: "routine:daily" }), false);
+  assert.equal(isWorkflowSession({}), false);
+});
 
 test("a lead with two helpers is one row with two squares", () => {
   const list = [LEAD, s("h1", "running", { parent_session_id: "lead" }), s("h2", "running", { parent_session_id: "lead" })];

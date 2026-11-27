@@ -99,6 +99,7 @@ from golem_protocol.rpc import (
     RpcSuccess,
     WorkflowRunDoneNotification,
     WorkflowRunResumedNotification,
+    WorkflowRunUpdatedNotification,
     WorkflowStepInDoubtNotification,
 )
 
@@ -844,6 +845,7 @@ def test_workflow_events_never_use_the_run_words() -> None:
         or "workflow_run_id" in done.model_dump()["params"]
     )
     assert WorkflowRunResumedNotification.model_fields["method"].default == "workflow.run.resumed"
+    assert WorkflowRunUpdatedNotification.model_fields["method"].default == "workflow.run.updated"
     doubt = WorkflowStepInDoubtNotification(
         params=WorkflowStepEvent(
             workflow_run_id="wr1",

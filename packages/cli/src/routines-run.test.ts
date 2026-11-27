@@ -107,6 +107,18 @@ test("run prints the session id", async () => {
   assert.deepEqual(calls, ["run morning-brief"]);
 });
 
+test("run of a workflow with no session prints the firing id, and says where to answer a wait", async () => {
+  const { client } = fake([run("waiting")]);
+  const noSession: RoutinesClient = { ...client, runRoutine: async () => ({ routine_run_id: "r1" }) };
+  const first = setup();
+  assert.equal(await runRoutinesRun(noSession, { name: "morning-brief", wait: false }, first.deps), 0);
+  assert.deepEqual(first.out, ["r1"]);
+  const second = setup();
+  assert.equal(await runRoutinesRun(noSession, { name: "morning-brief", wait: true }, second.deps), 3);
+  assert.deepEqual(second.err[0], "run: r1");
+  assert.match(second.err[1] ?? "", /Runs page/);
+});
+
 test("run --wait waits for the firing and prints its summary", async () => {
   const { client, calls } = fake([run("queued"), run("running"), run("succeeded", { summary: "Three meetings today.\n" })]);
   const slept: number[] = [];

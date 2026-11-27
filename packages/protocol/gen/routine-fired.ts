@@ -3,16 +3,18 @@
 export type Routine = string;
 export type RoutineRunId = string;
 export type Scope = string;
-export type SessionId = string;
+export type SessionId = string | null;
 export type Trigger = 'schedule' | 'watch' | 'manual' | 'hook';
 
 /**
  * A routine started a run. ``scope`` is ``user`` or the project folder.
+ *
+ * ``session_id`` is null for a workflow run that has no session yet.
  */
 export interface RoutineFired {
   routine: Routine;
   routine_run_id: RoutineRunId;
   scope: Scope;
-  session_id: SessionId;
+  session_id?: SessionId;
   trigger: Trigger;
 }

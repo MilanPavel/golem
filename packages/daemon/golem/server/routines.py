@@ -227,15 +227,22 @@ async def run_list(ctx: RequestContext, params: RunListParams) -> RunListResult:
     if runs is None or sessions is None:
         return RunListResult(runs=[])
     shown: list[RunInfo] = []
-    for row in await runs.headless(params.limit, params.session_id):
-        pending = await sessions.pending_of(row.session_id) if row.status == "waiting" else None
+    found = await runs.headless(params.limit, params.session_id)
+    bare = [] if params.session_id is not None else await runs.sessionless(params.limit)
+    found = [*found, *bare]
+    for row in found:
+        waiting = row.status == "waiting" and row.session_id is not None
+        pending = await sessions.pending_of(row.session_id) if waiting and row.session_id else None
         info = run_info(row, pending)
         if (
             info.kind == "workflow" or row.origin.startswith("workflow:")
         ) and ctx.state.workflows is not None:
             info = await _workflow_row(ctx.state.workflows.runs, row, info)
         shown.append(info)
-    return RunListResult(runs=shown)
+    if bare:
+        # Runs with no session come from another table, so the two lists are merged by start.
+        shown.sort(key=lambda info: info.started_at or "", reverse=True)
+    return RunListResult(runs=shown[: params.limit])
 
 
 _WORKFLOW_STATUS = {"pending": "queued", "done": "succeeded"}
@@ -243,7 +250,11 @@ _WORKFLOW_STATUS = {"pending": "queued", "done": "succeeded"}
 
 async def _workflow_row(runs: WorkflowRuns, row: HeadlessRun, info: RunInfo) -> RunInfo:
     """A workflow run's row: its status, times and error come from its ``workflow_runs`` row."""
-    run = await runs.by_session(row.session_id)
+    run = (
+        await runs.get_run(row.workflow_run_id)
+        if row.workflow_run_id is not None
+        else await runs.by_session(row.session_id or "")
+    )
     if run is None:
         return info
     steps = await runs.list_steps(run.workflow_run_id)

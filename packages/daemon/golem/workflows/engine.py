@@ -31,7 +31,7 @@ from golem.workflow import (
     agent_title,
 )
 from golem.workflows.llm import Llm, parse_object
-from golem.workflows.tools import ToolVerdict, WorkflowTools
+from golem.workflows.tools import SESSION_TOOLS, ToolVerdict, WorkflowTools
 
 __all__ = ["BIG_OUTPUT_CHARS", "WorkflowEngine", "restart_policy"]
 
@@ -68,6 +68,10 @@ result. ``workflows/agents.py`` is behind it."""
 
 SkillRunner = Callable[[str, str, str, str, AgentStarted], Awaitable[dict[str, Any]]]
 """Runs a skill step: workflow run id, step key, skill name, arguments and the same callback."""
+
+
+SessionOf = Callable[[str], Awaitable[str | None]]
+"""The session of a run, made when it has none: workflow run id to session id (None: no session)."""
 
 
 def _no_emit(name: str, payload: dict[str, Any]) -> None:
@@ -107,7 +111,9 @@ class WorkflowEngine:
         llm: Llm | None = None,
         tools: WorkflowTools | None = None,
         skill: SkillRunner | None = None,
+        session: SessionOf | None = None,
     ) -> None:
+        self._session = session
         self._skill = skill
         self._store = store
         self._llm = llm
@@ -195,10 +201,17 @@ class WorkflowEngine:
         record = await self._store.get_run(workflow_run_id)
         if tools is None or record is None:
             raise WorkflowError("run.tool is not available: this daemon has no tools")
-        text = await tools.call(record.session_id, record.project, name, args)
-        if len(text) <= BIG_OUTPUT_CHARS or record.session_id is None:
+        session_id = record.session_id
+        if session_id is None and name in SESSION_TOOLS and self._session is not None:
+            session_id = await self._session(workflow_run_id)
+        text = await tools.call(session_id, record.project, name, args)
+        if len(text) <= BIG_OUTPUT_CHARS:
             return text
-        artifact_id = await tools.keep(record.session_id, key, text)
+        if session_id is None and self._session is not None:
+            session_id = await self._session(workflow_run_id)
+        if session_id is None:
+            return text
+        artifact_id = await tools.keep(session_id, key, text)
         first = " ".join(text.split())[:120]
         return {
             "summary": f"{first} ({len(text)} characters)",

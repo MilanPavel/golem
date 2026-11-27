@@ -108,7 +108,7 @@ The outline of the same file, read from the code by fixed rules:
 
 Flow:
 
-1. `workflow.start` (or a trigger) makes a `workflow_runs` row and a headless session `workflow:<name>`.
+1. `workflow.start` (or a trigger) makes a `workflow_runs` row. The headless session `workflow:<name>` is made later, the first time a step needs one (an agent, a skill, a tool that reads the session); a run of plain steps has none.
 2. The engine calls the function. Each `run.*` call becomes a `workflow_steps` row, keyed by its step key.
 3. A step that is already `done` returns its saved result and does not run.
 4. After a restart, the engine calls the function again from the top. Finished steps return saved results. Running agents continue from their last saved turn (`reconcile_helpers`, `resume_helper`).

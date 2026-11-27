@@ -21,6 +21,9 @@ from golem.workflow import WorkflowError, idempotency_key
 KEY_ARG = "idempotency_key"
 """A tool that takes this argument gets the step's key in it, when the workflow left it out."""
 
+SESSION_TOOLS = frozenset({"read_artifact", "remember", "load_skill"})
+"""The tools that read the session they run in. A run makes its session before it calls one."""
+
 _WRAPPED = re.compile(r"\A.*?\n<mcp_output[^>\n]*>\n(.*)\n</mcp_output>\Z", re.DOTALL)
 
 
@@ -130,4 +133,4 @@ def _bare(output: str) -> str:
     return output if found is None else found.group(1)
 
 
-__all__ = ["KEY_ARG", "ToolVerdict", "WorkflowTools"]
+__all__ = ["KEY_ARG", "SESSION_TOOLS", "ToolVerdict", "WorkflowTools"]

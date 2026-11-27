@@ -2,8 +2,10 @@
 
 ``launch`` runs the engine as a background task the service tracks, so shutdown and
 ``workflow.cancel`` can stop it. The engine's events go out as ``workflow.run.*`` and
-``workflow.step.*`` notifications. Each run gets one headless session (``origin`` is
-``workflow:<name>``) before its first step event; it only holds the run, no turn starts.
+``workflow.step.*`` notifications. A run gets a headless session (``origin`` is
+``workflow:<name>``) only when a step needs one: an agent, a skill, or a tool that reads the
+session. It only holds the run's helpers and files, no turn starts, and it is not listed in
+Sessions. A run of plain steps has none.
 """
 
 from __future__ import annotations
@@ -40,6 +42,7 @@ _NOTIFICATIONS: dict[str, type[BaseModel]] = {
     "workflow.run.started": rpc.WorkflowRunStartedNotification,
     "workflow.run.waiting": rpc.WorkflowRunWaitingNotification,
     "workflow.run.resumed": rpc.WorkflowRunResumedNotification,
+    "workflow.run.updated": rpc.WorkflowRunUpdatedNotification,
     "workflow.run.done": rpc.WorkflowRunDoneNotification,
     "workflow.run.failed": rpc.WorkflowRunFailedNotification,
     "workflow.run.cancelled": rpc.WorkflowRunCancelledNotification,
@@ -130,8 +133,8 @@ class WorkflowService:
         user_file: Path,
         trusted: Callable[[Path], bool],
         broadcast: Callable[[BaseModel], None],
-        create_session: Callable[[str, str | None], Awaitable[str]] | None = None,
-        notify: Callable[[str, str, str | None], Awaitable[None]] | None = None,
+        create_session: Callable[[str, str | None, str], Awaitable[str]] | None = None,
+        notify: Callable[[str, str, str | None, str | None], Awaitable[None]] | None = None,
         touch_session: Callable[[str], Awaitable[None]] | None = None,
         agents: WorkflowAgents | None = None,
         llm: Llm | None = None,
@@ -146,6 +149,7 @@ class WorkflowService:
         self._touches: set[asyncio.Task[None]] = set()
         self._broadcast = broadcast
         self._create_session = create_session
+        self._session_lock = asyncio.Lock()
         self._folders: set[Path] = set()
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._recovery: asyncio.Task[None] | None = None
@@ -166,6 +170,7 @@ class WorkflowService:
             skill=self._skill if agents and agents.has_skills else None,
             llm=llm,
             tools=tools,
+            session=self.session_of,
         )
 
     async def _agent(
@@ -183,10 +188,11 @@ class WorkflowService:
     ) -> dict[str, Any]:
         """Adapt a ``run.agent`` to the seam: the helper belongs to the run's session."""
         record = await self.runs.get_run(run_id)
-        if self._agents is None or record is None or record.session_id is None:
+        session_id = await self.session_of(run_id)
+        if self._agents is None or record is None or session_id is None:
             raise WorkflowError("run.agent needs the run's session, and this run has none")
         return await self._agents.run(
-            session_id=record.session_id,
+            session_id=session_id,
             cwd=record.project,
             key=key,
             agent_type=agent_type,
@@ -204,10 +210,11 @@ class WorkflowService:
     ) -> dict[str, Any]:
         """Adapt a ``run.skill`` to the seam: the helper belongs to the run's session."""
         record = await self.runs.get_run(run_id)
-        if self._agents is None or record is None or record.session_id is None:
+        session_id = await self.session_of(run_id)
+        if self._agents is None or record is None or session_id is None:
             raise WorkflowError("run.skill needs the run's session, and this run has none")
         return await self._agents.run_skill(
-            session_id=record.session_id,
+            session_id=session_id,
             cwd=record.project,
             key=key,
             name=name,
@@ -216,13 +223,13 @@ class WorkflowService:
         )
 
     async def _notify(self, title: str | None, text: str, run_id: str) -> None:
-        """Adapt a ``run.notify`` to the Notifier: the click opens the run's session."""
+        """Adapt a ``run.notify`` to the Notifier: the run is the subject, its session is not."""
         if self._tell is None:
             return
         record = await self.runs.get_run(run_id)
         name = record.name if record is not None else "workflow"
         session_id = record.session_id if record is not None else None
-        await self._tell(title or name, text, session_id)
+        await self._tell(title or name, text, session_id, run_id)
 
     def _projects(self) -> list[Path]:
         """The folders asked for in ``workflow.list`` and the user's trusted folders."""
@@ -476,7 +483,8 @@ class WorkflowService:
     async def start_run(
         self, entry: WorkflowEntry, inputs: dict[str, Any], trigger: str
     ) -> tuple[str, str | None]:
-        """Write a run, give it its session, and launch it. Returns ``(run id, session id)``."""
+        """Write a run and launch it. Returns ``(run id, session id)``; the session id is None
+        until a step needs a session, so it is usually None here."""
         digest = hashlib.sha256(await asyncio.to_thread(entry.path.read_bytes)).hexdigest()
         run_id = await self.runs.create_run(
             entry.id,
@@ -488,7 +496,6 @@ class WorkflowService:
             trigger=trigger,
             source_hash=digest,
         )
-        await self._ensure_session(run_id)
         self.launch(run_id)
         record = await self.runs.get_run(run_id)
         return run_id, None if record is None else record.session_id
@@ -512,18 +519,43 @@ class WorkflowService:
         self._tasks[run_id] = task
         task.add_done_callback(lambda _t: self._tasks.pop(run_id, None))
 
-    async def _ensure_session(self, run_id: str) -> None:
-        """Give the run its headless session, so ``workflow.run.started`` carries its id."""
-        if self._create_session is None:
-            return
-        record = await self.runs.get_run(run_id)
-        if record is None or record.session_id is not None:
-            return
-        try:
-            session_id = await self._create_session(f"workflow:{record.name}", record.project)
-            await self.runs.set_run_session(run_id, session_id)
-        except Exception:
-            log.exception("workflow run %s got no session", run_id)
+    async def session_of(self, run_id: str) -> str | None:
+        """The run's session, made now when it has none (a step needs one).
+
+        One lock covers the making, so parallel steps share one session. The session is titled
+        ``<workflow> · run of <date>``, and ``workflow.run.updated`` tells clients it exists.
+        None when this daemon makes no sessions or the make failed.
+        """
+        async with self._session_lock:
+            record = await self.runs.get_run(run_id)
+            if record is None or record.session_id is not None or self._create_session is None:
+                return None if record is None else record.session_id
+            title = f"{record.name} \u00b7 run of {record.created_at[:10]}"
+            try:
+                session_id = await self._create_session(
+                    f"workflow:{record.name}", record.project, title
+                )
+                await self.runs.set_run_session(run_id, session_id)
+            except Exception:
+                log.exception("workflow run %s got no session", run_id)
+                return None
+        updated = await self.runs.get_run(run_id)
+        if updated is not None:
+            self._emit(
+                "workflow.run.updated",
+                {
+                    "workflow_run_id": updated.workflow_run_id,
+                    "workflow_id": updated.workflow_id,
+                    "name": updated.name,
+                    "status": updated.status,
+                    "trigger": updated.trigger,
+                    "session_id": updated.session_id,
+                    "started_at": updated.started_at,
+                    "finished_at": updated.finished_at,
+                    "error": updated.error,
+                },
+            )
+        return session_id
 
     async def _warn_if_changed(self, run_id: str) -> None:
         """Log when the workflow file is not the one the run started with (versions: #17)."""
@@ -540,7 +572,6 @@ class WorkflowService:
     async def _run(self, run_id: str) -> None:
         try:
             await self._warn_if_changed(run_id)
-            await self._ensure_session(run_id)
             await self.engine.execute(run_id)
         except asyncio.CancelledError:
             record = await self.runs.get_run(run_id)

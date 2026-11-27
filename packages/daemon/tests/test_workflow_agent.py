@@ -132,9 +132,11 @@ class World:
         self.store = WorkflowRuns(database)
         self.sent: list[BaseModel] = []
 
-    def service(self) -> WorkflowService:
-        async def create(origin: str, cwd: str | None) -> str:
-            return await self.manager.create(None, cwd=cwd, origin=origin)
+    def service(self, notify: Any = None) -> WorkflowService:
+        async def create(origin: str, cwd: str | None, title: str) -> str:
+            session_id = await self.manager.create(None, cwd=cwd, origin=origin)
+            await self.manager.rename(session_id, title)
+            return session_id
 
         return WorkflowService(
             runs=self.store,
@@ -143,6 +145,7 @@ class World:
             trusted=lambda _p: True,
             broadcast=self.sent.append,
             create_session=create,
+            notify=notify,
             agents=self.seam,
         )
 
@@ -232,6 +235,77 @@ async def test_an_agent_step_runs_a_helper_of_the_runs_session(
         getattr(m.params, "child_session_id", None) == step.child_session_id  # type: ignore[attr-defined]
         for m in steps
     )
+
+
+async def test_the_agents_session_is_made_with_the_step_titled_and_not_listed(
+    world: Callable[..., World], project: Path
+) -> None:
+    w = world(["found it"])
+    run_id = await w.new_run(ONE, project)
+    record = await w.store.get_run(run_id)
+    assert record is not None and record.session_id is None  # nothing made before a step asks
+    service = w.service()
+    service.launch(run_id)
+    await w.until(run_id, "done")
+    await service.aclose()
+
+    run = await w.store.get_run(run_id)
+    assert run is not None and run.session_id is not None
+    session = await w.records.get(run.session_id)
+    assert session is not None and session.origin == "workflow:flow"
+    assert session.title == f"flow \u00b7 run of {run.created_at[:10]}"
+    listed = [a.session.session_id for a in await w.records.recent(50)]
+    assert run.session_id not in listed
+    assert await w.records.get(run.session_id) is not None  # it still opens by its id
+    updated = [m for m in w.sent if type(m).__name__ == "WorkflowRunUpdatedNotification"]
+    assert [getattr(m.params, "session_id", None) for m in updated] == [run.session_id]  # type: ignore[attr-defined]
+
+
+PLAIN = """
+    @workflow()
+    async def flow(run: Run):
+        await run.notify("hello", title="T")
+        draft = await run.review("the draft", ask="Send it?")
+        return draft["verdict"]
+"""
+
+
+async def test_plain_steps_make_no_session_and_notify_and_review_work(
+    world: Callable[..., World], project: Path
+) -> None:
+    w = world([])
+    told: list[tuple[str, str, str | None, str | None]] = []
+
+    async def tell(title: str, text: str, session_id: str | None, run: str | None) -> None:
+        told.append((title, text, session_id, run))
+
+    service = w.service(notify=tell)
+    run_id = await w.new_run(PLAIN, project)
+    service.launch(run_id)
+    await w.until(run_id, "waiting")
+    assert told == [("T", "hello", None, run_id)]
+    (review,) = await w.store.list_open_reviews(run_id)
+    await service.answer_review(run_id, review.step_key, "approve", None)
+    await w.until(run_id, "done")
+    await service.aclose()
+
+    run = await w.store.get_run(run_id)
+    assert run is not None and run.session_id is None
+    assert [a.session.origin for a in await w.records.recent(50)] == []
+
+
+async def test_a_restart_resumes_a_run_with_no_session(
+    world: Callable[..., World], project: Path
+) -> None:
+    w = world([])
+    run_id = await w.new_run(PLAIN, project)
+    await w.store.set_run_status(run_id, "running", "2026-11-25T10:00:00Z")  # the daemon died
+    service = w.service()
+    service.start()
+    await w.until(run_id, "waiting")  # the restart policy resumes it
+    await service.aclose()
+    run = await w.store.get_run(run_id)
+    assert run is not None and run.session_id is None
 
 
 async def test_a_local_only_folder_runs_the_agent_locally(

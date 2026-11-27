@@ -55,9 +55,13 @@ class RoutineRunRecord:
 
 @dataclass(frozen=True, slots=True)
 class HeadlessRun:
-    """A session whose origin is not ``user``, joined with its firing when it has one."""
+    """A session whose origin is not ``user``, joined with its firing when it has one.
 
-    session_id: str
+    A workflow run that has no session is a row too: ``session_id`` is None and
+    ``workflow_run_id`` names it.
+    """
+
+    session_id: str | None
     origin: str
     routine_run_id: str | None
     routine: str | None
@@ -69,6 +73,7 @@ class HeadlessRun:
     reason: str | None
     summary: str | None
     watch_path: str | None
+    workflow_run_id: str | None = None
 
 
 _LAST_RUN = (
@@ -150,6 +155,34 @@ def _record(row: sqlite3.Row) -> RoutineRunRecord:
         status=row["status"],
         reason=row["reason"],
         summary=row["summary"],
+        watch_path=row["watch_path"],
+        workflow_run_id=row["workflow_run_id"],
+    )
+
+
+_SESSIONLESS = (
+    "SELECT w.workflow_run_id, w.name, w.created_at, r.routine_run_id, r.routine, r.scope,"
+    " r.trigger, r.status AS fired_status, r.started_at AS fired_at, r.ended_at AS fired_end,"
+    " r.reason AS fired_reason, r.summary AS fired_summary, r.watch_path"
+    " FROM workflow_runs w LEFT JOIN routine_runs r ON r.workflow_run_id = w.workflow_run_id"
+    " WHERE w.session_id IS NULL"
+)
+
+
+def _sessionless(row: sqlite3.Row) -> HeadlessRun:
+    fired = row["routine_run_id"] is not None
+    return HeadlessRun(
+        session_id=None,
+        origin=f"workflow:{row['name']}",
+        routine_run_id=row["routine_run_id"],
+        routine=row["routine"],
+        scope=row["scope"],
+        trigger=row["trigger"],
+        status=row["fired_status"] if fired else "queued",
+        started_at=row["fired_at"] if fired else row["created_at"],
+        ended_at=row["fired_end"],
+        reason=row["fired_reason"],
+        summary=row["fired_summary"],
         watch_path=row["watch_path"],
         workflow_run_id=row["workflow_run_id"],
     )
@@ -308,3 +341,15 @@ class RoutineRuns:
             params,
         )
         return [_headless(row) for row in rows]
+
+    async def sessionless(self, limit: int) -> list[HeadlessRun]:
+        """The workflow runs that have no session, newest first, each with its firing if it has one.
+
+        A run gets a session only when a step needs one, so these are the runs of plain steps.
+        """
+        rows = await self._database.fetch_all(
+            f"{_SESSIONLESS} ORDER BY COALESCE(r.started_at, w.created_at) DESC,"
+            " w.workflow_run_id DESC LIMIT ?",
+            (limit,),
+        )
+        return [_sessionless(row) for row in rows]

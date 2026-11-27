@@ -323,3 +323,54 @@ async def test_a_cancel_during_begin_leaves_no_transaction_open(database: Databa
             await task
         async with database.transaction():
             pass
+
+
+async def test_the_migration_removes_empty_workflow_sessions_only(tmp_path: Path) -> None:
+    path = tmp_path / "golem.db"
+    async with Database.open(path, MIGRATIONS[:-1]):
+        pass
+    with sqlite3.connect(path) as raw:
+        for sid, origin in (
+            ("s_empty", "workflow:a"),
+            ("s_chat", "workflow:b"),
+            ("s_lead", "workflow:c"),
+            ("s_user", None),
+        ):
+            raw.execute(
+                "INSERT INTO sessions (session_id, model_profile, created_at, updated_at, origin)"
+                " VALUES (?, 'm', 't', 't', ?)",
+                (sid, origin),
+            )
+            raw.execute(
+                "INSERT INTO events (session_id, seq, ts, type, data) VALUES (?, 1, 't',"
+                " 'session.created', '{}')",
+                (sid,),
+            )
+        raw.execute(
+            "INSERT INTO events (session_id, seq, ts, type, data) VALUES"
+            " ('s_chat', 2, 't', 'message.completed', '{}')"
+        )
+        raw.execute(
+            "INSERT INTO sessions (session_id, model_profile, created_at, updated_at, origin,"
+            " parent_session_id) VALUES ('s_child', 'm', 't', 't', 'agent:x', 's_lead')"
+        )
+        for run, sid in (("wr_1", "s_empty"), ("wr_2", "s_chat"), ("wr_3", "s_lead")):
+            raw.execute(
+                "INSERT INTO workflow_runs (workflow_run_id, workflow_id, name, path, session_id,"
+                " created_at) VALUES (?, 'w', 'a', 'p', ?, 't')",
+                (run, sid),
+            )
+    async with Database.open(path) as database:
+        assert await database.user_version() == len(MIGRATIONS)
+        sessions = await database.fetch_all("SELECT session_id FROM sessions ORDER BY 1")
+        assert [row["session_id"] for row in sessions] == ["s_chat", "s_child", "s_lead", "s_user"]
+        events = await database.fetch_all("SELECT DISTINCT session_id FROM events ORDER BY 1")
+        assert [row["session_id"] for row in events] == ["s_chat", "s_lead", "s_user"]
+        runs = await database.fetch_all(
+            "SELECT workflow_run_id, session_id FROM workflow_runs ORDER BY 1"
+        )
+        assert [(row[0], row[1]) for row in runs] == [
+            ("wr_1", None),
+            ("wr_2", "s_chat"),
+            ("wr_3", "s_lead"),
+        ]

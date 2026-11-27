@@ -3010,22 +3010,29 @@ class RoutineRunParams(BaseModel):
 
 
 class RoutineRunResult(BaseModel):
-    """The firing ``routine.run`` started, and the session it runs in."""
+    """The firing ``routine.run`` started, and the session it runs in.
+
+    ``session_id`` is null for a workflow routine whose run has no session yet: a run gets one
+    only when a step needs it.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     routine_run_id: str = Field(min_length=1)
-    session_id: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
 
 
 class RoutineFired(BaseModel):
-    """A routine started a run. ``scope`` is ``user`` or the project folder."""
+    """A routine started a run. ``scope`` is ``user`` or the project folder.
+
+    ``session_id`` is null for a workflow run that has no session yet.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     routine: str = Field(min_length=1)
     routine_run_id: str = Field(min_length=1)
-    session_id: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
     trigger: RoutineTrigger
     scope: str = Field(min_length=1)
 
@@ -3054,7 +3061,9 @@ infers it from an id."""
 class RunInfo(BaseModel):
     """One row of the Runs list: a headless session and how its run is going (ADR-050).
 
-    One row for each session whose origin is not ``user``. ``kind`` is ``routine`` for a
+    One row for each session whose origin is not ``user``, and one for each workflow run that
+    has no session (``session_id`` is null: a run gets a session only when a step needs one, so
+    a client keys a workflow run by ``workflow_run_id``). ``kind`` is ``routine`` for a
     routine's firing, ``ask`` for ``golem ask --detach`` and ``workflow`` for a workflow run
     (``routine`` stays null; the name is in ``origin``, after ``workflow:``).
     ``routine`` is the routine's name, null for ``ask``. ``folder`` is the project folder of a
@@ -3072,7 +3081,7 @@ class RunInfo(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    session_id: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
     kind: RunKind
     origin: str = Field(min_length=1)
     routine: str | None = Field(default=None, min_length=1)
@@ -6391,8 +6400,8 @@ class WorkflowStartResult(BaseModel):
 class WorkflowRunInfo(BaseModel):
     """One run of a workflow, from its ``workflow_runs`` row.
 
-    The times are ISO 8601 with an offset. ``session_id`` is the run's headless session.
-    ``error`` says why a ``failed`` run failed.
+    The times are ISO 8601 with an offset. ``session_id`` is the run's headless session, null
+    until a step needs one. ``error`` says why a ``failed`` run failed.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
