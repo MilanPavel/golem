@@ -783,7 +783,7 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       chooseFolder: (start) => client.chooseFolder(start),
       reveal: async (path, output) => {
-        await client.reveal(path, output);
+        await (output === undefined ? client.reveal(path) : client.reveal(path, output));
       },
       async createSession(cwd, model, branch) {
         const options: { cwd?: string; modelProfile?: string; branch?: string; createBranch?: boolean } = {};
