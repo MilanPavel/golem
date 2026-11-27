@@ -377,7 +377,7 @@ test("⌘K focuses the ask box", async () => {
   expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Ask golem to change this workflow" }));
 });
 
-type EditFn = (code: string, stepId: string, name: string, value: string) => Promise<WorkflowEditStepResult>;
+type EditFn = (code: string, stepId: string, name: string, value: string | null) => Promise<WorkflowEditStepResult>;
 
 function fieldsEditor(onEditStep: EditFn, extra: Partial<WorkflowEditorProps> = {}) {
   return <WorkflowEditor workflow={SAMPLE_UPGRADE} steps={SAMPLE_UPGRADE_STEPS} code={SAMPLE_UPGRADE_CODE} codeHash={SAMPLE_PR_DIGEST_HASH} onEditStep={onEditStep} onSave={async () => saved("h2")} agents={SAMPLE_UPGRADE_AGENTS} initial={{ selected: "agent:worker", problems: [] }} {...extra} />;
@@ -410,7 +410,7 @@ test("the agent and the model are selects, and a change is sent at once", async 
   const pane = within(screen.getByRole("group", { name: "Selected step" }));
   expect(within(pane.getByLabelText("agent")).getAllByRole("option").map((option) => option.textContent)).toEqual([...SAMPLE_UPGRADE_AGENTS]);
   // The models you have set up are offered; the old wish word the file has stays, marked, and no other is offered.
-  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["cheapest (old word)", "qwen3.5:9b", "deepseek/chat"]);
+  expect(within(pane.getByLabelText("model")).getAllByRole("option").map((option) => option.textContent)).toEqual(["The workflow's model", "cheapest (old word)", "qwen3.5:9b", "deepseek/chat"]);
   await user.selectOptions(pane.getByLabelText("model"), "deepseek/chat");
   await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", "deepseek/chat"));
   await user.selectOptions(pane.getByLabelText("agent"), "reviewer");
@@ -524,4 +524,19 @@ test("a model that is not set up here is said beside the pill and in the step's 
   render(fieldsEditor(vi.fn<EditFn>(), { steps, workflowModel: { model: "gone/model", now: "gone/model", ready: false, note: "gone/model is not set up on this machine" } }));
   expect(screen.getByRole("button", { name: "Model of this workflow" }).textContent).toContain("not set up here");
   expect(screen.getByText(/gone\/model is not set up on this machine, so this step would stop/)).toBeTruthy();
+});
+
+test("choosing the workflow's model on a step removes its model=, and choosing the default in the header removes the decorator's", async () => {
+  const user = userEvent.setup();
+  const written = { model: "qwen3.5:9b", now: "qwen3.5:9b", ready: true, note: null };
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [], workflow_model: written }));
+  render(fieldsEditor(onEditStep, { models: ["qwen3.5:9b"], workflowModel: written }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const field = pane.getByLabelText("model") as HTMLSelectElement;
+  expect(Array.from(field.options)[0]?.textContent).toBe("The workflow's model");
+  await user.selectOptions(field, "");
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "model", null));
+  await user.click(screen.getByRole("button", { name: "Model of this workflow" }));
+  await user.click(screen.getByRole("button", { name: /golem's default model/ }));
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "@workflow", "model", null));
 });

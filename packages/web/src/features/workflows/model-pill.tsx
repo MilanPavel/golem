@@ -22,7 +22,7 @@ export function modelPillHelp(info: WorkflowModelInfo): string {
  * The model of a workflow, in the header of the editor (mock § Which model). It is the `model=` of `@workflow(...)`:
  * picking a model writes that argument into the text, as an unsaved edit like any other change.
  */
-export function WorkflowModelPill({ info, models, onPick }: { info: WorkflowModelInfo; models: readonly string[]; onPick: (name: string) => void }) {
+export function WorkflowModelPill({ info, models, onPick }: { info: WorkflowModelInfo; models: readonly string[]; onPick: (name: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const listed = info.model !== null && info.model !== undefined && !models.includes(info.model) ? [info.model, ...models] : models;
   const missing = info.ready === false;
@@ -43,6 +43,20 @@ export function WorkflowModelPill({ info, models, onPick }: { info: WorkflowMode
         <p className="px-1 text-meta font-medium text-faint">The model of this workflow</p>
         {listed.length === 0 ? <p className="px-1 py-1.5 text-sm text-muted">No model is set up yet. Set one up in Settings › Models.</p> : null}
         <ul className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+          <li>
+            <button
+              type="button"
+              aria-pressed={info.model === null || info.model === undefined}
+              onClick={() => {
+                setOpen(false);
+                if (info.model !== null && info.model !== undefined) onPick(null);
+              }}
+              className={cn("flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-ink outline-offset-2 outline-clay hover:bg-line focus-visible:outline-2", info.model === null || info.model === undefined ? "bg-sunken" : undefined)}
+            >
+              <span className="min-w-0 flex-1 truncate">golem&apos;s default model</span>
+              <span className="text-meta text-faint">{info.model === null || info.model === undefined ? "now" : "removes model="}</span>
+            </button>
+          </li>
           {listed.map((name) => (
             <li key={name}>
               <button

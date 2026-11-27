@@ -33,8 +33,8 @@ export function fieldsOf(kind: string): readonly FieldSpec[] {
 
 export type StepFieldsProps = {
   step: WorkflowOutlineStep;
-  /** Sets one argument. Rejects with the reason it was refused. */
-  onEdit: (name: string, value: string) => Promise<void>;
+  /** Sets one argument; a null value takes it out of the call. Rejects with the reason it was refused. */
+  onEdit: (name: string, value: string | null) => Promise<void>;
   /** The agent types to pick from. */
   agents?: readonly string[];
   /** The names of the models you have set up, as the chat's model picker shows them. */
@@ -77,7 +77,7 @@ export function modelNote(step: WorkflowOutlineStep, arg: WorkflowStepArg | unde
   return arg === undefined ? `Uses ${now}: the workflow's model, else golem's default. Choosing one here writes it on this step.` : `Uses ${now}.${where}`;
 }
 
-function Control({ spec, step, value, id, busy, agents, models, onCommit }: { spec: FieldSpec; step: WorkflowOutlineStep; value: string | null; id: string; busy: boolean; agents: readonly string[]; models: readonly string[]; onCommit: (value: string) => void }) {
+function Control({ spec, step, value, id, busy, agents, models, onCommit }: { spec: FieldSpec; step: WorkflowOutlineStep; value: string | null; id: string; busy: boolean; agents: readonly string[]; models: readonly string[]; onCommit: (value: string | null) => void }) {
   const describedBy = `${id}-note`;
   if (spec.kind === "agent" || spec.kind === "model") {
     const options = spec.kind === "agent" ? agents : models;
@@ -91,9 +91,10 @@ function Control({ spec, step, value, id, busy, agents, models, onCommit }: { sp
         disabled={busy}
         onChange={(event) => {
           if (event.target.value !== "") onCommit(event.target.value);
+          else if (spec.kind === "model") onCommit(null);
         }}
       >
-        {value === null ? <option value="">{spec.kind === "agent" ? "Choose…" : "the workflow's model"}</option> : null}
+        {spec.kind === "model" ? <option value="">The workflow&apos;s model</option> : value === null ? <option value="">Choose…</option> : null}
         {extra ? <option value={value}>{spec.kind === "model" && (WISHES as readonly string[]).includes(value) ? `${value} (old word)` : value}</option> : null}
         {options.map((name) => (
           <option key={name} value={name}>
@@ -203,7 +204,7 @@ export function StepFields({ step, onEdit, agents = [], models = [], onOpenAgent
   const specs = fieldsOf(step.kind);
   if (specs.length === 0) return <p className="text-meta text-faint">A code step has no fields to edit here. Its function opens in the code pane.</p>;
 
-  async function commit(name: string, value: string): Promise<void> {
+  async function commit(name: string, value: string | null): Promise<void> {
     setBusy(name);
     setError(null);
     try {

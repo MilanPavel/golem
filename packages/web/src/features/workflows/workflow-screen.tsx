@@ -116,8 +116,8 @@ export function WorkflowScreen({ id }: { id: string }) {
         routines={routinesStarting(routines.data?.routines ?? [], workflow.name)}
         now={now}
         onNavigate={navigate}
-        onStart={async (inputs) => {
-          const runId = await actions.startWorkflow(workflow.id, inputs);
+        onStart={async (inputs, model) => {
+          const runId = await (model === undefined ? actions.startWorkflow(workflow.id, inputs) : actions.startWorkflow(workflow.id, inputs, model));
           navigate(`/runs/${encodeURIComponent(runId)}`);
         }}
         onChooseFolder={

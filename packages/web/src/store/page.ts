@@ -451,7 +451,7 @@ export type PageActions = {
   /** A proposal for the notes of a source. It is not saved. */
   dataNotesDraft(name: string, project: string | null): Promise<string>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
-  startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
+  startWorkflow(id: string, inputs: Record<string, unknown>, model?: string): Promise<string>;
   /** Writes a starter as a workflow file: in `folder` for a starter that reads a project, in the user's folder when `folder` is null. With `routine` it also makes the starter's routine, and the routine list is read again too. The workflow list is read again. Resolves with the result: its `id` is the new workflow's, which `/workflows/:id` opens it by, and `routine_problem` says why the routine was not made. Rejects with the daemon's reason: the folder is not trusted, the file exists. */
   addWorkflowStarter(id: string, folder: string | null, routine?: boolean): Promise<WorkflowAddStarterResult>;
   /** Checks `code` as the file of the workflow `id`, without writing it: the problems with their lines and steps, and the outline of that text. */
@@ -459,7 +459,7 @@ export type PageActions = {
   /** Asks golem for a change to `code`, the file of the workflow `id`: one model call, the answer checked, nothing written. `previous` is the last proposal and its note, for a refine. Rejects with the daemon's reason, such as no model for that folder. */
   proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
   /** Sets one argument of one step in `code`: the new text with its outline and problems. Nothing is written. Rejects with the daemon's reason: a code step, an argument the code computes, a value that is not valid. */
-  editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean): Promise<WorkflowEditStepResult>;
+  editWorkflowStep(id: string, code: string, stepId: string, name: string, value: string | number | boolean | null): Promise<WorkflowEditStepResult>;
   /** Writes `code` as the file of the workflow `id`. `baseHash` is the `code_hash` the editor started from. Rejects with the daemon's reason: the file changed on disk, the code has errors, the folder is not trusted. */
   saveWorkflow(id: string, code: string, baseHash: string): Promise<WorkflowSaveResult>;
   /** Stops a workflow run. `cancelled` is false when it had ended already. */
@@ -467,7 +467,7 @@ export type PageActions = {
   /** The text of output `index` of a run that is a file path the run marked: cut at a limit, `truncated` says so. Rejects with the daemon's reason. */
   readWorkflowOutput(workflowRunId: string, index: number): Promise<WorkflowReadOutputResult>;
   /** Continues a stopped run; the steps that finished are not run again. Resolves with the run as it is then. */
-  resumeWorkflow(workflowRunId: string): Promise<WorkflowResumeResult>;
+  resumeWorkflow(workflowRunId: string, model?: string): Promise<WorkflowResumeResult>;
   /** Answers the review `key` of a waiting run. `text` is what an edit says. The run continues once none of its reviews waits. */
   answerWorkflowReview(workflowRunId: string, key: string, verdict: ReviewVerdict, text?: string): Promise<void>;
   /** Deletes a user routine from config.toml. */
@@ -1053,8 +1053,8 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         return saved.path;
       },
       dataNotesDraft: async (name, project) => (await (project === null ? client.draftDataNotes(name) : client.draftDataNotes(name, project))).text,
-      async startWorkflow(id, inputs) {
-        const started = await client.startWorkflow(id, inputs);
+      async startWorkflow(id, inputs, model) {
+        const started = await (model === undefined ? client.startWorkflow(id, inputs) : client.startWorkflow(id, inputs, model));
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });
         return started.workflow_run_id;
       },
@@ -1092,9 +1092,9 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
         }
       },
       readWorkflowOutput: (workflowRunId, index) => client.readWorkflowOutput(workflowRunId, index),
-      async resumeWorkflow(workflowRunId) {
+      async resumeWorkflow(workflowRunId, model) {
         try {
-          return await client.resumeWorkflow(workflowRunId);
+          return await (model === undefined ? client.resumeWorkflow(workflowRunId) : client.resumeWorkflow(workflowRunId, model));
         } finally {
           await queryClient.invalidateQueries({ queryKey: WORKFLOW_STATUS_KEY });
           await queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });

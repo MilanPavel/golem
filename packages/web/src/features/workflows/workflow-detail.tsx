@@ -50,7 +50,7 @@ export type WorkflowDetailProps = {
   /** Opens the file's folder in Finder. Without it, the action is not offered. */
   onReveal?: (path: string) => Promise<void>;
   /** Starts a run with these inputs and opens it. Rejects with the daemon's reason, which the Run… dialog shows. Without it, Run… is not offered. */
-  onStart?: (inputs: Record<string, unknown>) => Promise<void>;
+  onStart?: (inputs: Record<string, unknown>, model?: string) => Promise<void>;
   /** Opens the folder dialog on the daemon's Mac. Without it, a folder input is typed. */
   onChooseFolder?: (start: string | null) => Promise<string | null>;
   /** Opens the Run… dialog at the start. For the gallery and tests. */
@@ -234,8 +234,9 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
       </header>
       <Pills workflow={workflow} routines={routines} runs={runs} problems={problems} now={now} onNavigate={onNavigate} />
       {onStart === undefined ? null : <RunDialog open={runOpen} workflow={workflow}
-          onStart={async (inputs) => {
-            await onStart(inputs);
+          models={models}
+          onStart={async (inputs, model) => {
+            await (model === undefined ? onStart(inputs) : onStart(inputs, model));
             setRunOpen(false);
           }}
           onCancel={() => setRunOpen(false)} onChooseFolder={onChooseFolder} />}

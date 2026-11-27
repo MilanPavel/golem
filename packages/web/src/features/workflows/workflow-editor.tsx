@@ -37,7 +37,7 @@ export type WorkflowEditorProps = {
   /** Asks golem for a change to `code` (workflow.propose), with the last proposal and its note for a refine. Rejects with the daemon's reason. Without it, the ask box is not offered. */
   onPropose?: (code: string, ask: string, previous?: { code: string; note: string }) => Promise<WorkflowProposeResult>;
   /** Sets one argument of one step in a text, without writing it (`workflow.edit_step`). Without it, the fields of a step are shown but not edited. */
-  onEditStep?: (code: string, stepId: string, name: string, value: string) => Promise<WorkflowEditStepResult>;
+  onEditStep?: (code: string, stepId: string, name: string, value: string | null) => Promise<WorkflowEditStepResult>;
   /** The agent types a step may name, for its agent field. */
   agents?: readonly string[];
   /** The names of the models you have set up, as the chat's model picker shows them: for the model of the workflow and of a step. */
@@ -161,7 +161,7 @@ type StepPaneProps = {
   lines: readonly string[];
   text: string;
   /** Sets one argument of the step. Without it, the fields are only shown. */
-  onEdit?: (name: string, value: string) => Promise<void>;
+  onEdit?: (name: string, value: string | null) => Promise<void>;
   agents?: readonly string[];
   models?: readonly string[];
   onOpenAgent?: (name: string) => void;
@@ -580,7 +580,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   }
 
   // One field of the selected step: the daemon writes that one argument into the text, and the text is an unsaved edit.
-  async function editField(name: string, value: string): Promise<void> {
+  async function editField(name: string, value: string | null): Promise<void> {
     if (selected === null || onEditStep === undefined) return;
     const at = steps.indexOf(selected);
     const result = await onEditStep(text, selected.id, name, value);
@@ -600,7 +600,7 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
   }
 
   // The workflow's own model: the daemon writes `model=` into `@workflow(...)`, and the text is an unsaved edit.
-  async function pickModel(name: string): Promise<void> {
+  async function pickModel(name: string | null): Promise<void> {
     if (onEditStep === undefined) return;
     try {
       const result = await onEditStep(text, "@workflow", "model", name);
