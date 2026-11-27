@@ -56,9 +56,9 @@ const step = (id: string, kind: string, title: string, first: number, last: numb
 });
 
 export const SAMPLE_PR_DIGEST_STEPS: WorkflowOutlineStep[] = [
-  step("s1", "tool", "List the pull requests", 12, 12),
-  step("s2", "llm", "Summarise each pull request", 15, 17, { for_each: "pulls" }),
-  step("s3", "review", "Check the digest", 20, 20),
+  step("s1", "tool", "List the pull requests", 12, 12, { does: "Reads the open pull requests of the repository." }),
+  step("s2", "llm", "Summarise each pull request", 15, 17, { for_each: "pulls", does: "Writes one line about each pull request.", after: ["s1"] }),
+  step("s3", "review", "Check the digest", 20, 20, { does: "Asks you to look at the digest before it goes out.", after: ["s2"] }),
   step("s4", "notify", "Tell you", 23, 23, { condition: 'reviewed["verdict"] != "reject"' }),
 ];
 

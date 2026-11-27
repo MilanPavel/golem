@@ -8,7 +8,7 @@ import { Input } from "../../ui/input.tsx";
 import { cn } from "../../ui/cn.ts";
 import { CodeEditor } from "../settings/config/code-editor.tsx";
 import { StepFields } from "./step-fields.tsx";
-import { changedLines, compareSteps, groupWords, lineDiff, problemCounts, stepAtLine, stepNotes, stepNumberLines, stepRange, type StepChange } from "./text.ts";
+import { changedLines, compareSteps, groupWords, lineDiff, problemCounts, repeatWords, stepAtLine, stepKindWords, stepNumberLines, stepRange, stepUses, type StepChange } from "./text.ts";
 
 /** How long the code rests before it is checked. */
 export const CHECK_DELAY_MS = 600;
@@ -16,8 +16,8 @@ export const CHECK_DELAY_MS = 600;
 export type EditorView = "outline" | "both" | "code";
 
 const VIEWS: readonly { view: EditorView; label: string }[] = [
-  { view: "outline", label: "Outline" },
-  { view: "both", label: "Both" },
+  { view: "outline", label: "Steps" },
+  { view: "both", label: "Steps and code" },
   { view: "code", label: "Code" },
 ];
 
@@ -58,6 +58,14 @@ function whereText(problem: WorkflowProblem, steps: readonly WorkflowOutlineStep
   return at < 0 ? `line ${problem.line}` : `line ${problem.line} · step ${at + 1}`;
 }
 
+function KindTag({ kind }: { kind: string }) {
+  return <span className="shrink-0 rounded-md border border-line bg-bg px-1.5 py-0.5 text-meta font-normal text-muted">{stepKindWords(kind)}</span>;
+}
+
+function NumberDot({ number, selected }: { number: number; selected: boolean }) {
+  return <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full text-meta font-medium", selected ? "bg-clay text-on-clay" : "bg-bg text-muted ring-1 ring-line")}>{number}</span>;
+}
+
 function StepCard({ step, number, selected, problems, change, onSelect }: { step: WorkflowOutlineStep; number: number; selected: boolean; problems: readonly WorkflowProblem[]; change?: StepChange; onSelect: () => void }) {
   return (
     <button
@@ -65,12 +73,12 @@ function StepCard({ step, number, selected, problems, change, onSelect }: { step
       aria-current={selected ? "step" : undefined}
       onClick={onSelect}
       className={cn(
-        "flex w-full flex-col gap-0.5 rounded-lg border bg-surface px-2.5 py-2 text-left outline-offset-2 outline-clay focus-visible:outline-2",
+        "flex w-full flex-col gap-1 rounded-lg border bg-surface px-2.5 py-2 text-left outline-offset-2 outline-clay focus-visible:outline-2",
         selected ? "border-clay bg-clay-soft" : change === "new" ? "border-dashed border-allow bg-allow-soft" : change === "changed" ? "border-clay" : "border-line hover:border-line-strong",
       )}
     >
-      <span className="flex items-baseline gap-2 text-sm font-medium">
-        <span className={cn("w-5 shrink-0 text-right text-meta", selected ? "text-clay-ink" : "text-faint")}>{number}</span>
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <NumberDot number={number} selected={selected} />
         <span className="min-w-0 flex-1 wrap-anywhere">
           {step.title}
           {step.item ? (
@@ -79,9 +87,15 @@ function StepCard({ step, number, selected, problems, change, onSelect }: { step
             </span>
           ) : null}
         </span>
+        <KindTag kind={step.kind} />
         {change === undefined ? null : <span className={cn("shrink-0 text-meta", change === "new" ? "text-allow" : "text-clay-ink")}>{change}</span>}
       </span>
-      <span className="pl-7 text-meta text-muted wrap-anywhere">{stepNotes(step).join(" · ")}</span>
+      {step.for_each ? <span className="pl-7 text-meta text-muted wrap-anywhere">↻ {repeatWords(step.for_each)}</span> : null}
+      {step.condition ? (
+        <span className="pl-7 text-meta text-muted wrap-anywhere">
+          if <Code tone="muted">{step.condition}</Code>
+        </span>
+      ) : null}
       {problems.map((problem, at) => (
         <span key={at} className={cn("pl-7 text-meta wrap-anywhere", problem.severity === "error" ? "text-deny" : "text-wait")}>
           <ProblemMark problem={problem} /> {problem.message}
@@ -91,17 +105,29 @@ function StepCard({ step, number, selected, problems, change, onSelect }: { step
   );
 }
 
+/** The steps in order. Steps that run at the same time sit in one dashed box: the first of them carries its title and count, and the box is drawn around them by their borders. */
 function Outline({ steps, selected, problemsOf, changes, onSelect }: { steps: readonly WorkflowOutlineStep[]; selected: string | null; problemsOf: (step: WorkflowOutlineStep) => WorkflowProblem[]; changes?: ReadonlyMap<string, StepChange>; onSelect: (step: WorkflowOutlineStep) => void }) {
   if (steps.length === 0) return <p className="text-sm text-muted">No steps found in the code.</p>;
   return (
-    <ol aria-label="Outline" className="flex flex-col gap-1.5">
+    <ol aria-label="Outline" className="flex flex-col">
       {steps.map((step, at) => {
         const group = step.group ?? null;
         const before = at === 0 ? null : (steps[at - 1]?.group ?? null);
+        const after = steps[at + 1]?.group ?? null;
+        const first = group !== null && group !== before;
+        const last = group !== null && group !== after;
+        const size = first ? steps.slice(at).findIndex((other) => (other.group ?? null) !== group) : 0;
+        const count = first ? (size < 0 ? steps.length - at : size) : 0;
         return (
-          <li key={step.id} className="flex flex-col gap-1.5">
-            {group !== null && group !== before ? <span className="pt-1 text-meta font-medium text-faint">{groupWords(step)}</span> : null}
-            <div className={cn(group !== null && "border-l-2 border-line pl-2")}>
+          <li key={step.id} className="flex flex-col">
+            {at === 0 || (group !== null && !first) ? null : <span aria-hidden="true" className="mx-auto h-3 w-px bg-line-strong" />}
+            <div className={cn(group !== null && "flex flex-col gap-1.5 border-x border-dashed border-line-strong px-2 pb-1.5", first && "rounded-t-lg border-t pt-2", last && "rounded-b-lg border-b")}>
+              {first ? (
+                <span className="flex flex-wrap items-center gap-x-2 px-1 text-meta text-muted">
+                  <span className="font-medium text-ink">{groupWords(step)}</span>
+                  <span className="text-faint">· these {count} run at the same time</span>
+                </span>
+              ) : null}
               <StepCard step={step} number={at + 1} selected={selected === step.id} problems={problemsOf(step)} change={changes?.get(step.id)} onSelect={() => onSelect(step)} />
             </div>
           </li>
@@ -114,7 +140,7 @@ function Outline({ steps, selected, problemsOf, changes, onSelect }: { steps: re
 function Field({ name, children }: { name: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3 text-sm">
-      <dt className="w-14 shrink-0 text-meta text-faint">{name}</dt>
+      <dt className="w-16 shrink-0 text-meta text-faint">{name}</dt>
       <dd className="min-w-0 flex-1 wrap-anywhere">{children}</dd>
     </div>
   );
@@ -123,6 +149,8 @@ function Field({ name, children }: { name: string; children: React.ReactNode }) 
 type StepPaneProps = {
   step: WorkflowOutlineStep | null;
   number: number;
+  /** The outline, to name the steps this one uses. */
+  steps: readonly WorkflowOutlineStep[];
   lines: readonly string[];
   text: string;
   /** Sets one argument of the step. Without it, the fields are only shown. */
@@ -130,50 +158,83 @@ type StepPaneProps = {
   agents?: readonly string[];
   onOpenAgent?: (name: string) => void;
   onJump?: (line: number) => void;
+  /** Switches to Steps and code and shows the step's lines. Without it, no link. */
+  onShow?: () => void;
   refused?: { name: string; message: string } | null;
 };
 
-function StepPane({ step, number, lines, text, onEdit, agents, onOpenAgent, onJump, refused }: StepPaneProps) {
+function StepPane({ step, number, steps, lines, text, onEdit, agents, onOpenAgent, onJump, onShow, refused }: StepPaneProps) {
   if (step === null) return <p className="text-sm text-muted">Pick a step in the outline, or put the cursor in its lines.</p>;
   const range = stepRange(step);
   const brief = step.brief_line === null || step.brief_line === undefined ? null : (text.split("\n")[step.brief_line - 1]?.trim() ?? null);
   const editable = onEdit !== undefined && step.kind !== "code";
   const where = range === null ? null : range[0] === range[1] ? `${range[0]}` : `${range[0]}–${range[1]}`;
+  const uses = stepUses(steps, step);
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="flex items-baseline gap-2 text-sm font-medium">
-        <span className="text-meta text-clay-ink">{number}</span>
-        <span className="wrap-anywhere">
+    <div className="flex flex-col gap-4">
+      <h3 className="flex flex-wrap items-center gap-2 text-base font-semibold">
+        <NumberDot number={number} selected />
+        <span className="min-w-0 wrap-anywhere">
           {step.title}
           {step.item ? (
-            <span className="ml-2 font-normal">
+            <span className="ml-2 text-sm font-normal">
               <Code tone="muted">{step.item}</Code>
             </span>
           ) : null}
         </span>
+        <KindTag kind={step.kind} />
       </h3>
-      <dl className="flex flex-col gap-1.5">
-        <Field name="kind">{step.kind}</Field>
-        {step.does ? <Field name="does">{step.does}</Field> : null}
-        {editable || !step.agent ? null : <Field name="agent">{step.agent}</Field>}
+      {step.does ? <p className="max-w-[70ch] text-sm text-pretty text-ink-soft">{step.does}</p> : null}
+      <dl aria-label="About the step" className="flex flex-col gap-1.5">
+        {step.for_each ? <Field name="Repeats">{repeatWords(step.for_each)}</Field> : null}
+        {step.condition ? (
+          <Field name="Only if">
+            <Code tone="muted">{step.condition}</Code>
+          </Field>
+        ) : null}
+        <Field name="Uses">
+          {uses.length === 0 ? (
+            <span className="text-faint">nothing</span>
+          ) : (
+            <span className="flex flex-wrap gap-1.5">
+              {uses.map((use) => (
+                <span key={use.number} className="rounded-md border border-line bg-bg px-1.5 py-0.5 text-meta">
+                  {use.title} · step {use.number}
+                </span>
+              ))}
+            </span>
+          )}
+        </Field>
+        {editable || !step.agent ? null : <Field name="Agent">{step.agent}</Field>}
         {editable || brief === null ? null : (
-          <Field name="brief">
+          <Field name="Brief">
             <Code tone="muted">{brief}</Code>
           </Field>
         )}
-        {step.for_each ? <Field name="for each">{step.for_each}</Field> : null}
-        {step.condition ? <Field name="if">{step.condition}</Field> : null}
-        {step.gets ? <Field name="gets">{step.gets}</Field> : null}
+        {step.gets ? <Field name="Gets">{step.gets}</Field> : null}
         {editable || !step.key ? null : (
-          <Field name="key">
-            <Code tone="muted">{step.key}</Code>
+          <Field name="Only once">
+            <Code tone="muted">key={step.key}</Code>
           </Field>
         )}
-        {editable || !step.budget ? null : <Field name="budget">{step.budget}</Field>}
-        {where === null ? null : <Field name="lines">{where}</Field>}
+        {editable || !step.budget ? null : <Field name="Budget">{step.budget}</Field>}
       </dl>
       {editable ? <StepFields step={step} onEdit={onEdit} agents={agents} onOpenAgent={onOpenAgent} onJump={onJump} refused={refused} /> : null}
-      {lines.length === 0 ? null : <pre aria-label="Lines of the step" className="overflow-x-auto rounded-md border border-line bg-surface p-2 font-mono text-code text-ink">{lines.join("\n")}</pre>}
+      {lines.length === 0 ? null : (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline gap-2">
+            <h4 className="text-meta font-medium text-faint">Code</h4>
+            {where === null ? null : <span className="text-meta text-faint">{range !== null && range[0] !== range[1] ? `lines ${where}` : `line ${where}`}</span>}
+            <span className="min-w-0 flex-1" />
+            {onShow === undefined ? null : (
+              <button type="button" onClick={onShow} className="text-meta text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2">
+                Show in the file
+              </button>
+            )}
+          </div>
+          <pre aria-label="Lines of the step" className="rounded-md border border-line bg-surface p-2 font-mono text-code whitespace-pre-wrap text-ink wrap-anywhere">{lines.join("\n")}</pre>
+        </div>
+      )}
       <p className="text-meta text-faint">
         {step.kind === "code"
           ? "A code step has no fields to edit here. Its function opens in the code pane."
@@ -695,8 +756,8 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
       )}
       <div className="flex flex-col gap-3 lg:min-h-48 lg:flex-1 lg:flex-row lg:items-stretch">
         {showOutline ? (
-          <div className="flex min-w-0 flex-col gap-2 lg:min-h-0 lg:w-72 lg:shrink-0 lg:overflow-y-auto">
-            <h2 className="text-meta font-medium text-faint">Outline, read from the code</h2>
+          <div className={cn("flex min-w-0 flex-col gap-2 lg:min-h-0 lg:shrink-0 lg:overflow-y-auto", view === "outline" ? "lg:w-100" : "lg:w-72")}>
+            <h2 className="text-meta font-medium text-faint">Steps, read from the code</h2>
             <Outline steps={shownSteps} selected={proposing ? null : selectedId} problemsOf={problemsOf} changes={changes} onSelect={proposing ? () => undefined : pick} />
           </div>
         ) : null}
@@ -731,17 +792,26 @@ export function WorkflowEditor({ workflow, steps: savedSteps, code, codeHash, on
           </div>
         ) : null}
         {showStep ? (
-          <div role="group" aria-label="Selected step" className="flex min-w-0 flex-col gap-2 lg:min-h-0 lg:w-72 lg:shrink-0 lg:overflow-y-auto">
+          <div role="group" aria-label="Selected step" className={cn("flex min-w-0 flex-col gap-2 lg:min-h-0 lg:overflow-y-auto", view === "outline" ? "lg:flex-1" : "lg:w-72 lg:shrink-0")}>
             <h2 className="text-meta font-medium text-faint">Step</h2>
             <StepPane
               step={selected}
               number={selectedAt}
+              steps={steps}
               lines={range === null ? [] : lines.slice(range[0] - 1, range[1])}
               text={text}
               onEdit={readOnly || onEditStep === undefined ? undefined : editField}
               agents={agents}
               onOpenAgent={onOpenAgent}
               onJump={(line) => setReveal({ line, nonce: (reveal?.nonce ?? 0) + 1 })}
+              onShow={
+                view === "both" || range === null
+                  ? undefined
+                  : () => {
+                      setView("both");
+                      setReveal({ line: range[0], nonce: (reveal?.nonce ?? 0) + 1 });
+                    }
+              }
               refused={initial?.refusedField ?? null}
             />
           </div>

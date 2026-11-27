@@ -3,14 +3,16 @@ import type { WorkflowOutlineStep, WorkflowStepArg } from "../../store/workflows
 import { Code } from "../../ui/code.tsx";
 import { cn } from "../../ui/cn.ts";
 import { fieldClass } from "../../ui/input.tsx";
+import { suggestedKey } from "./text.ts";
 
 /** The model wishes a step may name (`golem.agents.model.WISHES`). A workflow file never names a model. */
 export const WISHES = ["cheapest", "same", "stronger", "local", "budget", "frontier"] as const;
 
-type FieldKind = "text" | "area" | "agent" | "wish" | "money";
+type FieldKind = "text" | "area" | "agent" | "wish" | "money" | "once";
 type FieldSpec = { label: string; arg: string; kind: FieldKind };
 
-const KEY: FieldSpec = { label: "key", arg: "key", kind: "text" };
+/** `key=` is shown as a tick box: "Only once". */
+const KEY: FieldSpec = { label: "Only once", arg: "key", kind: "once" };
 
 /** The fields of each kind of step: the argument each one writes. A code step has none. */
 export function fieldsOf(kind: string): readonly FieldSpec[] {
@@ -49,7 +51,7 @@ function argOf(step: WorkflowOutlineStep, name: string): WorkflowStepArg | undef
 function Row({ label, id, children }: { label: string; id: string | null; children: ReactNode }) {
   return (
     <div className="flex gap-3 text-sm">
-      <dt className="w-14 shrink-0 pt-1 text-meta text-faint">
+      <dt className="w-16 shrink-0 pt-1 text-meta text-faint">
         {id === null ? label : <label htmlFor={id}>{label}</label>}
       </dt>
       <dd className="flex min-w-0 flex-1 flex-col gap-1 wrap-anywhere">{children}</dd>
@@ -125,6 +127,56 @@ function Control({ spec, step, value, id, busy, agents, onCommit }: { spec: Fiel
 }
 
 /**
+ * `key=` as a tick box. Ticking a step with no key writes one made from its title. A key the code already has cannot be
+ * taken out from here (the daemon sets arguments, it does not remove them), and a step that repeats needs a key for each
+ * round, which only the code can say: both point to the code.
+ */
+function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: WorkflowOutlineStep; arg: WorkflowStepArg | undefined; id: string; busy: boolean; error: string | null; onSet: (value: string) => void; onJump?: (line: number) => void }) {
+  const on = arg !== undefined;
+  const repeats = !on && Boolean(step.for_each);
+  const hint = on ? `key=${arg.source}` : repeats ? "key=f\"…{item}\"" : `key="${suggestedKey(step)}"`;
+  return (
+    <>
+      <span className="flex items-start gap-2">
+        <input
+          id={id}
+          type="checkbox"
+          aria-describedby={`${id}-note`}
+          checked={on}
+          disabled={busy || on || repeats}
+          onChange={() => onSet(suggestedKey(step))}
+          className="mt-1 accent-clay"
+        />
+        <span className="min-w-0">
+          If the run stops and starts again, this step is not done a second time.
+          <span className="block text-meta text-faint">
+            In the code: <Code tone="muted">{hint}</Code>
+          </span>
+        </span>
+      </span>
+      <span id={`${id}-note`} className={cn("text-meta wrap-anywhere", error === null ? "text-faint" : "text-deny")} role={error === null ? undefined : "alert"}>
+        {error ??
+          (busy
+            ? "Writing…"
+            : repeats
+              ? "This step repeats, so each round needs its own key. Write it in the code."
+              : on
+                ? `To turn it off, take key out of line ${arg.line} of the code.`
+                : "Not written in the code. Ticking it adds it.")}
+        {on && onJump !== undefined ? (
+          <>
+            {" "}
+            <button type="button" onClick={() => onJump(arg.line)} aria-label={`Show key in code, line ${arg.line}`} className="text-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2">
+              show ↗
+            </button>
+          </>
+        ) : null}
+      </span>
+    </>
+  );
+}
+
+/**
  * The fields of the selected step (mock § B). Each one is one argument of the step's call: changing it writes exactly
  * that argument in the code, and nothing else. A value the code computes is shown as its source, "set in code".
  */
@@ -154,6 +206,13 @@ export function StepFields({ step, onEdit, agents = [], onOpenAgent, onJump, ref
         const id = `${base}-${spec.arg}`;
         const mine = error !== null && error.name === spec.arg ? error.message : null;
         const computed = arg !== undefined && !arg.literal;
+        if (spec.kind === "once") {
+          return (
+            <Row key={spec.arg} label={spec.label} id={id}>
+              <OnceBox step={step} arg={arg} id={id} busy={busy === spec.arg} error={mine} onSet={(value) => void commit(spec.arg, value)} onJump={onJump} />
+            </Row>
+          );
+        }
         return (
           <Row key={spec.arg} label={spec.label} id={computed ? null : id}>
             {computed ? (

@@ -53,8 +53,8 @@ test("a step in the outline selects it, shows its fields and marks its lines", a
   expect(screen.getByText(/Pick a step in the outline/)).toBeTruthy();
   await user.click(screen.getByRole("button", { name: /Summarise each pull request/ }));
   const pane = within(screen.getByRole("group", { name: "Selected step" }));
-  expect(pane.getByText("llm")).toBeTruthy();
-  expect(pane.getByText("15–17")).toBeTruthy();
+  expect(pane.getByText("Model")).toBeTruthy();
+  expect(pane.getByText("lines 15–17")).toBeTruthy();
   expect(pane.getByLabelText("Lines of the step").textContent).toContain("run.parallel(");
   expect(screen.getByRole("button", { name: /Summarise each pull request/ }).getAttribute("aria-current")).toBe("step");
 });
@@ -91,7 +91,7 @@ test("the caret in a step's lines selects that step", async () => {
 test("the view toggle hides the code or the outline", async () => {
   const user = userEvent.setup();
   render(editor());
-  await user.click(screen.getByRole("button", { name: "Outline" }));
+  await user.click(screen.getByRole("button", { name: "Steps" }));
   expect(screen.queryByRole("textbox", { name: "Code of pr_digest" })).toBeNull();
   expect(screen.getByRole("list", { name: "Outline" })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Code" }));
@@ -428,9 +428,9 @@ test("a field that was not changed writes nothing, and a missing one is added wh
   await user.click(pane.getByLabelText("brief"));
   await user.tab();
   expect(onEditStep).not.toHaveBeenCalled();
-  expect(pane.getByText("Not written in the code. Setting it adds it.")).toBeTruthy();
-  await user.type(pane.getByLabelText("key"), "up{enter}");
-  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", "up"));
+  expect(pane.getByText("Not written in the code. Ticking it adds it.")).toBeTruthy();
+  await user.click(pane.getByRole("checkbox", { name: "Only once" }));
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", "worker-upgrade-httpx-fix"));
 });
 
 test("a value the code computes is shown as source, set in code, and jumps to its line", async () => {
@@ -467,4 +467,37 @@ test("a code step has no fields, and without onEditStep the fields are not offer
   render(fieldsEditor(vi.fn<EditFn>(), { onEditStep: undefined }));
   expect(screen.queryByLabelText("brief")).toBeNull();
   expect(screen.getByRole("group", { name: "Selected step" }).textContent).toContain("Read only");
+});
+
+test("a step card says its kind in words, its repeat and its condition, and a group is a box with its count", () => {
+  const steps = [
+    { id: "a", kind: "step", title: "Check folder", lines: [12, 12] as [number, number], item: "golem", group: "parallel-1", group_title: "Both folders" },
+    { id: "b", kind: "step", title: "Check folder", lines: [13, 13] as [number, number], item: "web", group: "parallel-1", group_title: "Both folders" },
+    { id: "c", kind: "notify", title: "Tell me", lines: [17, 17] as [number, number], for_each: "f in folders", condition: "found" },
+  ];
+  render(editor({ steps }));
+  const items = within(screen.getByRole("list", { name: "Outline" })).getAllByRole("listitem");
+  expect(items[0]!.textContent).toContain("these 2 run at the same time");
+  expect(items[1]!.textContent).not.toContain("run at the same time");
+  expect(items[0]!.textContent).toContain("Python");
+  expect(items[2]!.textContent).toContain("Inbox");
+  expect(items[2]!.textContent).toContain("↻ Once for each f in folders");
+  expect(items[2]!.textContent).not.toContain("kind");
+});
+
+test("the pane says what a step does, what it repeats and what it uses, and its code links to the file", async () => {
+  const user = userEvent.setup();
+  const steps = [
+    { id: "a", kind: "step", title: "Read the list", lines: [12, 12] as [number, number], does: "Reads the list." },
+    { id: "b", kind: "step", title: "Save it", lines: [13, 14] as [number, number], does: "Saves each item.", for_each: "item in items", after: ["a"] },
+  ];
+  render(editor({ steps, initial: { selected: "b", view: "outline" } }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  expect(pane.getByText("Saves each item.")).toBeTruthy();
+  expect(pane.getByText("Once for each item in items")).toBeTruthy();
+  expect(pane.getByText("Read the list · step 1")).toBeTruthy();
+  expect(screen.queryByRole("textbox", { name: "Code of pr_digest" })).toBeNull();
+  await user.click(pane.getByRole("button", { name: "Show in the file" }));
+  expect(screen.getByRole("textbox", { name: "Code of pr_digest" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Steps and code" }).getAttribute("aria-pressed")).toBe("true");
 });

@@ -416,6 +416,7 @@ export {
   outlineNotes,
   outlineRows,
   repeatWords,
+  stepKindWords,
   stepRanTimes,
   type OutlineRow,
   type OutlineStepLike,
