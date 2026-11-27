@@ -199,6 +199,22 @@ export function stepOutputText(result: unknown): string {
   return typeof result === "string" ? result : JSON.stringify(result, null, 2);
 }
 
+/** What Copy puts on the clipboard for a result: the text, the path of a file, the address of a link, or a record or table as JSON. */
+export function resultCopyText(result: unknown): string {
+  if (typeof result === "string") return result.trim();
+  return stepOutputText(result);
+}
+
+/** What "Ask about this" starts a new chat with: where the result is from, then the result (text quoted, a file as its path, data as JSON), and room for the question. */
+export function askAboutResult(title: string, result: unknown): string {
+  const kind = resultKind(result);
+  const text = resultCopyText(result);
+  const fence = "```";
+  const body = kind === "text" ? text.split("\n").map((line) => (line === "" ? ">" : `> ${line}`)).join("\n") : kind === "file" || kind === "link" ? text : `${fence}json\n${text}\n${fence}`;
+  const what = kind === "file" ? "the file" : "this";
+  return `About ${what} from the result "${title}":\n\n${body}\n\n`;
+}
+
 /** `llm · deepseek/chat · $0.02`: the kind of a step, and its model and cost when it has them. */
 export function stepMetaLine(step: Pick<StepLike, "kind" | "model" | "cost_usd">): string {
   const parts: string[] = [step.kind];

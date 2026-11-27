@@ -416,6 +416,8 @@ export {
   stepOutputLine,
   stepLabel,
   stepOutputText,
+  askAboutResult,
+  resultCopyText,
   stepRowState,
   stepsProgress,
   stepTook,
