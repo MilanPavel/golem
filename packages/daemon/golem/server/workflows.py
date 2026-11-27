@@ -27,7 +27,13 @@ from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.outputs import OutputError, read_marked_file
 from golem.workflows.propose import ProposeError
 from golem.workflows.registry import WorkflowEntry
-from golem.workflows.service import ResumeError, ReviewError, SaveError, WorkflowService
+from golem.workflows.service import (
+    ResumeError,
+    ReviewError,
+    SaveError,
+    StartError,
+    WorkflowService,
+)
 from golem.workflows.starter import STARTERS, StarterError
 from golem.workflows.starter import get as get_starter
 from golem_protocol.commands import (
@@ -444,6 +450,13 @@ def _coerce(entry: WorkflowEntry, inputs: dict[str, Any]) -> dict[str, Any]:
 
 async def workflow_start(ctx: RequestContext, params: WorkflowStartParams) -> WorkflowStartResult:
     service = _service(ctx)
+    if params.from_run is not None and params.from_key is not None:
+        try:
+            again, _ = await service.start_again(params.from_run, params.from_key)
+        except StartError as exc:
+            raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+        return WorkflowStartResult(workflow_run_id=again)
+    assert params.id is not None  # the params check says id or from_run
     entry = _find(await service.refresh([]), params.id)
     if entry.state == "untrusted":
         raise RpcCallError(
@@ -456,6 +469,26 @@ async def workflow_start(ctx: RequestContext, params: WorkflowStartParams) -> Wo
     inputs = _coerce(entry, params.inputs)
     run_id, _ = await service.start_run(entry, inputs, params.trigger, params.model)
     return WorkflowStartResult(workflow_run_id=run_id)
+
+
+async def _origin(service: WorkflowService, run: WorkflowRunRecord) -> dict[str, Any] | None:
+    """Where a run started again from a step came from, or None."""
+    if run.from_run_id is None or run.from_key is None:
+        return None
+    old = await service.runs.get_run(run.from_run_id)
+    steps = await service.runs.list_steps(run.from_run_id)
+    place = next((n for n, s in enumerate(steps, 1) if s.step_key == run.from_key), None)
+    if old is None or place is None:
+        return None
+    step = steps[place - 1]
+    return {
+        "workflow_run_id": old.workflow_run_id,
+        "started_at": old.started_at,
+        "step_key": step.step_key,
+        "step_title": step.title or step.step_key,
+        "step_number": place,
+        "file_changed": bool(run.file_changed),
+    }
 
 
 async def _run_info(service: WorkflowService, run: WorkflowRunRecord) -> WorkflowRunInfo:
@@ -484,6 +517,7 @@ async def _run_info(service: WorkflowService, run: WorkflowRunRecord) -> Workflo
             "summary": outputs[0].summary if outputs else None,
             "steps_expected": await service.engine.expected(run.workflow_run_id),
             "usual_ms": await _usual_ms(service, run),
+            "from_run": await _origin(service, run),
         }
     )
 
@@ -517,6 +551,7 @@ def _step_info(
             "group": step.group_key,
             "group_title": step.group_title,
             "item": step.item,
+            "reused_from": step.reused_from,
             "attempts": step.attempts,
             "error": step.error,
             "child_session_id": step.child_session_id,

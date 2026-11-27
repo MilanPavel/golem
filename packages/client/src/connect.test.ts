@@ -2834,6 +2834,27 @@ test("listDirs sends the path only when given, and rejects a malformed listing",
   }
 });
 
+test("startWorkflowAgain sends from_run and from_key and nothing else", async () => {
+  const seen: Record<string, unknown>[] = [];
+  const daemon = await listen((socket) => {
+    attach(socket, {
+      answerPing: true,
+      results: { "workflow.start": { workflow_run_id: "wr_2" } },
+      onRequest: (_socket, method, params) => {
+        if (method === "workflow.start") seen.push(params);
+      },
+    });
+  });
+  const client = connectGolem({ socketPath: daemon.socketPath, clientName: "tui", reconnect: false, heartbeatMs: 60_000 });
+  try {
+    assert.deepEqual(await client.startWorkflowAgain("wr_1", "summarise"), { workflow_run_id: "wr_2" });
+    assert.deepEqual(seen, [{ from_run: "wr_1", from_key: "summarise" }]);
+  } finally {
+    client.close();
+    await daemon.close();
+  }
+});
+
 test("the repo info and the folder dialog send their arguments, localUi follows hello, and a malformed result is rejected", async () => {
   const seen: [string, Record<string, unknown>][] = [];
   const info = { repository: true, branch: "main", root: "/r", detached: false, changed: 0, worktrees: [{ path: "/r", branch: "main", main: true, agent: false }] };

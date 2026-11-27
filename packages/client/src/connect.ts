@@ -959,6 +959,8 @@ export interface GolemClient {
   proposeWorkflow(id: string, code: string, ask: string, previous?: { code: string; note: string }): Promise<WorkflowProposeResult>;
   /** `workflow.start`: start a run of the workflow `id`. It returns at once; the steps arrive on `onWorkflowEvent`. `model` is this one run's choice of model: it beats the steps' and the workflow's. */
   startWorkflow(id: string, inputs?: Record<string, unknown>, model?: string): Promise<WorkflowStartResult>;
+  /** `workflow.start {from_run, from_key}`: a new run of the same workflow with the same inputs that takes the saved results of the steps before `fromKey` of the finished run `fromRun` and runs that step and what follows. Refused with the reason when the step is inside a group or the code before it changed. */
+  startWorkflowAgain(fromRun: string, fromKey: string): Promise<WorkflowStartResult>;
   /** `workflow.status`: a run and its steps. */
   workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
   /** `workflow.cancel`: stop a run. `cancelled` is false when it had already ended. */
@@ -3271,6 +3273,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     async startWorkflow(id: string, inputs?: Record<string, unknown>, model?: string): Promise<WorkflowStartResult> {
       await ready;
       const result = await call("workflow.start", { id, ...(inputs === undefined ? {} : { inputs }), ...(model === undefined ? {} : { model }) });
+      if (!isWorkflowStartResult(result)) {
+        throw new Error("invalid workflow.start result");
+      }
+      return result;
+    },
+    async startWorkflowAgain(fromRun: string, fromKey: string): Promise<WorkflowStartResult> {
+      await ready;
+      const result = await call("workflow.start", { from_run: fromRun, from_key: fromKey });
       if (!isWorkflowStartResult(result)) {
         throw new Error("invalid workflow.start result");
       }

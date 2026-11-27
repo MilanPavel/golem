@@ -1,4 +1,4 @@
-import { groupWords, repeatCount, shortTime, stepOutputLine, stepRowState, stepTook, stepWords, type RunStepRow } from "@golem/view";
+import { groupWords, repeatCount, reusedWords, shortTime, stepOutputLine, stepRowState, stepTook, stepWords, type RunStepRow } from "@golem/view";
 import { useState } from "react";
 import type { WorkflowStepInfo } from "../../store/workflows.ts";
 import { cn } from "../../ui/cn.ts";
@@ -47,7 +47,12 @@ function Row({ selected, state, title, item, line, time, tone, onClick, expanded
 }
 
 /** What a step says in its row: why it failed, the line of its result, or what it is doing. */
-function stepLine(step: WorkflowStepInfo): string {
+function stepLine(step: WorkflowStepInfo, reusedWhen: string | null = null): string {
+  const line = ownLine(step);
+  return reusedWhen !== null && step.reused_from !== null && step.reused_from !== undefined ? `${reusedWords(reusedWhen)} · ${line}` : line;
+}
+
+function ownLine(step: WorkflowStepInfo): string {
   if (step.status === "failed" && step.error !== null && step.error !== undefined) return step.error;
   const output = stepOutputLine(step);
   if (output !== "") return output;
@@ -62,7 +67,7 @@ const MAX_AHEAD = 120;
 const SQUARE: Record<string, string> = { done: "bg-allow", skipped: "bg-faint", failed: "bg-deny", in_doubt: "bg-wait", running: "bg-clay animate-pulse", waiting: "bg-wait" };
 
 /** The folded row: the title, a square for each item, a count, and the items that work or failed (all of them on request). */
-function RepeatRow({ row, now, selected, onSelect }: { row: Extract<RunStepRow<WorkflowStepInfo>, { kind: "repeat" }>; now: number; selected: string; onSelect: (key: string) => void }) {
+function RepeatRow({ row, now, selected, onSelect, reusedWhen }: { row: Extract<RunStepRow<WorkflowStepInfo>, { kind: "repeat" }>; now: number; selected: string; onSelect: (key: string) => void; reusedWhen: string | null }) {
   const [open, setOpen] = useState(false);
   const [all, setAll] = useState(false);
   const interesting = row.items.filter((item) => item.status === "running" || item.status === "waiting" || item.status === "failed" || item.status === "in_doubt");
@@ -98,7 +103,7 @@ function RepeatRow({ row, now, selected, onSelect }: { row: Extract<RunStepRow<W
           <ul className="m-0 flex list-none flex-col p-0">
             {shown.map((item) => (
               <li key={item.key} data-step-row={item.key}>
-                <Row selected={selected === item.key} state={item.status} title={item.title} item={item.item} line={stepLine(item)} time={stepTook(item, now)} tone={item.status === "failed" ? "bad" : undefined} onClick={() => onSelect(item.key)} />
+                <Row selected={selected === item.key} state={item.status} title={item.title} item={item.item} line={stepLine(item, reusedWhen)} time={stepTook(item, now)} tone={item.status === "failed" ? "bad" : undefined} onClick={() => onSelect(item.key)} />
               </li>
             ))}
           </ul>
@@ -122,10 +127,12 @@ export type RunStepsProps = {
   /** "Result" for a run that is over, "Live" for one that goes on. */
   resultWord: string;
   resultLine: string;
+  /** When the run this run took steps from started, as words. The steps taken from it are marked "from the run of …". */
+  reusedWhen?: string | null;
 };
 
 /** The vertical list: the Result row, then the steps top to bottom, each on a line. A loop is one row. */
-export function RunSteps({ rows, now, selected, onSelect, resultWord, resultLine }: RunStepsProps) {
+export function RunSteps({ rows, now, selected, onSelect, resultWord, resultLine, reusedWhen = null }: RunStepsProps) {
   // A caption stands over the first row of each run of rows in one group.
   const captions = rows.map((row, at) => {
     const group = groupWords(row.kind === "step" ? row.step : row.items[0]!);
@@ -149,9 +156,9 @@ export function RunSteps({ rows, now, selected, onSelect, resultWord, resultLine
           <li key={row.kind === "step" ? row.step.key : `repeat:${row.title}`} className="flex flex-col" data-step-row={row.kind === "step" ? row.step.key : row.title}>
             {caption === null ? null : <span className="px-2.5 pt-1.5 text-meta text-faint">{caption}</span>}
             {row.kind === "step" ? (
-              <Row selected={selected === row.step.key} state={row.step.status} title={row.step.title} item={row.step.item} line={stepLine(row.step)} time={stepTook(row.step, now)} tone={row.step.status === "failed" ? "bad" : undefined} onClick={() => onSelect(row.step.key)} />
+              <Row selected={selected === row.step.key} state={row.step.status} title={row.step.title} item={row.step.item} line={stepLine(row.step, reusedWhen)} time={stepTook(row.step, now)} tone={row.step.status === "failed" ? "bad" : undefined} onClick={() => onSelect(row.step.key)} />
             ) : (
-              <RepeatRow row={row} now={now} selected={selected} onSelect={onSelect} />
+              <RepeatRow row={row} now={now} selected={selected} onSelect={onSelect} reusedWhen={reusedWhen} />
             )}
           </li>
         );

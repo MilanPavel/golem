@@ -34990,6 +34990,7 @@ public struct WorkflowResumeResultRun: Codable {
     public let description: String?
     public let error: String?
     public let finishedAt: String?
+    public let fromRun: PurpleWorkflowRunOrigin?
     public let inputs: [String: JSONAny]?
     public let name: String
     public let outputs: [PurpleWorkflowOutput]?
@@ -35009,6 +35010,7 @@ public struct WorkflowResumeResultRun: Codable {
         case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
+        case fromRun = "from_run"
         case inputs = "inputs"
         case name = "name"
         case outputs = "outputs"
@@ -35025,10 +35027,11 @@ public struct WorkflowResumeResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [PurpleWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, fromRun: PurpleWorkflowRunOrigin?, inputs: [String: JSONAny]?, name: String, outputs: [PurpleWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
+        self.fromRun = fromRun
         self.inputs = inputs
         self.name = name
         self.outputs = outputs
@@ -35042,6 +35045,35 @@ public struct WorkflowResumeResultRun: Codable {
         self.trigger = trigger
         self.usualMS = usualMS
         self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Where a run started again from a step came from.
+// MARK: - PurpleWorkflowRunOrigin
+public struct PurpleWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
+    public let startedAt: String?
+    public let stepKey: String
+    public let stepNumber: Int
+    public let stepTitle: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
+        case startedAt = "started_at"
+        case stepKey = "step_key"
+        case stepNumber = "step_number"
+        case stepTitle = "step_title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
+        self.startedAt = startedAt
+        self.stepKey = stepKey
+        self.stepNumber = stepNumber
+        self.stepTitle = stepTitle
         self.workflowRunID = workflowRunID
     }
 }
@@ -35135,6 +35167,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
     public let description: String?
     public let error: String?
     public let finishedAt: String?
+    public let fromRun: FluffyWorkflowRunOrigin?
     public let inputs: [String: JSONAny]?
     public let name: String
     public let outputs: [FluffyWorkflowOutput]?
@@ -35154,6 +35187,7 @@ public struct WorkflowReviewAnswerResultRun: Codable {
         case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
+        case fromRun = "from_run"
         case inputs = "inputs"
         case name = "name"
         case outputs = "outputs"
@@ -35170,10 +35204,11 @@ public struct WorkflowReviewAnswerResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [FluffyWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, fromRun: FluffyWorkflowRunOrigin?, inputs: [String: JSONAny]?, name: String, outputs: [FluffyWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
+        self.fromRun = fromRun
         self.inputs = inputs
         self.name = name
         self.outputs = outputs
@@ -35187,6 +35222,35 @@ public struct WorkflowReviewAnswerResultRun: Codable {
         self.trigger = trigger
         self.usualMS = usualMS
         self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Where a run started again from a step came from.
+// MARK: - FluffyWorkflowRunOrigin
+public struct FluffyWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
+    public let startedAt: String?
+    public let stepKey: String
+    public let stepNumber: Int
+    public let stepTitle: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
+        case startedAt = "started_at"
+        case stepKey = "step_key"
+        case stepNumber = "step_number"
+        case stepTitle = "step_title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
+        self.startedAt = startedAt
+        self.stepKey = stepKey
+        self.stepNumber = stepNumber
+        self.stepTitle = stepTitle
         self.workflowRunID = workflowRunID
     }
 }
@@ -35536,6 +35600,7 @@ public struct WorkflowRunInfo: Codable {
     public let description: String?
     public let error: String?
     public let finishedAt: String?
+    public let fromRun: WorkflowRunInfoWorkflowRunOrigin?
     public let inputs: [String: JSONAny]?
     public let name: String
     public let outputs: [WorkflowRunInfoOutput]?
@@ -35555,6 +35620,7 @@ public struct WorkflowRunInfo: Codable {
         case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
+        case fromRun = "from_run"
         case inputs = "inputs"
         case name = "name"
         case outputs = "outputs"
@@ -35571,10 +35637,11 @@ public struct WorkflowRunInfo: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [WorkflowRunInfoOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, fromRun: WorkflowRunInfoWorkflowRunOrigin?, inputs: [String: JSONAny]?, name: String, outputs: [WorkflowRunInfoOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
+        self.fromRun = fromRun
         self.inputs = inputs
         self.name = name
         self.outputs = outputs
@@ -35588,6 +35655,35 @@ public struct WorkflowRunInfo: Codable {
         self.trigger = trigger
         self.usualMS = usualMS
         self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Where a run started again from a step came from.
+// MARK: - WorkflowRunInfoWorkflowRunOrigin
+public struct WorkflowRunInfoWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
+    public let startedAt: String?
+    public let stepKey: String
+    public let stepNumber: Int
+    public let stepTitle: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
+        case startedAt = "started_at"
+        case stepKey = "step_key"
+        case stepNumber = "step_number"
+        case stepTitle = "step_title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
+        self.startedAt = startedAt
+        self.stepKey = stepKey
+        self.stepNumber = stepNumber
+        self.stepTitle = stepTitle
         self.workflowRunID = workflowRunID
     }
 }
@@ -35611,6 +35707,35 @@ public struct WorkflowRunInfoOutput: Codable {
         self.summary = summary
         self.title = title
         self.value = value
+    }
+}
+
+/// Where a run started again from a step came from.
+// MARK: - WorkflowRunOrigin
+public struct WorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
+    public let startedAt: String?
+    public let stepKey: String
+    public let stepNumber: Int
+    public let stepTitle: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
+        case startedAt = "started_at"
+        case stepKey = "step_key"
+        case stepNumber = "step_number"
+        case stepTitle = "step_title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
+        self.startedAt = startedAt
+        self.stepKey = stepKey
+        self.stepNumber = stepNumber
+        self.stepTitle = stepTitle
+        self.workflowRunID = workflowRunID
     }
 }
 
@@ -36247,21 +36372,37 @@ public struct WorkflowSaveResultWorkflowModelInfo: Codable {
 /// ``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.
 ///
 /// ``trigger`` says what asked for it. A person pressing Run is ``manual``.
+///
+/// ``from_run`` and ``from_key`` start a run again from a step: a new run of the same
+/// workflow
+/// with the same inputs that takes the saved results of the steps before ``from_key`` in
+/// ``from_run`` and runs that step and what follows. ``id``, ``inputs`` and ``trigger`` are
+/// then
+/// not given. It is refused, with the reason, when ``from_run`` is not over or the step is
+/// inside
+/// a ``run.parallel`` group. A file that changed above the step does not refuse: the run
+/// says so.
 // MARK: - WorkflowStartParams
 public struct WorkflowStartParams: Codable {
-    public let id: String
+    public let fromKey: String?
+    public let fromRun: String?
+    public let id: String?
     public let inputs: [String: JSONAny]?
     public let model: String?
     public let trigger: WorkflowStartParamsTrigger?
 
     public enum CodingKeys: String, CodingKey {
+        case fromKey = "from_key"
+        case fromRun = "from_run"
         case id = "id"
         case inputs = "inputs"
         case model = "model"
         case trigger = "trigger"
     }
 
-    public init(id: String, inputs: [String: JSONAny]?, model: String?, trigger: WorkflowStartParamsTrigger?) {
+    public init(fromKey: String?, fromRun: String?, id: String?, inputs: [String: JSONAny]?, model: String?, trigger: WorkflowStartParamsTrigger?) {
+        self.fromKey = fromKey
+        self.fromRun = fromRun
         self.id = id
         self.inputs = inputs
         self.model = model
@@ -36491,6 +36632,7 @@ public struct WorkflowStatusResultRun: Codable {
     public let description: String?
     public let error: String?
     public let finishedAt: String?
+    public let fromRun: TentacledWorkflowRunOrigin?
     public let inputs: [String: JSONAny]?
     public let name: String
     public let outputs: [TentacledWorkflowOutput]?
@@ -36510,6 +36652,7 @@ public struct WorkflowStatusResultRun: Codable {
         case description = "description"
         case error = "error"
         case finishedAt = "finished_at"
+        case fromRun = "from_run"
         case inputs = "inputs"
         case name = "name"
         case outputs = "outputs"
@@ -36526,10 +36669,11 @@ public struct WorkflowStatusResultRun: Codable {
         case workflowRunID = "workflow_run_id"
     }
 
-    public init(description: String?, error: String?, finishedAt: String?, inputs: [String: JSONAny]?, name: String, outputs: [TentacledWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
+    public init(description: String?, error: String?, finishedAt: String?, fromRun: TentacledWorkflowRunOrigin?, inputs: [String: JSONAny]?, name: String, outputs: [TentacledWorkflowOutput]?, result: JSONAny?, sessionID: String?, startedAt: String?, status: WorkflowRunEventStatus, stepsExpected: Int?, summary: String?, title: String?, trigger: String, usualMS: Int?, workflowID: String, workflowRunID: String) {
         self.description = description
         self.error = error
         self.finishedAt = finishedAt
+        self.fromRun = fromRun
         self.inputs = inputs
         self.name = name
         self.outputs = outputs
@@ -36543,6 +36687,35 @@ public struct WorkflowStatusResultRun: Codable {
         self.trigger = trigger
         self.usualMS = usualMS
         self.workflowID = workflowID
+        self.workflowRunID = workflowRunID
+    }
+}
+
+/// Where a run started again from a step came from.
+// MARK: - TentacledWorkflowRunOrigin
+public struct TentacledWorkflowRunOrigin: Codable {
+    public let fileChanged: Bool?
+    public let startedAt: String?
+    public let stepKey: String
+    public let stepNumber: Int
+    public let stepTitle: String
+    public let workflowRunID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case fileChanged = "file_changed"
+        case startedAt = "started_at"
+        case stepKey = "step_key"
+        case stepNumber = "step_number"
+        case stepTitle = "step_title"
+        case workflowRunID = "workflow_run_id"
+    }
+
+    public init(fileChanged: Bool?, startedAt: String?, stepKey: String, stepNumber: Int, stepTitle: String, workflowRunID: String) {
+        self.fileChanged = fileChanged
+        self.startedAt = startedAt
+        self.stepKey = stepKey
+        self.stepNumber = stepNumber
+        self.stepTitle = stepTitle
         self.workflowRunID = workflowRunID
     }
 }
@@ -36594,6 +36767,7 @@ public struct StepClass: Codable {
     public let of: Int?
     public let progress: String?
     public let result: JSONAny?
+    public let reusedFrom: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -36614,12 +36788,13 @@ public struct StepClass: Codable {
         case of = "of"
         case progress = "progress"
         case result = "result"
+        case reusedFrom = "reused_from"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, progress: String?, result: JSONAny?, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, progress: String?, result: JSONAny?, reusedFrom: String?, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
         self.costUsd = costUsd
@@ -36635,6 +36810,7 @@ public struct StepClass: Codable {
         self.of = of
         self.progress = progress
         self.result = result
+        self.reusedFrom = reusedFrom
         self.startedAt = startedAt
         self.status = status
         self.title = title
@@ -37084,6 +37260,7 @@ public struct WorkflowStepInfo: Codable {
     public let of: Int?
     public let progress: String?
     public let result: JSONAny?
+    public let reusedFrom: String?
     public let startedAt: String?
     public let status: StepStatus
     public let title: String
@@ -37104,12 +37281,13 @@ public struct WorkflowStepInfo: Codable {
         case of = "of"
         case progress = "progress"
         case result = "result"
+        case reusedFrom = "reused_from"
         case startedAt = "started_at"
         case status = "status"
         case title = "title"
     }
 
-    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, progress: String?, result: JSONAny?, startedAt: String?, status: StepStatus, title: String) {
+    public init(attempts: Int?, childSessionID: String?, costUsd: Double?, error: String?, finishedAt: String?, group: String?, groupTitle: String?, item: String?, key: String, kind: StepKind, line: String?, model: String?, of: Int?, progress: String?, result: JSONAny?, reusedFrom: String?, startedAt: String?, status: StepStatus, title: String) {
         self.attempts = attempts
         self.childSessionID = childSessionID
         self.costUsd = costUsd
@@ -37125,6 +37303,7 @@ public struct WorkflowStepInfo: Codable {
         self.of = of
         self.progress = progress
         self.result = result
+        self.reusedFrom = reusedFrom
         self.startedAt = startedAt
         self.status = status
         self.title = title

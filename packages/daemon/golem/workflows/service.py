@@ -23,7 +23,12 @@ from typing import Any
 from pydantic import BaseModel
 
 from golem.routine_scheduler import trusted_folders
-from golem.store.workflow_runs import WorkflowReviewRecord, WorkflowRunRecord, WorkflowRuns
+from golem.store.workflow_runs import (
+    WorkflowReviewRecord,
+    WorkflowRunRecord,
+    WorkflowRuns,
+    WorkflowStepRecord,
+)
 from golem.workflow import WorkflowError
 from golem.workflows.agents import WorkflowAgents
 from golem.workflows.check import CheckEnv, Problem, check
@@ -32,6 +37,7 @@ from golem.workflows.engine import AgentStarted, WorkflowEngine, restart_policy
 from golem.workflows.llm import Llm
 from golem.workflows.propose import Proposal, ProposeError, draft, numbered_outline, propose
 from golem.workflows.registry import WorkflowEntry, WorkflowRegistry
+from golem.workflows.rerun import code_changed_before
 from golem.workflows.starter import StarterError, add_starter
 from golem.workflows.tools import WorkflowTools
 from golem_protocol import rpc
@@ -566,11 +572,20 @@ class WorkflowService:
         return input_problem(entry, inputs)
 
     async def start_run(
-        self, entry: WorkflowEntry, inputs: dict[str, Any], trigger: str, model: str | None = None
+        self,
+        entry: WorkflowEntry,
+        inputs: dict[str, Any],
+        trigger: str,
+        model: str | None = None,
+        again: tuple[WorkflowRunRecord, str, list[WorkflowStepRecord], bool] | None = None,
     ) -> tuple[str, str | None]:
         """Write a run and launch it. Returns ``(run id, session id)``; the session id is None
-        until a step needs a session, so it is usually None here."""
-        digest = hashlib.sha256(await asyncio.to_thread(entry.path.read_bytes)).hexdigest()
+        until a step needs a session, so it is usually None here.
+
+        ``again`` is ``(old run, step key, steps to take over)`` of a run started again from a
+        step: the steps are written into the new run before it launches."""
+        data = await asyncio.to_thread(entry.path.read_bytes)
+        digest = hashlib.sha256(data).hexdigest()
         run_id = await self.runs.create_run(
             entry.id,
             entry.name,
@@ -581,10 +596,64 @@ class WorkflowService:
             trigger=trigger,
             source_hash=digest,
             model=None if model is None else model.strip() or None,
+            from_run_id=None if again is None else again[0].workflow_run_id,
+            from_key=None if again is None else again[1],
+            source_text=data.decode("utf-8", errors="replace"),
+            file_changed=None if again is None else again[3],
         )
+        if again is not None:
+            await self.runs.copy_steps(run_id, again[2])
         self.launch(run_id)
         record = await self.runs.get_run(run_id)
         return run_id, None if record is None else record.session_id
+
+    async def start_again(self, from_run: str, from_key: str) -> tuple[str, str | None]:
+        """Start a new run of the same workflow with the same inputs, taking the saved results of
+        the steps before ``from_key`` of ``from_run`` and running that step and what follows.
+
+        The old run is left as it is. Raises :class:`StartError` with the reason when the run is
+        unknown or not over, the step is unknown, or it is not in a run of its own (inside a
+        ``run.parallel`` group). A file that changed above the step does not refuse: the run
+        starts and records it (``file_changed``)."""
+        old = await self.runs.get_run(from_run)
+        if old is None:
+            raise StartError(f"there is no workflow run {from_run}")
+        if old.status not in ("done", "failed", "cancelled"):
+            raise StartError(f"the run is {old.status}; only a run that is over can start again")
+        steps = await self.runs.list_steps(from_run)
+        chosen = next((s for s in steps if s.step_key == from_key), None)
+        if chosen is None:
+            raise StartError(f"the run has no step {from_key!r}")
+        if chosen.group_key is not None:
+            raise StartError(
+                f"{chosen.title or from_key} runs inside a group of steps that go together;"
+                " run again from a step outside the group"
+            )
+        project = None if old.project is None else Path(old.project)
+        await asyncio.to_thread(self.registry.refresh)
+        inputs: dict[str, Any] = json.loads(old.inputs_json or "{}")
+        problem = self.problem(old.name, project, inputs)
+        entry = self.find(old.name, project)
+        if problem is not None or entry is None:
+            raise StartError(problem or f"there is no workflow called {old.name}")
+        text = await asyncio.to_thread(entry.path.read_text, encoding="utf-8", errors="replace")
+        # A file that changed above the step does not stop the run: it says so, and the steps
+        # before are taken as they were.
+        if old.source_text is None:
+            # An old run kept no text: only the hash of the whole file can say.
+            now_hash = hashlib.sha256(await asyncio.to_thread(entry.path.read_bytes)).hexdigest()
+            changed = old.source_hash is None or now_hash != old.source_hash
+        else:
+            changed = (
+                code_changed_before(
+                    old.source_text, text, old.name, chosen.kind, chosen.title or from_key
+                )
+                is not None
+            )
+        taken = [s for s in steps if s.seq < chosen.seq and s.status == "done"]
+        return await self.start_run(
+            entry, inputs, "manual", old.model, (old, from_key, taken, changed)
+        )
 
     async def start_named(
         self,

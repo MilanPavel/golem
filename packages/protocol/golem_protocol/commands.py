@@ -6582,15 +6582,35 @@ class WorkflowStartParams(BaseModel):
     """``workflow.start``. Start a run of the workflow ``id`` with ``inputs``.
 
     ``trigger`` says what asked for it. A person pressing Run is ``manual``.
+
+    ``from_run`` and ``from_key`` start a run again from a step: a new run of the same workflow
+    with the same inputs that takes the saved results of the steps before ``from_key`` in
+    ``from_run`` and runs that step and what follows. ``id``, ``inputs`` and ``trigger`` are then
+    not given. It is refused, with the reason, when ``from_run`` is not over or the step is inside
+    a ``run.parallel`` group. A file that changed above the step does not refuse: the run says so.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    id: str = Field(min_length=1)
+    id: str | None = Field(default=None, min_length=1)
     inputs: dict[str, Any] = Field(default_factory=dict[str, Any])
     trigger: WorkflowStartTrigger = "manual"
     model: str | None = None
     """One run's choice of model: it beats the step's and the workflow's. Null keeps the file's."""
+    from_run: str | None = Field(default=None, min_length=1)
+    """A run that is over, to start again from one of its steps."""
+    from_key: str | None = Field(default=None, min_length=1)
+    """The step key of ``from_run`` to start again from."""
+
+    @model_validator(mode="after")
+    def _one_way(self) -> Self:
+        if (self.from_run is None) != (self.from_key is None):
+            raise ValueError("from_run and from_key go together")
+        if self.from_run is None and self.id is None:
+            raise ValueError("give id, or from_run and from_key")
+        if self.from_run is not None and (self.id is not None or self.inputs):
+            raise ValueError("a run started again takes its workflow and inputs from from_run")
+        return self
 
 
 class WorkflowStartResult(BaseModel):
@@ -6612,6 +6632,25 @@ class WorkflowOutput(BaseModel):
     title: str | None = None
     value: Any = None
     summary: str | None = None
+
+
+class WorkflowRunOrigin(BaseModel):
+    """Where a run started again from a step came from."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow_run_id: str = Field(min_length=1)
+    """The run it started again from."""
+    started_at: str | None = None
+    """When that run started."""
+    step_key: str = Field(min_length=1)
+    step_title: str
+    """The step it started again from, by its title."""
+    step_number: int = Field(ge=1)
+    """The place of that step among the steps of that run (the first is 1)."""
+    file_changed: bool = False
+    """True when the workflow file had changed above that step since that run. The run started
+    anyway, taking the steps before it as they were."""
 
 
 class WorkflowRunInfo(BaseModel):
@@ -6650,6 +6689,8 @@ class WorkflowRunInfo(BaseModel):
     usual_ms: int | None = Field(default=None, ge=0)
     """How long a run of this workflow usually takes: the median of the last five runs that
     finished (``done``), in milliseconds. Null when fewer than two have."""
+    from_run: WorkflowRunOrigin | None = None
+    """Where this run came from, when it was started again from a step of another run."""
 
 
 class WorkflowStepInfo(BaseModel):
@@ -6672,6 +6713,8 @@ class WorkflowStepInfo(BaseModel):
     """The title of the ``run.parallel`` group, when the workflow gave one."""
     item: str | None = None
     """The part that changes in a loop (``item=`` of a ``run.step``)."""
+    reused_from: str | None = Field(default=None, min_length=1)
+    """The run this step's result was taken from, when the run started again from a step."""
     attempts: int = Field(default=0, ge=0)
     error: str | None = None
     child_session_id: str | None = Field(default=None, min_length=1)
@@ -8012,6 +8055,7 @@ __all__ = [
     "WorkflowReviewVerdict",
     "WorkflowRunEvent",
     "WorkflowRunInfo",
+    "WorkflowRunOrigin",
     "WorkflowRunStatus",
     "WorkflowRunTrigger",
     "WorkflowStartParams",
