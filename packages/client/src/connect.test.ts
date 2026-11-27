@@ -1731,6 +1731,7 @@ test("data.* calls send their params, a password stays out of the wire view, and
       results: {
         "data.list": { sources: [source] },
         "data.add": { source },
+        "data.inspect": { kind: "postgres", tables: [], sample: {}, suggested_name: "shop", suggested_privacy: "local", server_version: "PostgreSQL 17.2" },
         "data.describe": { source, tables: [], sample: {} },
         "data.notes.draft": { text: "# bank\n" },
       },
@@ -1754,8 +1755,11 @@ test("data.* calls send their params, a password stays out of the wire view, and
     assert.deepEqual((await client.listData()).sources.map((each) => each.name), ["bank"]);
     await client.describeData("bank", "transactions");
     await client.addData({ name: "bank", location: "~/b/*.csv", privacy: "local", scope: "user", password: "s3cret" });
+    const found = await client.inspectDatabase({ kind: "postgres", host: "localhost", database: "shop", user: "u", password: "s3cret" });
+    assert.equal(found.server_version, "PostgreSQL 17.2");
     assert.equal((await client.draftDataNotes("bank")).text, "# bank\n");
-    assert.deepEqual(sent.map((each) => each["method"]), ["data.list", "data.describe", "data.add", "data.notes.draft"]);
+    assert.deepEqual(sent.map((each) => each["method"]), ["data.list", "data.describe", "data.add", "data.inspect", "data.notes.draft"]);
+    assert.deepEqual(sent[3], { method: "data.inspect", kind: "postgres", host: "localhost", database: "shop", user: "u", password: "s3cret" });
     assert.deepEqual(sent[1], { method: "data.describe", source: "bank", table: "transactions" });
     for (let tries = 0; tries < 50 && seen.length < 1; tries += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));

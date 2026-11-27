@@ -413,14 +413,17 @@ A value in `env` or `headers` may name `keychain:mcp/<name>`, and a key that loo
 
 `[data]` holds the limits of the data engine: `query_timeout_seconds` (`15`), `max_rows` (`10000`), `worker_memory` (`"2GB"`) and `threads` (`4`). Each sub-table is one source: a named, read-only view of a file, a folder of files, or a database. The name uses letters, digits and `_`, starts with a letter, and is not `golem`, which is the built-in source of your own usage and runs. Your own file and a trusted project's `.golem/config.toml` may hold sources; a project source replaces yours of the same name in that folder. An untrusted project's sources are listed and never opened. The page cannot change them.
 
+A Postgres or MySQL source is read live and read-only: golem opens the connection in a read-only transaction with a time limit, keeps no rows, and a query result is kept as a file like any other. A project's database source keeps its password in your Keychain, never in the project.
+
 | Key | Default | Meaning |
 |---|---|---|
 | `path` | none | A file, a folder or a glob. Use this or `url` |
-| `url` | none | A database address |
+| `url` | none | A database address such as `postgres://golem_ro@localhost:5432/shop_dev` or `mysql://golem_ro@db.example.com/shop`. It never holds a password: one in the address makes the source invalid. `?sslmode=` (Postgres) or `?ssl_mode=` (MySQL) sets encryption |
 | `kind` | from the path | `files`, `sqlite`, `duckdb`, `postgres`, `mysql` or `url` |
 | `privacy` | `"local"` | `"open"`: any model reads rows. `"local"`: only a local model does. `"schema"`: models read names and types only |
 | `watch` | `false` | Notice when files appear in the folder |
-| `password` | none | Only `keychain:data/<name>`, with the source's own name |
+| `password` | none | Only `keychain:data/<name>`, with the source's own name. The add dialog and `golem data add` store the password in the macOS Keychain under that name |
+| `timeout_s` | `15` | For a database: seconds a query may run on the server before it is cut |
 | `tables` | none | `{ include = [...], exclude = [...] }`: the tables the lists show |
 
 ### Older keys

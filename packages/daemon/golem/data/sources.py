@@ -25,11 +25,19 @@ from typing import Any, Literal
 from golem.config import DATA_RESERVED, DataSourceSettings, load_data_sources
 from golem.data import builtin
 from golem.data.client import DataWorker
+from golem.data.database import (
+    WRITE_WARNING,
+    DatabaseTarget,
+    build_url,
+    parse_url,
+    read_only_howto,
+)
 from golem.data.notes import MAX_BYTES, Notes, notes_file, read_notes
 from golem.data.privacy import guess_privacy
 from golem.data.results import ResultStore
-from golem.data.types import DataError, NeedsExtension, SourceSpec
+from golem.data.types import DATABASE_KINDS, DataError, NeedsExtension, SourceSpec
 from golem.paths import GolemPaths
+from golem.secrets import SecretMissingError, SecretStore, SecretStoreError, resolve
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +62,9 @@ Kind = Literal["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url
 Scope = Literal["builtin", "user", "project"]
 Status = Literal["ready", "reading", "untrusted", "error"]
 Privacy = Literal["open", "local", "schema"]
-_ENGINE_KINDS = ("files", "sqlite", "duckdb")
+_ENGINE_KINDS = ("files", "sqlite", "duckdb", "postgres", "mysql")
+DEFAULT_TIMEOUT = 15.0
+"""Seconds a query may run on a database server, unless ``timeout_s`` says otherwise."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +103,12 @@ class SourceInfo:
     dates: tuple[str, str] | None = None
     """The first and last month of a date column, such as ``2024-01``, for a ``files`` source."""
     needs_extension: str | None = None
+    in_keychain: bool = False
+    """True when the source names a password in the Keychain. The password itself is never here."""
+    timeout_s: float | None = None
+    """For a database: seconds a query may run on the server."""
+    warning: str | None = None
+    """For a database: a sentence when its login can change data."""
 
     @property
     def rows(self) -> int | None:
@@ -126,6 +142,11 @@ class Inspection:
     files: int | None = None
     notes: tuple[str, ...] = ()
     needs_extension: str | None = None
+    url: str | None = None
+    """For a database: its address, with no password, as ``data.add`` takes it."""
+    server_version: str | None = None
+    warning: str | None = None
+    """For a database: a sentence when the login can change data, with a way to make a safer one."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +224,7 @@ class _Open:
     tables: tuple[TableInfo, ...] = ()
     error: str | None = None
     needs: str | None = None
+    warning: str | None = None
     files: int | None = None
     dates: tuple[str, str] | None = None
     stamp: tuple[tuple[str, int, int], ...] = ()
@@ -234,6 +256,8 @@ class DataSources:
         self._warming: set[asyncio.Task[None]] = set()
         self._watch_seconds = watch_seconds
         self._watcher: asyncio.Task[None] | None = None
+        self.secrets: SecretStore | None = None
+        """Where a database source's password is read from. Set by the daemon."""
         self.changed: Callable[[str, str], None] = lambda _name, _reason: None
         """Called with a source's name and a reason (``files``) when its files changed."""
 
@@ -293,6 +317,10 @@ class DataSources:
             project=None if entry.project is None else str(entry.project),
             watch=False if settings is None else settings.watch,
             description=builtin.DESCRIPTION if settings is None else None,
+            in_keychain=settings is not None and settings.password is not None,
+            timeout_s=None
+            if settings is None or entry.kind not in DATABASE_KINDS
+            else settings.timeout_s or DEFAULT_TIMEOUT,
         )
         if opened is not None and opened.needs is not None:
             base = replace(base, needs_extension=opened.needs)
@@ -311,6 +339,7 @@ class DataSources:
             tables=self._visible(entry, opened.tables),
             files=opened.files,
             dates=opened.dates if base.privacy == "open" else None,
+            warning=opened.warning,
         )
 
     def _visible(self, entry: _Entry, tables: tuple[TableInfo, ...]) -> tuple[TableInfo, ...]:
@@ -404,6 +433,8 @@ class DataSources:
             return await self._count(entry.key, [table.name for table in builtin.TABLES])
         if entry.kind not in _ENGINE_KINDS:
             raise DataError(f"golem cannot open {entry.kind} sources yet.")
+        if entry.kind in DATABASE_KINDS:
+            return await self._attach_database(entry, opened)
         spec = SourceSpec(entry.key, entry.kind, entry.location)  # type: ignore[arg-type]
         await self._need_extension(spec)
         listed = await self._worker.attach(spec)
@@ -413,6 +444,41 @@ class DataSources:
             opened.files = len(opened.stamp)
             opened.dates = await self._dates(entry, opened, tables)
         return tables
+
+    async def _password(self, entry: _Entry) -> str | None:
+        """The password of a database source, read from the Keychain. It goes nowhere else."""
+        ref = None if entry.settings is None else entry.settings.password
+        if ref is None:
+            return None
+        if self.secrets is None:
+            raise DataError(f"golem has no place to read the password of {entry.name} from.")
+        try:
+            return await asyncio.to_thread(resolve, ref, self.secrets)
+        except SecretMissingError:
+            raise DataError(
+                f"The password of {entry.name} is not in the Keychain. "
+                "Open the source's settings and enter it again."
+            ) from None
+        except SecretStoreError as exc:
+            raise DataError(f"The Keychain could not be read for {entry.name}: {exc}") from None
+
+    async def _attach_database(self, entry: _Entry, opened: _Open) -> tuple[TableInfo, ...]:
+        """Connect to a server. Its tables are listed with the catalog's row estimates."""
+        settings = entry.settings
+        assert settings is not None
+        spec = SourceSpec(
+            entry.key,
+            entry.kind,  # type: ignore[arg-type]
+            entry.location,
+            await self._password(entry),
+            settings.timeout_s or DEFAULT_TIMEOUT,
+        )
+        await self._need_extension(spec)
+        listed = await self._worker.attach(spec)
+        info = self._worker.server_info(entry.key)
+        if info.get("can_write"):
+            opened.warning = _write_warning(parse_url(entry.location))
+        return tuple(TableInfo(item["name"], item.get("rows")) for item in listed)
 
     async def _need_extension(self, spec: SourceSpec) -> None:
         """Raise :class:`NeedsExtension` when ``spec`` needs one that is not installed yet."""
@@ -610,6 +676,92 @@ class DataSources:
             tuple(notes),
         )
 
+    async def inspect_database(
+        self, target: DatabaseTarget, password: str | None, root: Path | None = None
+    ) -> Inspection:
+        """Connect to a database read-only, look at it, and disconnect. Nothing is stored.
+
+        The password is used for this one connection. Raises :class:`DataError`.
+        """
+        url = build_url(target)
+        name = self.suggest_database_name(target.database, root)
+        privacy, reason = (
+            ("local", "This database runs on your Mac, so a local model may read it.")
+            if target.is_local
+            else ("schema", "This database is on another computer, so no model reads its rows.")
+        )
+        spec = SourceSpec(
+            f"inspect_{uuid.uuid4().hex[:8]}",
+            target.kind,  # type: ignore[arg-type]
+            url,
+            password or None,
+        )
+        need = await asyncio.to_thread(_needed, spec)
+        if need is not None and not self._extension_ready(need):
+            return Inspection(
+                target.kind,  # type: ignore[arg-type]
+                (),
+                {},
+                name,
+                privacy,  # type: ignore[arg-type]
+                reason,
+                None,
+                (str(NeedsExtension(need)),),
+                need,
+                url,
+            )
+        described: list[TableInfo] = []
+        sample: dict[str, list[list[Any]]] = {}
+        try:
+            listed = await self._worker.attach(spec)
+            info = self._worker.server_info(spec.name)
+            for item in listed[:MAX_DESCRIBED]:
+                answer = await self._worker.describe(spec.name, item["name"])
+                described.append(_table_info(item["name"], answer))
+                shown = await self._worker.query(
+                    spec.name,
+                    f"select * from {_quote(item['name'], server=True)} limit {INSPECT_ROWS}",
+                    INSPECT_ROWS,
+                )
+                sample[item["name"]] = shown["rows"]
+        finally:
+            with contextlib.suppress(DataError):
+                await self._worker.detach(spec.name)
+        notes: list[str] = []
+        if len(listed) > MAX_DESCRIBED:
+            notes.append(f"{len(listed)} tables: the first {MAX_DESCRIBED} are described here.")
+        return Inspection(
+            target.kind,  # type: ignore[arg-type]
+            tuple(described),
+            sample,
+            name,
+            privacy,  # type: ignore[arg-type]
+            reason,
+            None,
+            tuple(notes),
+            None,
+            url,
+            info.get("version"),
+            _write_warning(target) if info.get("can_write") else None,
+        )
+
+    def suggest_database_name(self, database: str, root: Path | None) -> str:
+        """A source name from a database name: valid, not ``golem``, not taken."""
+        base = _NAME_CHARS.sub("_", database).strip("_")[:28]
+        if not base or not base[0].isalpha():
+            base = f"db_{base}".strip("_")
+        taken = self.taken_names(root) | DATA_RESERVED
+        candidate, number = base, 1
+        while candidate in taken:
+            number += 1
+            candidate = f"{base}_{number}"
+        return candidate
+
+    def _extension_ready(self, need: str) -> bool:
+        from golem.data.engine import extension_installed
+
+        return extension_installed(self._paths.data_extensions_dir, need)
+
     def suggest_name(self, place: Path, root: Path | None) -> str:
         """A source name from a file or folder name: valid, not ``golem``, not taken."""
         stem = place.name if place.is_dir() else place.stem
@@ -692,7 +844,11 @@ class DataSources:
         return info
 
     async def _sample(self, entry: _Entry, table: str, count: int) -> list[list[Any]]:
-        answer = await self._worker.query(entry.key, f"select * from {_quote(table)}", count)
+        server = entry.kind in DATABASE_KINDS
+        bound = f" limit {count}" if server else ""
+        answer = await self._worker.query(
+            entry.key, f"select * from {_quote(table, server=server)}{bound}", count
+        )
         return answer["rows"]
 
     async def query(
@@ -816,6 +972,16 @@ def _stamp(spec: SourceSpec) -> tuple[tuple[str, int, int], ...]:
     return stamp(spec)
 
 
+def _needed(spec: SourceSpec) -> str | None:
+    from golem.data.engine import needed_extension
+
+    return needed_extension(spec)
+
+
+def _write_warning(target: DatabaseTarget) -> str:
+    return f"{WRITE_WARNING} {read_only_howto(target.kind, target.database)}"
+
+
 def _check_place(place: Path, shown: str) -> None:
     """Refuse a location that is missing, or a system folder outside the home folder."""
     base = place
@@ -864,7 +1030,7 @@ def _skipped(place: Path, used: set[Path]) -> list[str]:
 def _table_info(name: str, answer: dict[str, Any]) -> TableInfo:
     return TableInfo(
         name,
-        int(answer["rows"]),
+        None if answer["rows"] is None else int(answer["rows"]),
         tuple(
             ColumnInfo(
                 name=str(column["name"]),
@@ -879,8 +1045,10 @@ def _table_info(name: str, answer: dict[str, Any]) -> TableInfo:
     )
 
 
-def _quote(name: str) -> str:
-    return '"' + name.replace('"', '""') + '"'
+def _quote(name: str, *, server: bool = False) -> str:
+    """A table's name as SQL. A server's table is ``schema.table``, so it is two names."""
+    parts = name.split(".", 1) if server else [name]
+    return ".".join('"' + part.replace('"', '""') + '"' for part in parts)
 
 
 def _text(value: object) -> str | None:

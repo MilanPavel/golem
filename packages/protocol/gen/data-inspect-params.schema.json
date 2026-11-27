@@ -1,11 +1,89 @@
 {
   "additionalProperties": false,
-  "description": "``data.inspect``. Look at a location before it is added.",
+  "description": "``data.inspect``. Look at a location before it is added.\n\nA file or a folder is a ``location``. A database is ``kind`` (``postgres`` or ``mysql``) with\n``host``, ``port``, ``database``, ``user`` and ``ssl_mode``, and its ``password`` for this\none look: it is used to connect and is not stored.",
   "properties": {
+    "database": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Database"
+    },
+    "host": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Host"
+    },
+    "kind": {
+      "anyOf": [
+        {
+          "enum": [
+            "postgres",
+            "mysql"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Kind"
+    },
     "location": {
-      "minLength": 1,
-      "title": "Location",
-      "type": "string"
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location"
+    },
+    "password": {
+      "anyOf": [
+        {
+          "format": "password",
+          "type": "string",
+          "writeOnly": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Password"
+    },
+    "port": {
+      "anyOf": [
+        {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Port"
     },
     "session_id": {
       "anyOf": [
@@ -19,11 +97,34 @@
       ],
       "default": null,
       "title": "Session Id"
+    },
+    "ssl_mode": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ssl Mode"
+    },
+    "user": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "User"
     }
   },
-  "required": [
-    "location"
-  ],
   "title": "DataInspectParams",
   "type": "object"
 }

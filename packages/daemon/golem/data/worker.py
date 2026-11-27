@@ -23,7 +23,7 @@ from typing import IO, Any, cast
 import duckdb
 
 from golem.data import parquet
-from golem.data.engine import Limits, Source, install_extension
+from golem.data.engine import Limits, Source, install_extension, redact
 from golem.data.types import DataError, SourceSpec
 
 
@@ -127,7 +127,7 @@ class Worker:
             self._sources[spec.name] = source
         if old is not None:
             old.close()
-        return {"tables": source.tables()}
+        return {"tables": source.tables(), "info": source.info}
 
     def _source(self, args: dict[str, Any]) -> Source:
         name = str(args.get("source", ""))
@@ -177,7 +177,7 @@ class Worker:
         if error is None:
             message.update(ok=True, result=result)
         else:
-            message.update(ok=False, error=error)
+            message.update(ok=False, error=redact(error))
         text = json.dumps(message, ensure_ascii=False, default=str)
         with self._write_lock:
             try:

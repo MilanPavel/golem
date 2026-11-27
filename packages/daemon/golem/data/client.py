@@ -80,6 +80,7 @@ class DataWorker:
         self._tags: dict[str, int] = {}
         self._next_id = 0
         self._sources: dict[str, SourceSpec] = {}
+        self._info: dict[str, dict[str, Any]] = {}
         self._start_lock = asyncio.Lock()
         self._failures = 0
         self._started_at = 0.0
@@ -99,16 +100,22 @@ class DataWorker:
 
     # -- what a caller asks for ---------------------------------------------------------------
 
-    async def attach(self, spec: SourceSpec) -> list[dict[str, str]]:
+    def server_info(self, name: str) -> dict[str, Any]:
+        """What a database told on connect (``version``, ``can_write``). Empty for a file."""
+        return self._info.get(name, {})
+
+    async def attach(self, spec: SourceSpec) -> list[dict[str, Any]]:
         """Open a source. It stays open, and a restarted worker opens it again."""
         result = await self.request(
             "attach", self._attach_args(spec), timeout=self._attach_seconds()
         )
         self._sources[spec.name] = spec
+        self._info[spec.name] = result.get("info") or {}
         return result["tables"]
 
     async def detach(self, name: str) -> None:
         self._sources.pop(name, None)
+        self._info.pop(name, None)
         if self.running:
             await self.request("detach", {"name": name}, timeout=10)
 

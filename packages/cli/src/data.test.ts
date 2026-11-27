@@ -12,7 +12,7 @@ import {
   formatQueryTable,
   truncatedNote,
 } from "./data-format.ts";
-import { NO_DATA_METHODS, runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
+import { NO_DATA_METHODS, runDataAdd, runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
 import { explainDaemonDown } from "./daemon-down.ts";
 
 const GOLEM = { name: "golem", kind: "builtin", scope: "builtin", location: "golem", privacy: "open", status: "ready", tables: 2, rows: 1204 } as const;
@@ -139,7 +139,7 @@ interface Harness {
   interrupt: () => void;
 }
 
-function harness(options: { tty?: boolean; stdin?: string } = {}): Harness {
+function harness(options: { tty?: boolean; stdin?: string; password?: string; prompts?: string[] } = {}): Harness {
   const out: string[] = [];
   const err: string[] = [];
   let handler: (() => void) | null = null;
@@ -152,6 +152,14 @@ function harness(options: { tty?: boolean; stdin?: string } = {}): Harness {
       error: (line) => err.push(line),
       stdinIsTty: options.tty ?? false,
       readStdin: async () => options.stdin ?? "",
+      ...(options.password === undefined
+        ? {}
+        : {
+            readPassword: async (prompt: string) => {
+              options.prompts?.push(prompt);
+              return options.password ?? "";
+            },
+          }),
       onInterrupt: (next) => {
         handler = next;
         return () => {
@@ -163,7 +171,7 @@ function harness(options: { tty?: boolean; stdin?: string } = {}): Harness {
   };
 }
 
-function client(overrides: Partial<Record<"listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult", (...args: never[]) => unknown>> = {}) {
+function client(overrides: Partial<Record<"addData" | "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult", (...args: never[]) => unknown>> = {}) {
   return {
     listData: async () => ({ sources: [GOLEM] }),
     describeData: async () => ({ source: GOLEM, tables: [], sample: {} }),
@@ -409,4 +417,60 @@ test("a daemon that is not running gets the usual message", () => {
   const text = explainDaemonDown("connect ECONNREFUSED /x.sock", null, false);
   assert.match(text, /daemon is not running/);
   assert.match(text, /run: golem daemon install/);
+});
+
+const SHOP = { name: "shop", kind: "postgres", scope: "user", location: "postgres://golem_ro@db.example.com:5432/shop", privacy: "schema", status: "ready", in_keychain: true } as const;
+
+test("add parses the name, the address and the options", () => {
+  assert.deepEqual(parseDataArgs(["add", "shop", "postgres://u@h/d"]), { kind: "add", name: "shop", location: "postgres://u@h/d", privacy: null, passwordStdin: false });
+  assert.deepEqual(parseDataArgs(["add", "shop", "postgres://u@h/d", "--privacy", "open", "--password-stdin"]), { kind: "add", name: "shop", location: "postgres://u@h/d", privacy: "open", passwordStdin: true });
+  assert.equal(parseDataArgs(["add", "shop"]).kind, "error");
+  assert.equal(parseDataArgs(["add", "shop", "x", "--privacy", "all"]).kind, "error");
+  assert.equal(parseDataArgs(["add", "shop", "x", "--nope"]).kind, "error");
+});
+
+test("add asks for the password without echo and sends it to the daemon, not in the address", async () => {
+  const prompts: string[] = [];
+  const run = harness({ tty: true, password: "s3cret", prompts });
+  const sent: unknown[] = [];
+  const fake = client({ addData: async (params: unknown) => (sent.push(params), { source: { ...SHOP, warning: "This login can change data. golem only reads, but a read-only login is safer." } }) });
+  const code = await runDataAdd(fake, { kind: "add", name: "shop", location: SHOP.location, privacy: null, passwordStdin: false }, run.deps);
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["Password for golem_ro@db.example.com (Enter for none): "]);
+  assert.deepEqual(sent, [{ name: "shop", location: SHOP.location, privacy: "schema", scope: "user", password: "s3cret" }]);
+  const printed = run.out.join("");
+  assert.match(printed, /Added shop \(PostgreSQL, schema only\)\./);
+  assert.match(printed, /Keychain as golem\/data\/shop/);
+  assert.match(printed, /This login can change data/);
+  assert.equal(printed.includes("s3cret") || run.err.join("").includes("s3cret"), false);
+});
+
+test("add reads the password from stdin with --password-stdin, and a database on this Mac is local", async () => {
+  const run = harness({ stdin: "from-a-pipe\n" });
+  const sent: unknown[] = [];
+  const fake = client({ addData: async (params: unknown) => (sent.push(params), { source: { ...SHOP, privacy: "local" } }) });
+  const code = await runDataAdd(fake, { kind: "add", name: "dev", location: "mysql://u@localhost/dev", privacy: null, passwordStdin: true }, run.deps);
+  assert.equal(code, 0);
+  assert.deepEqual(sent, [{ name: "dev", location: "mysql://u@localhost/dev", privacy: "local", scope: "user", password: "from-a-pipe" }]);
+});
+
+test("add refuses an address with a password in it, and never repeats it", async () => {
+  const run = harness({ tty: true, password: "x" });
+  const sent: unknown[] = [];
+  const fake = client({ addData: async (params: unknown) => (sent.push(params), { source: SHOP }) });
+  const code = await runDataAdd(fake, { kind: "add", name: "shop", location: "postgres://u:hunter2@h/d", privacy: null, passwordStdin: false }, run.deps);
+  assert.equal(code, 1);
+  assert.deepEqual(sent, []);
+  assert.match(run.err.join(""), /has a password in it/);
+  assert.equal(run.err.join("").includes("hunter2"), false);
+});
+
+test("add of a folder sends no password and says a folder has none when one is piped", async () => {
+  const run = harness({ stdin: "x" });
+  const sent: unknown[] = [];
+  const fake = client({ addData: async (params: unknown) => (sent.push(params), { source: BANK }) });
+  assert.equal(await runDataAdd(fake, { kind: "add", name: "bank", location: "~/bank/*.csv", privacy: "local", passwordStdin: false }, run.deps), 0);
+  assert.deepEqual(sent, [{ name: "bank", location: "~/bank/*.csv", privacy: "local", scope: "user" }]);
+  assert.equal(await runDataAdd(fake, { kind: "add", name: "bank", location: "~/bank", privacy: null, passwordStdin: true }, run.deps), 1);
+  assert.match(run.err.join(""), /no password/);
 });

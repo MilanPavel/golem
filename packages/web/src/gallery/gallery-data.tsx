@@ -11,6 +11,7 @@ import {
   SAMPLE_FOLDER,
   SAMPLE_INSPECT_FILES,
   SAMPLE_INSPECT_PG,
+  SAMPLE_INSPECT_PG_WRITABLE,
   SAMPLE_LOGS,
   SAMPLE_PROD_DESCRIBED,
   SAMPLE_SHOP_DEV,
@@ -40,6 +41,7 @@ function Story({ title, theme, source, described, tab, notes = NOTES_READY, desc
         onDraftNotes={() => Promise.resolve("# bank\n\nDrafted from the schema.\n")}
         onPrivacy={() => Promise.resolve()}
         onWatch={() => Promise.resolve()}
+        onChangePassword={() => Promise.resolve()}
         onRemove={() => Promise.resolve()}
       />
     </div>
@@ -58,6 +60,7 @@ const STORIES: readonly [string, DataSource, DataDescribeResult | null, DataTab,
   ["Source, queries, none", SAMPLE_SHOP_DEV, SAMPLE_DEV_DESCRIBED, "queries"],
   ["Source, settings", SAMPLE_BANK, SAMPLE_BANK_DESCRIBED, "settings"],
   ["Source, settings, built in", SAMPLE_BUILTIN, SAMPLE_BUILTIN_DESCRIBED, "settings"],
+  ["Source, settings, database", SAMPLE_SHOP_PROD, SAMPLE_PROD_DESCRIBED, "settings"],
   ["Source, not available yet", SAMPLE_BANK, null, "tables", { describeMissing: true }],
 ];
 
@@ -67,9 +70,25 @@ const DIALOGS: readonly [string, AddFormInitial][] = [
   ["Add dialog, files, checked", { step: "where", kind: "files", path: "~/Documents/bank/*.csv", check: { state: "ok", location: "~/Documents/bank/*.csv", result: SAMPLE_INSPECT_FILES } }],
   ["Add dialog, files, checking", { step: "where", kind: "files", path: "~/Documents/bank/*.csv", check: { state: "checking", location: "~/Documents/bank/*.csv" } }],
   ["Add dialog, files, not found", { step: "where", kind: "files", path: "~/Documents/bnak/*.csv", check: { state: "error", location: "~/Documents/bnak/*.csv", message: "No files match ~/Documents/bnak/*.csv." } }],
+  ["Add dialog, database, not tested", { step: "where", kind: "database", host: "localhost", database: "shop_dev", user: "golem_ro", scope: "project" }],
   [
     "Add dialog, database, tested",
-    { step: "where", kind: "database", address: "postgres://golem_ro@localhost:5432/shop_dev", scope: "project", check: { state: "ok", location: "postgres://golem_ro@localhost:5432/shop_dev", result: SAMPLE_INSPECT_PG } },
+    { step: "where", kind: "database", host: "localhost", port: "5432", database: "shop_dev", user: "golem_ro", scope: "project", check: { state: "ok", location: "postgres://golem_ro@localhost:5432/shop_dev", result: SAMPLE_INSPECT_PG } },
+  ],
+  [
+    "Add dialog, database, login can write",
+    { step: "where", kind: "database", host: "db.internal", port: "5432", database: "shop", user: "golem_ro", scope: "project", check: { state: "ok", location: "postgres://golem_ro@db.internal:5432/shop", result: SAMPLE_INSPECT_PG_WRITABLE } },
+  ],
+  [
+    "Add dialog, database, could not connect",
+    {
+      step: "where",
+      kind: "database",
+      host: "db.internal",
+      database: "shop",
+      user: "golem_ro",
+      check: { state: "error", location: "postgres://golem_ro@db.internal/shop", message: "Cannot connect to the postgres database at db.internal: password authentication failed for user \"golem_ro\"" },
+    },
   ],
   ["Add dialog, privacy, files", { step: "privacy", kind: "files", path: "~/Documents/bank/*.csv", check: { state: "ok", location: "~/Documents/bank/*.csv", result: SAMPLE_INSPECT_FILES } }],
   [
@@ -77,7 +96,10 @@ const DIALOGS: readonly [string, AddFormInitial][] = [
     {
       step: "privacy",
       kind: "database",
-      address: "postgres://golem_ro@localhost:5432/shop_dev",
+      host: "localhost",
+      port: "5432",
+      database: "shop_dev",
+      user: "golem_ro",
       scope: "project",
       check: { state: "ok", location: "postgres://golem_ro@localhost:5432/shop_dev", result: SAMPLE_INSPECT_PG },
       error: "password authentication failed for user \"golem_ro\"",

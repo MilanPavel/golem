@@ -184,17 +184,18 @@ export function resultHeader(result: ResultLike): string {
   return `table · ${rowsText(result.total_rows)} · from @${result.source}${result.truncated === true ? " · the query had more rows than were kept" : ""}`;
 }
 
-export type DataExtensionName = "excel" | "sqlite";
+export type DataExtensionName = "excel" | "sqlite" | "postgres" | "mysql";
 
 export const EXTENSION_BUTTON = "Get it (one-time download)";
 
-const EXTENSION_WORD: Record<DataExtensionName, string> = { excel: "Excel", sqlite: "SQLite" };
+const EXTENSION_WORD: Record<DataExtensionName, string> = { excel: "Excel files", sqlite: "SQLite files", postgres: "PostgreSQL databases", mysql: "MySQL databases" };
+const EXTENSION_SHORT: Record<DataExtensionName, string> = { excel: "Excel", sqlite: "SQLite", postgres: "PostgreSQL", mysql: "MySQL" };
 
 /** What the add-on is for and where it goes, before anything downloads. */
 export function extensionNote(name: DataExtensionName): string {
-  return `Reading ${EXTENSION_WORD[name]} files needs a small add-on. golem downloads it once into its own folder, and only when you press the button.`;
+  return `Reading ${EXTENSION_WORD[name]} needs a small add-on. golem downloads it once into its own folder, and only when you press the button.`;
 }
 
 export function extensionDownloading(name: DataExtensionName): string {
-  return `Downloading the ${EXTENSION_WORD[name]} add-on…`;
+  return `Downloading the ${EXTENSION_SHORT[name]} add-on…`;
 }

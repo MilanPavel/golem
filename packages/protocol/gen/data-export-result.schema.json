@@ -7,7 +7,9 @@
         {
           "enum": [
             "excel",
-            "sqlite"
+            "sqlite",
+            "postgres",
+            "mysql"
           ],
           "type": "string"
         },

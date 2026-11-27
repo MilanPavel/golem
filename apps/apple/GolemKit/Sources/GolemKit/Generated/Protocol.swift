@@ -4592,7 +4592,7 @@ public enum DaemonStatusState: String, Codable {
 /// ``data.add``. ``password`` goes to the Keychain and is never written to a file.
 // MARK: - DataAddParams
 public struct DataAddParams: Codable {
-    public let kind: KindEnum?
+    public let kind: KindKind?
     public let location: String
     public let name: String
     public let password: String?
@@ -4612,7 +4612,7 @@ public struct DataAddParams: Codable {
         case watch = "watch"
     }
 
-    public init(kind: KindEnum?, location: String, name: String, password: String?, privacy: SuggestedPrivacyEnum, scope: Scope, sessionID: String?, watch: Bool?) {
+    public init(kind: KindKind?, location: String, name: String, password: String?, privacy: SuggestedPrivacyEnum, scope: Scope, sessionID: String?, watch: Bool?) {
         self.kind = kind
         self.location = location
         self.name = name
@@ -4624,7 +4624,7 @@ public struct DataAddParams: Codable {
     }
 }
 
-public enum KindEnum: String, Codable {
+public enum KindKind: String, Codable {
     case builtin = "builtin"
     case duckdb = "duckdb"
     case files = "files"
@@ -4658,7 +4658,8 @@ public struct DataAddResult: Codable {
 // MARK: - DataAddResultSource
 public struct DataAddResultSource: Codable {
     public let error: String?
-    public let kind: KindEnum
+    public let inKeychain: Bool?
+    public let kind: KindKind
     public let location: String
     public let name: String
     public let needsExtension: NeedsExtensionEnum?
@@ -4670,10 +4671,13 @@ public struct DataAddResultSource: Codable {
     public let scope: SourceScope
     public let status: SourceStatus
     public let tables: Int?
+    public let timeoutS: Double?
+    public let warning: String?
     public let watch: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case error = "error"
+        case inKeychain = "in_keychain"
         case kind = "kind"
         case location = "location"
         case name = "name"
@@ -4686,11 +4690,14 @@ public struct DataAddResultSource: Codable {
         case scope = "scope"
         case status = "status"
         case tables = "tables"
+        case timeoutS = "timeout_s"
+        case warning = "warning"
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, inKeychain: Bool?, kind: KindKind, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, timeoutS: Double?, warning: String?, watch: Bool?) {
         self.error = error
+        self.inKeychain = inKeychain
         self.kind = kind
         self.location = location
         self.name = name
@@ -4703,12 +4710,16 @@ public struct DataAddResultSource: Codable {
         self.scope = scope
         self.status = status
         self.tables = tables
+        self.timeoutS = timeoutS
+        self.warning = warning
         self.watch = watch
     }
 }
 
 public enum NeedsExtensionEnum: String, Codable {
     case excel = "excel"
+    case mysql = "mysql"
+    case postgres = "postgres"
     case sqlite = "sqlite"
 }
 
@@ -4965,7 +4976,8 @@ public enum Row: Codable {
 // MARK: - DataDescribeResultSource
 public struct DataDescribeResultSource: Codable {
     public let error: String?
-    public let kind: KindEnum
+    public let inKeychain: Bool?
+    public let kind: KindKind
     public let location: String
     public let name: String
     public let needsExtension: NeedsExtensionEnum?
@@ -4977,10 +4989,13 @@ public struct DataDescribeResultSource: Codable {
     public let scope: SourceScope
     public let status: SourceStatus
     public let tables: Int?
+    public let timeoutS: Double?
+    public let warning: String?
     public let watch: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case error = "error"
+        case inKeychain = "in_keychain"
         case kind = "kind"
         case location = "location"
         case name = "name"
@@ -4993,11 +5008,14 @@ public struct DataDescribeResultSource: Codable {
         case scope = "scope"
         case status = "status"
         case tables = "tables"
+        case timeoutS = "timeout_s"
+        case warning = "warning"
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, inKeychain: Bool?, kind: KindKind, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, timeoutS: Double?, warning: String?, watch: Bool?) {
         self.error = error
+        self.inKeychain = inKeychain
         self.kind = kind
         self.location = location
         self.name = name
@@ -5010,6 +5028,8 @@ public struct DataDescribeResultSource: Codable {
         self.scope = scope
         self.status = status
         self.tables = tables
+        self.timeoutS = timeoutS
+        self.warning = warning
         self.watch = watch
     }
 }
@@ -5136,34 +5156,69 @@ public struct DataExtensionInstallResult: Codable {
 }
 
 /// ``data.inspect``. Look at a location before it is added.
+///
+/// A file or a folder is a ``location``. A database is ``kind`` (``postgres`` or ``mysql``)
+/// with
+/// ``host``, ``port``, ``database``, ``user`` and ``ssl_mode``, and its ``password`` for
+/// this
+/// one look: it is used to connect and is not stored.
 // MARK: - DataInspectParams
 public struct DataInspectParams: Codable {
-    public let location: String
+    public let database: String?
+    public let host: String?
+    public let kind: PurpleKind?
+    public let location: String?
+    public let password: String?
+    public let port: Int?
     public let sessionID: String?
+    public let sslMode: String?
+    public let user: String?
 
     public enum CodingKeys: String, CodingKey {
+        case database = "database"
+        case host = "host"
+        case kind = "kind"
         case location = "location"
+        case password = "password"
+        case port = "port"
         case sessionID = "session_id"
+        case sslMode = "ssl_mode"
+        case user = "user"
     }
 
-    public init(location: String, sessionID: String?) {
+    public init(database: String?, host: String?, kind: PurpleKind?, location: String?, password: String?, port: Int?, sessionID: String?, sslMode: String?, user: String?) {
+        self.database = database
+        self.host = host
+        self.kind = kind
         self.location = location
+        self.password = password
+        self.port = port
         self.sessionID = sessionID
+        self.sslMode = sslMode
+        self.user = user
     }
+}
+
+public enum PurpleKind: String, Codable {
+    case mysql = "mysql"
+    case postgres = "postgres"
 }
 
 /// What a location holds. ``notes`` are plain-language guesses. ``sample``: 20 rows a table.
 // MARK: - DataInspectResult
 public struct DataInspectResult: Codable {
     public let files: Int?
-    public let kind: KindEnum
+    public let kind: KindKind
     public let needsExtension: NeedsExtensionEnum?
     public let notes: [String]?
     public let privacyReason: String?
     public let sample: [String: [[Row]]]
+    public let serverVersion: String?
     public let suggestedName: String
     public let suggestedPrivacy: SuggestedPrivacyEnum
     public let tables: [DataInspectResultTable]
+    public let url: String?
+    public let warning: String?
 
     public enum CodingKeys: String, CodingKey {
         case files = "files"
@@ -5172,21 +5227,27 @@ public struct DataInspectResult: Codable {
         case notes = "notes"
         case privacyReason = "privacy_reason"
         case sample = "sample"
+        case serverVersion = "server_version"
         case suggestedName = "suggested_name"
         case suggestedPrivacy = "suggested_privacy"
         case tables = "tables"
+        case url = "url"
+        case warning = "warning"
     }
 
-    public init(files: Int?, kind: KindEnum, needsExtension: NeedsExtensionEnum?, notes: [String]?, privacyReason: String?, sample: [String: [[Row]]], suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable]) {
+    public init(files: Int?, kind: KindKind, needsExtension: NeedsExtensionEnum?, notes: [String]?, privacyReason: String?, sample: [String: [[Row]]], serverVersion: String?, suggestedName: String, suggestedPrivacy: SuggestedPrivacyEnum, tables: [DataInspectResultTable], url: String?, warning: String?) {
         self.files = files
         self.kind = kind
         self.needsExtension = needsExtension
         self.notes = notes
         self.privacyReason = privacyReason
         self.sample = sample
+        self.serverVersion = serverVersion
         self.suggestedName = suggestedName
         self.suggestedPrivacy = suggestedPrivacy
         self.tables = tables
+        self.url = url
+        self.warning = warning
     }
 }
 
@@ -5271,7 +5332,8 @@ public struct DataListResult: Codable {
 // MARK: - SourceElement
 public struct SourceElement: Codable {
     public let error: String?
-    public let kind: KindEnum
+    public let inKeychain: Bool?
+    public let kind: KindKind
     public let location: String
     public let name: String
     public let needsExtension: NeedsExtensionEnum?
@@ -5283,10 +5345,13 @@ public struct SourceElement: Codable {
     public let scope: SourceScope
     public let status: SourceStatus
     public let tables: Int?
+    public let timeoutS: Double?
+    public let warning: String?
     public let watch: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case error = "error"
+        case inKeychain = "in_keychain"
         case kind = "kind"
         case location = "location"
         case name = "name"
@@ -5299,11 +5364,14 @@ public struct SourceElement: Codable {
         case scope = "scope"
         case status = "status"
         case tables = "tables"
+        case timeoutS = "timeout_s"
+        case warning = "warning"
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, inKeychain: Bool?, kind: KindKind, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, timeoutS: Double?, warning: String?, watch: Bool?) {
         self.error = error
+        self.inKeychain = inKeychain
         self.kind = kind
         self.location = location
         self.name = name
@@ -5316,6 +5384,8 @@ public struct SourceElement: Codable {
         self.scope = scope
         self.status = status
         self.tables = tables
+        self.timeoutS = timeoutS
+        self.warning = warning
         self.watch = watch
     }
 }
@@ -5675,7 +5745,8 @@ public struct DataSavedQuery: Codable {
 // MARK: - DataSource
 public struct DataSource: Codable {
     public let error: String?
-    public let kind: KindEnum
+    public let inKeychain: Bool?
+    public let kind: KindKind
     public let location: String
     public let name: String
     public let needsExtension: NeedsExtensionEnum?
@@ -5687,10 +5758,13 @@ public struct DataSource: Codable {
     public let scope: SourceScope
     public let status: SourceStatus
     public let tables: Int?
+    public let timeoutS: Double?
+    public let warning: String?
     public let watch: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case error = "error"
+        case inKeychain = "in_keychain"
         case kind = "kind"
         case location = "location"
         case name = "name"
@@ -5703,11 +5777,14 @@ public struct DataSource: Codable {
         case scope = "scope"
         case status = "status"
         case tables = "tables"
+        case timeoutS = "timeout_s"
+        case warning = "warning"
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, inKeychain: Bool?, kind: KindKind, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, timeoutS: Double?, warning: String?, watch: Bool?) {
         self.error = error
+        self.inKeychain = inKeychain
         self.kind = kind
         self.location = location
         self.name = name
@@ -5720,6 +5797,8 @@ public struct DataSource: Codable {
         self.scope = scope
         self.status = status
         self.tables = tables
+        self.timeoutS = timeoutS
+        self.warning = warning
         self.watch = watch
     }
 }
@@ -5779,25 +5858,31 @@ public struct DataUpdateParams: Codable {
     public let exclude: [String]?
     public let include: [String]?
     public let name: String
+    public let password: String?
     public let privacy: SuggestedPrivacyEnum?
     public let sessionID: String?
+    public let timeoutS: Double?
     public let watch: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case exclude = "exclude"
         case include = "include"
         case name = "name"
+        case password = "password"
         case privacy = "privacy"
         case sessionID = "session_id"
+        case timeoutS = "timeout_s"
         case watch = "watch"
     }
 
-    public init(exclude: [String]?, include: [String]?, name: String, privacy: SuggestedPrivacyEnum?, sessionID: String?, watch: Bool?) {
+    public init(exclude: [String]?, include: [String]?, name: String, password: String?, privacy: SuggestedPrivacyEnum?, sessionID: String?, timeoutS: Double?, watch: Bool?) {
         self.exclude = exclude
         self.include = include
         self.name = name
+        self.password = password
         self.privacy = privacy
         self.sessionID = sessionID
+        self.timeoutS = timeoutS
         self.watch = watch
     }
 }
@@ -5820,7 +5905,8 @@ public struct DataUpdateResult: Codable {
 // MARK: - DataUpdateResultSource
 public struct DataUpdateResultSource: Codable {
     public let error: String?
-    public let kind: KindEnum
+    public let inKeychain: Bool?
+    public let kind: KindKind
     public let location: String
     public let name: String
     public let needsExtension: NeedsExtensionEnum?
@@ -5832,10 +5918,13 @@ public struct DataUpdateResultSource: Codable {
     public let scope: SourceScope
     public let status: SourceStatus
     public let tables: Int?
+    public let timeoutS: Double?
+    public let warning: String?
     public let watch: Bool?
 
     public enum CodingKeys: String, CodingKey {
         case error = "error"
+        case inKeychain = "in_keychain"
         case kind = "kind"
         case location = "location"
         case name = "name"
@@ -5848,11 +5937,14 @@ public struct DataUpdateResultSource: Codable {
         case scope = "scope"
         case status = "status"
         case tables = "tables"
+        case timeoutS = "timeout_s"
+        case warning = "warning"
         case watch = "watch"
     }
 
-    public init(error: String?, kind: KindEnum, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, watch: Bool?) {
+    public init(error: String?, inKeychain: Bool?, kind: KindKind, location: String, name: String, needsExtension: NeedsExtensionEnum?, notesPath: String?, privacy: SuggestedPrivacyEnum, privacyReason: String?, project: String?, rows: Int?, scope: SourceScope, status: SourceStatus, tables: Int?, timeoutS: Double?, warning: String?, watch: Bool?) {
         self.error = error
+        self.inKeychain = inKeychain
         self.kind = kind
         self.location = location
         self.name = name
@@ -5865,6 +5957,8 @@ public struct DataUpdateResultSource: Codable {
         self.scope = scope
         self.status = status
         self.tables = tables
+        self.timeoutS = timeoutS
+        self.warning = warning
         self.watch = watch
     }
 }

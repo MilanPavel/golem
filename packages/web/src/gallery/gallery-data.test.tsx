@@ -29,6 +29,12 @@ test("the gallery's Data section shows the panel, each tab of a source, and the 
     expect(region("Add dialog, files, checked").getByText("36 files match, one table: transactions.")).toBeTruthy();
     expect(region("Add dialog, files, not found").getByRole("alert").textContent).toContain("No files match");
     expect(region("Add dialog, database, tested").getByText("goes to the macOS Keychain, never to a file or a model")).toBeTruthy();
+    expect(region("Add dialog, database, tested").getByText("connected · PostgreSQL 17.2 · 3 tables · 1 schema")).toBeTruthy();
+    expect(region("Add dialog, database, not tested").getByText(/You have not tested the connection/)).toBeTruthy();
+    expect(region("Add dialog, database, login can write").getByText(/This login can change data/)).toBeTruthy();
+    expect(region("Add dialog, database, could not connect").getByRole("alert").textContent).toContain("password authentication failed");
+    expect(region("Source, settings, database").getByText("password in the macOS Keychain · golem/data/shop_prod")).toBeTruthy();
+    expect(region("Source, settings, database").getByRole("button", { name: "Change password" })).toBeTruthy();
     expect(region("Add dialog, privacy, files").getByText("suggested")).toBeTruthy();
     expect(region("Add dialog, privacy, database, add failed").getByRole("alert").textContent).toContain("password authentication failed");
     unmount();

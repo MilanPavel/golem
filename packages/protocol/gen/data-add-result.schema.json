@@ -16,6 +16,11 @@
           "default": null,
           "title": "Error"
         },
+        "in_keychain": {
+          "default": false,
+          "title": "In Keychain",
+          "type": "boolean"
+        },
         "kind": {
           "enum": [
             "builtin",
@@ -43,7 +48,9 @@
             {
               "enum": [
                 "excel",
-                "sqlite"
+                "sqlite",
+                "postgres",
+                "mysql"
               ],
               "type": "string"
             },
@@ -143,6 +150,30 @@
           ],
           "default": null,
           "title": "Tables"
+        },
+        "timeout_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout S"
+        },
+        "warning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Warning"
         },
         "watch": {
           "default": false,

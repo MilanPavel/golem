@@ -1,6 +1,6 @@
-import { RpcError, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
+import { RpcError, type DataAddParams, type DataAddResult, type DataChanged, type DataColumn, type DataDescribeResult, type DataExportResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataResult, type DataSavedQuery, type DataSource, type DataTable, type DataUpdateParams, type ToolTable } from "@golem/client";
 
-export type { DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
+export type { DataAddParams, DataAddResult, DataChanged, DataColumn, DataDescribeResult, DataExportResult, DataInspectParams, DataInspectResult, DataListResult, DataNotesGetResult, DataResult, DataSavedQuery, DataSource, DataTable, DataUpdateParams, ToolTable };
 
 /** The query key of `data.list`. A pushed `data.changed` and every action below mark it stale. */
 export const DATA_LIST_KEY = ["data.list"] as const;

@@ -212,3 +212,74 @@ export function inspectSummary(found: { files?: number | null | undefined; table
   if (found.files === null || found.files === undefined) return `Found ${tables}.`;
   return `${found.files === 1 ? "1 file matches" : `${countText(found.files)} files match`}, ${tables}.`;
 }
+
+/** The kinds of database a person can connect to. */
+export type DatabaseType = "postgres" | "mysql";
+
+/** What the Database form holds, without the password. */
+export interface DatabaseFields {
+  type: DatabaseType;
+  host: string;
+  port: string;
+  database: string;
+  user: string;
+  /** The `sslmode` of Postgres or the `ssl_mode` of MySQL, or empty for the server's default. */
+  ssl: string;
+}
+
+export const DEFAULT_PORTS: Record<DatabaseType, number> = { postgres: 5432, mysql: 3306 };
+
+/** The ways to encrypt the connection, in words, with what each is called to the server. */
+export const SSL_CHOICES: Record<DatabaseType, readonly { value: string; label: string }[]> = {
+  postgres: [
+    { value: "", label: "Server default" },
+    { value: "disable", label: "Off" },
+    { value: "prefer", label: "If the server offers it" },
+    { value: "require", label: "Required" },
+    { value: "verify-full", label: "Required, and the server is checked" },
+  ],
+  mysql: [
+    { value: "", label: "Server default" },
+    { value: "disabled", label: "Off" },
+    { value: "preferred", label: "If the server offers it" },
+    { value: "required", label: "Required" },
+    { value: "verify_identity", label: "Required, and the server is checked" },
+  ],
+};
+
+/** Whether the form has the two things every address needs. */
+export function databaseReady(fields: DatabaseFields): boolean {
+  return fields.host.trim() !== "" && fields.database.trim() !== "";
+}
+
+/** The address of a database with no password in it, such as `postgres://golem_ro@localhost:5432/shop_dev`. The daemon checks it again. */
+export function databaseUrl(fields: DatabaseFields): string {
+  const user = fields.user.trim();
+  const port = fields.port.trim();
+  const key = fields.type === "postgres" ? "sslmode" : "ssl_mode";
+  const ssl = fields.ssl === "" ? "" : `?${key}=${fields.ssl}`;
+  return `${fields.type}://${user === "" ? "" : `${encodeURIComponent(user)}@`}${fields.host.trim()}${port === "" ? "" : `:${port}`}/${encodeURIComponent(fields.database.trim())}${ssl}`;
+}
+
+/** The line a successful test shows: `connected · PostgreSQL 17.2 · 14 tables · 3 schemas`. */
+export function databaseSummary(found: { server_version?: string | null | undefined; tables: readonly { name: string }[] }): string {
+  const schemas = new Set(found.tables.map((table) => (table.name.includes(".") ? table.name.split(".")[0] : "")));
+  const parts = ["connected"];
+  if (found.server_version !== null && found.server_version !== undefined && found.server_version !== "") parts.push(found.server_version);
+  parts.push(tablesText(found.tables.length));
+  parts.push(schemas.size === 1 ? "1 schema" : `${schemas.size} schemas`);
+  return parts.join(" · ");
+}
+
+/** What happens when Next is pressed without a test. */
+export const UNTESTED_NOTE = "You have not tested the connection. Next tests it for you. If it fails you can still go on, and Add source shows the real error.";
+
+/** The line under a database source's settings: where its password is kept. */
+export function keychainLine(name: string): string {
+  return `password in the macOS Keychain · golem/data/${name}`;
+}
+
+/** The limits of a database source, in one line. */
+export function limitsLine(timeoutSeconds: number | null | undefined): string {
+  return `read-only transaction · ${timeoutSeconds ?? 15} s per query · 10 000 rows per result`;
+}

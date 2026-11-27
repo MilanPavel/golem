@@ -3,13 +3,20 @@ import {
   ADD_KINDS,
   ADD_STEPS,
   DATA_PRIVACIES,
+  databaseReady,
+  databaseSummary,
+  databaseUrl,
+  DEFAULT_PORTS,
   FILES_PATH_EXAMPLE,
   inspectSummary,
   PASSWORD_NOTE,
   PRIVACY_SHORT,
+  SSL_CHOICES,
   stepName,
+  UNTESTED_NOTE,
   type AddKind,
   type AddStep,
+  type DatabaseFields,
   type DataPrivacy,
 } from "@golem/view";
 import { cn } from "../../ui/cn.ts";
@@ -17,7 +24,7 @@ import { Button } from "../../ui/button.tsx";
 import { AddKindIcon } from "../../ui/data-icons.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/dialog.tsx";
 import { Input } from "../../ui/input.tsx";
-import { dataErrorText, type DataAddParams, type DataExtensionName, type DataInspectResult, type DataSource } from "../../store/data.ts";
+import { dataErrorText, type DataAddParams, type DataExtensionName, type DataInspectParams, type DataInspectResult, type DataSource } from "../../store/data.ts";
 import { folderName } from "../sessions/folder.ts";
 import { ExtensionRow } from "./extension-row.tsx";
 import { PrivacyChip } from "./privacy-chip.tsx";
@@ -35,6 +42,11 @@ export type AddFormInitial = {
   kind?: AddKind;
   path?: string;
   address?: string;
+  host?: string;
+  port?: string;
+  database?: string;
+  user?: string;
+  ssl?: string;
   dbType?: DbType;
   scope?: Scope;
   name?: string;
@@ -48,6 +60,8 @@ export type AddFormProps = {
   folder: string | null;
   /** Looks at a location. Rejects with the daemon's reason. */
   onInspect: (location: string) => Promise<DataInspectResult>;
+  /** Connects to a Postgres or MySQL database with the password typed, to test it. Nothing is saved. Rejects with the daemon's reason. */
+  onInspectDatabase?: (params: DataInspectParams) => Promise<DataInspectResult>;
   /** Downloads an add-on the location needs. Rejects with the reason. Without it the dialog only says the add-on is missing. */
   onInstallExtension?: (name: DataExtensionName) => Promise<void>;
   /** Adds the source. Rejects with the daemon's reason. */
@@ -105,6 +119,7 @@ function Choice({ on, onClick, children, className }: { on: boolean; onClick: ()
 }
 
 function Found({ check }: { check: Check }) {
+  const database = check.state === "ok" && (check.result.kind === "postgres" || check.result.kind === "mysql");
   if (check.state === "idle") return null;
   if (check.state === "checking") return <p className="text-sm text-muted">Reading the headers and a few sample rows…</p>;
   if (check.state === "error") return null;
@@ -116,8 +131,13 @@ function Found({ check }: { check: Check }) {
         <span aria-hidden="true" className="text-allow">
           ✓{" "}
         </span>
-        {inspectSummary(check.result)}
+        {check.state === "ok" && database ? databaseSummary(check.result) : inspectSummary(check.result)}
       </p>
+      {check.state === "ok" && check.result.warning != null ? (
+        <p role="status" className="text-sm text-wait">
+          {check.result.warning}
+        </p>
+      ) : null}
       {first !== undefined && rows.length > 0 ? <RowsTable columns={first.columns ?? []} rows={rows} limit={3} label={`Sample rows of ${first.name}`} /> : null}
       {check.result.notes !== undefined && check.result.notes.length > 0 ? (
         <ul aria-label="What golem guessed" className="list-disc pl-5 text-meta text-muted">
@@ -131,7 +151,7 @@ function Found({ check }: { check: Check }) {
 }
 
 /** The three steps of Add a source: what kind, where it is, who may see rows. Nothing is saved until Add source. */
-export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded, onCancel, onOpenMcp, inline = false, initial }: AddFormProps) {
+export function AddForm({ folder, onInspect, onInspectDatabase, onInstallExtension, onAdd, onAdded, onCancel, onOpenMcp, inline = false, initial }: AddFormProps) {
   const ids = useId();
   const [step, setStep] = useState<AddStep>(initial?.step ?? "kind");
   const [kind, setKind] = useState<AddKind>(initial?.kind ?? "files");
@@ -140,6 +160,11 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
   const [dbType, setDbType] = useState<DbType>(initial?.dbType ?? "postgres");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [password, setPassword] = useState("");
+  const [host, setHost] = useState(initial?.host ?? "");
+  const [port, setPort] = useState(initial?.port ?? "");
+  const [database, setDatabase] = useState(initial?.database ?? "");
+  const [dbUser, setDbUser] = useState(initial?.user ?? "");
+  const [ssl, setSsl] = useState(initial?.ssl ?? "");
   const [scope, setScope] = useState<Scope>(initial?.scope ?? (folder !== null && initial?.kind === "database" ? "project" : "user"));
   const [check, setCheck] = useState<Check>(initial?.check ?? { state: "idle" });
   const [hint, setHint] = useState<string | null>(null);
@@ -148,7 +173,9 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(initial?.error ?? null);
 
-  const location = (kind === "files" ? path : kind === "url" ? url : address).trim();
+  const fields: DatabaseFields | null = kind === "database" && dbType !== "sqlite" ? { type: dbType, host, port, database, user: dbUser, ssl } : null;
+  const location = (kind === "files" ? path : kind === "url" ? url : fields !== null ? (databaseReady(fields) ? databaseUrl(fields) : "") : address).trim();
+  const typeHint = kind === "database" ? (fields !== null ? "Type the host and the database name first." : "Type the address of the database first.") : kind === "url" ? "Type the web address first." : "Type where the files are first.";
   const result = check.state === "ok" && check.location === location ? check.result : null;
   const failure = check.state === "error" && check.location === location ? check.message : null;
   const name = typedName ?? result?.suggested_name ?? nameFromLocation(location);
@@ -157,12 +184,26 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
 
   function inspect(): Promise<void> {
     if (location === "") {
-      setHint(kind === "database" ? "Type the address of the database first." : kind === "url" ? "Type the web address first." : "Type where the files are first.");
+      setHint(typeHint);
       return Promise.resolve();
     }
     setHint(null);
     setCheck({ state: "checking", location });
-    return onInspect(location).then(
+    const asked =
+      fields === null
+        ? onInspect(location)
+        : onInspectDatabase === undefined
+          ? Promise.reject(new Error("Testing a connection is not available in this version of golem."))
+          : onInspectDatabase({
+              kind: fields.type,
+              host: fields.host.trim(),
+              database: fields.database.trim(),
+              ...(fields.port.trim() === "" ? {} : { port: Number(fields.port) }),
+              ...(fields.user.trim() === "" ? {} : { user: fields.user.trim() }),
+              ...(fields.ssl === "" ? {} : { ssl_mode: fields.ssl }),
+              ...(password === "" ? {} : { password }),
+            });
+    return asked.then(
       (found) => setCheck({ state: "ok", location, result: found }),
       (failed: unknown) => setCheck({ state: "error", location, message: dataErrorText(failed, "Could not read that.") }),
     );
@@ -176,7 +217,7 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
     }
     if (step === "where") {
       if (location === "") {
-        setHint(kind === "database" ? "Type the address of the database first." : kind === "url" ? "Type the web address first." : "Type where the files are first.");
+        setHint(typeHint);
         return;
       }
       // A problem found now does not stop the person: Add source reports the real one.
@@ -196,7 +237,7 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
       scope,
       watch: kind === "files" && !location.startsWith("http"),
     };
-    if (kind === "database" && dbType !== "sqlite" && password !== "") params.password = password;
+    if (fields !== null && password !== "") params.password = password;
     onAdd(params).then(
       (source) => {
         // The password is gone from the form once it has gone to the daemon.
@@ -268,7 +309,10 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
                 <select
                   id={`${ids}-type`}
                   value={dbType}
-                  onChange={(event) => setDbType(event.target.value as DbType)}
+                  onChange={(event) => {
+                    setDbType(event.target.value as DbType);
+                    setSsl("");
+                  }}
                   className="w-44 rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2"
                 >
                   <option value="postgres">PostgreSQL</option>
@@ -276,23 +320,62 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
                   <option value="sqlite">SQLite file</option>
                 </select>
               </Field>
-              <Field label="Address" htmlFor={`${ids}-address`}>
-                <Input
-                  id={`${ids}-address`}
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  placeholder={dbType === "sqlite" ? "~/data/shop.db" : "postgres://reader@localhost:5432/shop"}
-                  aria-invalid={failure !== null}
-                  aria-describedby={failure === null ? undefined : `${ids}-failure`}
-                  spellCheck={false}
-                  autoComplete="off"
-                  className="font-mono"
-                />
-              </Field>
-              {dbType === "sqlite" ? null : (
-                <Field label="Password" htmlFor={`${ids}-password`} note={PASSWORD_NOTE}>
-                  <Input id={`${ids}-password`} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" className="w-64" />
+              {fields === null ? (
+                <Field label="File" htmlFor={`${ids}-address`}>
+                  <Input
+                    id={`${ids}-address`}
+                    value={address}
+                    onChange={(event) => setAddress(event.target.value)}
+                    placeholder="~/data/shop.db"
+                    aria-invalid={failure !== null}
+                    aria-describedby={failure === null ? undefined : `${ids}-failure`}
+                    spellCheck={false}
+                    autoComplete="off"
+                    className="font-mono"
+                  />
                 </Field>
+              ) : (
+                <>
+                  <Field label="Host" htmlFor={`${ids}-host`}>
+                    <Input id={`${ids}-host`} value={host} onChange={(event) => setHost(event.target.value)} placeholder="localhost" aria-invalid={failure !== null} aria-describedby={failure === null ? undefined : `${ids}-failure`} spellCheck={false} autoComplete="off" className="font-mono" />
+                  </Field>
+                  <Field label="Port" htmlFor={`${ids}-port`}>
+                    <Input id={`${ids}-port`} value={port} inputMode="numeric" onChange={(event) => setPort(event.target.value.replace(/\D/g, ""))} placeholder={String(DEFAULT_PORTS[fields.type])} autoComplete="off" className="w-28 font-mono" />
+                  </Field>
+                  <Field label="Database" htmlFor={`${ids}-database`}>
+                    <Input id={`${ids}-database`} value={database} onChange={(event) => setDatabase(event.target.value)} placeholder="shop_dev" spellCheck={false} autoComplete="off" className="font-mono" />
+                  </Field>
+                  <Field label="User" htmlFor={`${ids}-user`}>
+                    <Input id={`${ids}-user`} value={dbUser} onChange={(event) => setDbUser(event.target.value)} placeholder="golem_ro" spellCheck={false} autoComplete="off" className="w-56 font-mono" />
+                  </Field>
+                  <Field label="Password" htmlFor={`${ids}-password`} note={PASSWORD_NOTE}>
+                    <Input
+                      id={`${ids}-password`}
+                      type="password"
+                      value={password}
+                      onChange={(event) => {
+                        setPassword(event.target.value);
+                        if (check.state === "ok" || check.state === "error") setCheck({ state: "idle" });
+                      }}
+                      autoComplete="new-password"
+                      className="w-64"
+                    />
+                  </Field>
+                  <Field label="Encryption" htmlFor={`${ids}-ssl`}>
+                    <select
+                      id={`${ids}-ssl`}
+                      value={ssl}
+                      onChange={(event) => setSsl(event.target.value)}
+                      className="w-64 rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-offset-2 outline-clay focus-visible:outline-2"
+                    >
+                      {SSL_CHOICES[fields.type].map((choice) => (
+                        <option key={choice.value} value={choice.value}>
+                          {choice.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </>
               )}
             </>
           ) : (
@@ -339,6 +422,7 @@ export function AddForm({ folder, onInspect, onInstallExtension, onAdd, onAdded,
               {hint}
             </p>
           )}
+          {fields !== null && result === null && failure === null && check.state !== "checking" ? <p className="text-meta text-muted">{UNTESTED_NOTE}</p> : null}
           {failure === null ? null : (
             <p id={`${ids}-failure`} role="alert" className="text-sm text-deny wrap-anywhere">
               {failure}

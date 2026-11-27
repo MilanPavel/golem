@@ -7,7 +7,7 @@ export const EXPORT_FORMATS = ["csv", "parquet", "json", "xlsx"] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export const DATA_USAGE =
-  "usage: golem data [list] [--json] | golem data describe <source> [<table>] [--json] | golem data notes <source> [--edit] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] [--out <file>] | golem data export <result_id> <file> [--format csv|parquet|json|xlsx]";
+  "usage: golem data [list] [--json] | golem data add <name> <location> [--privacy open|local|schema] [--password-stdin] | golem data describe <source> [<table>] [--json] | golem data notes <source> [--edit] | golem data query <source> [<sql> | -] [--limit N] [--format table|csv|json] [--out <file>] | golem data export <result_id> <file> [--format csv|parquet|json|xlsx]";
 
 /** The text of `golem data --help` and `golem help data`. */
 export const DATA_HELP = [
@@ -15,6 +15,12 @@ export const DATA_HELP = [
   "",
   "  golem data [list] [--json]",
   "      One line per source: name, kind, scope, tables, rows, privacy and status.",
+  "  golem data add <name> <location> [--privacy open|local|schema] [--password-stdin]",
+  "      Adds a source for you. <location> is a file, a folder or a pattern, or a database address such as",
+  "        postgres://golem_ro@localhost:5432/shop_dev   or   mysql://golem_ro@db.example.com/shop",
+  "      A database address has no password in it. golem asks for the password without showing it, or reads it",
+  "      from stdin with --password-stdin, and keeps it in the macOS Keychain, never in a file.",
+  "      --privacy      who may see rows. The default is local for a database on this Mac, schema for any other.",
   "  golem data describe <source> [<table>] [--json]",
   "      The tables of a source with their columns and stats, its notes, and a few sample rows.",
   "  golem data notes <source> [--edit]",
@@ -38,6 +44,7 @@ export type DataArgs =
   | { kind: "list"; json: boolean }
   | { kind: "describe"; source: string; table: string | null; json: boolean }
   | { kind: "notes"; source: string; edit: boolean }
+  | { kind: "add"; name: string; location: string; privacy: "open" | "local" | "schema" | null; passwordStdin: boolean }
   /** `sql` is null when it comes from stdin. */
   | { kind: "query"; source: string; sql: string | null; limit: number | null; format: DataFormat; out?: string }
   | { kind: "export"; resultId: string; path: string; format: ExportFormat | null }
@@ -58,6 +65,7 @@ export function parseDataArgs(args: readonly string[]): DataArgs {
   }
   if (first === "describe") return parseDescribe(rest);
   if (first === "notes") return parseNotes(rest);
+  if (first === "add") return parseAdd(rest);
   if (first === "query") return parseQuery(rest);
   if (first === "export") return parseExport(rest);
   return fail(DATA_USAGE);
@@ -71,6 +79,34 @@ function parseDescribe(args: readonly string[]): DataArgs {
     return fail("usage: golem data describe <source> [<table>] [--json]");
   }
   return { kind: "describe", source, table: table ?? null, json };
+}
+
+const PRIVACIES = ["open", "local", "schema"] as const;
+
+function parseAdd(args: readonly string[]): DataArgs {
+  const usage = "usage: golem data add <name> <location> [--privacy open|local|schema] [--password-stdin]";
+  const words: string[] = [];
+  let privacy: "open" | "local" | "schema" | null = null;
+  let passwordStdin = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const word = args[index] ?? "";
+    if (word === "--password-stdin") {
+      passwordStdin = true;
+    } else if (word === "--privacy") {
+      const value = args[index + 1];
+      index += 1;
+      const known = PRIVACIES.find((each) => each === value);
+      if (known === undefined) return fail(`--privacy is ${PRIVACIES.join(", ")}`);
+      privacy = known;
+    } else if (word.startsWith("-")) {
+      return fail(`unknown option ${word}\n${usage}`);
+    } else {
+      words.push(word);
+    }
+  }
+  const [name, location, ...extra] = words;
+  if (name === undefined || location === undefined || extra.length > 0) return fail(usage);
+  return { kind: "add", name, location, privacy, passwordStdin };
 }
 
 function parseNotes(args: readonly string[]): DataArgs {

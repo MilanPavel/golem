@@ -5,7 +5,9 @@
     "name": {
       "enum": [
         "excel",
-        "sqlite"
+        "sqlite",
+        "postgres",
+        "mysql"
       ],
       "title": "Name",
       "type": "string"
