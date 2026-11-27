@@ -105,7 +105,7 @@ test("parseRoute reads the page that makes a new workflow, and workflowNewPath r
   expect(parseRoute("/workflows/new")).toEqual({ name: "workflow-new" });
   expect(parseRoute(workflowNewPath())).toEqual({ name: "workflow-new" });
   // A workflow id is a path and a name, so `new` alone is never one; a path that ends in new is.
-  expect(parseRoute(workflowPath("/a/new.py::new"))).toEqual({ name: "workflow", id: "/a/new.py::new" });
+  expect(parseRoute(workflowPath("/a/new.py::new"))).toEqual({ name: "workflow", id: "/a/new.py::new", step: null });
 });
 
 test("runsPath filters the Runs page by a workflow", () => {
