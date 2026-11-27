@@ -32692,6 +32692,585 @@ public struct WorkflowCheckResultWorkflowModelInfo: Codable {
     }
 }
 
+/// ``workflow.create``. Write a new workflow file called ``name`` and load it.
+///
+/// ``name`` is what the person typed ("Weekly invoices"): the file and the function are its
+/// lower-case words joined with ``_``. ``folder`` is a trusted project (the file goes in its
+/// ``workflows`` folder); without it the file goes in the user's folder. ``code`` is the
+/// whole
+/// file, such as a proposal from ``workflow.draft``; without it the file is a two-step
+/// skeleton.
+/// Refused, with the reason, for a name that cannot be a file name, a name in use (the
+/// reason
+/// gives the path of the file and a free name), an untrusted folder and code the check
+/// refuses.
+// MARK: - WorkflowCreateParams
+public struct WorkflowCreateParams: Codable {
+    public let code: String?
+    public let folder: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case folder = "folder"
+        case name = "name"
+    }
+
+    public init(code: String?, folder: String?, name: String) {
+        self.code = code
+        self.folder = folder
+        self.name = name
+    }
+}
+
+/// The new workflow as the registry loaded it, its steps, the check's warnings and the hash
+/// of the file, so a later ``workflow.save`` can name it as its base.
+// MARK: - WorkflowCreateResult
+public struct WorkflowCreateResult: Codable {
+    public let code: String
+    public let codeHash: String
+    public let problems: [WorkflowCreateResultProblem]?
+    public let steps: [WorkflowCreateResultStep]?
+    public let workflow: WorkflowCreateResultWorkflow
+    public let workflowModel: WorkflowCreateResultWorkflowModelInfo?
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case codeHash = "code_hash"
+        case problems = "problems"
+        case steps = "steps"
+        case workflow = "workflow"
+        case workflowModel = "workflow_model"
+    }
+
+    public init(code: String, codeHash: String, problems: [WorkflowCreateResultProblem]?, steps: [WorkflowCreateResultStep]?, workflow: WorkflowCreateResultWorkflow, workflowModel: WorkflowCreateResultWorkflowModelInfo?) {
+        self.code = code
+        self.codeHash = codeHash
+        self.problems = problems
+        self.steps = steps
+        self.workflow = workflow
+        self.workflowModel = workflowModel
+    }
+}
+
+/// One finding of ``workflow.check``, with the line it is on and the outline step it belongs
+/// to (null for the header or the whole file). ``fix`` is a short replacement text or the
+/// name
+/// of an action.
+// MARK: - WorkflowCreateResultProblem
+public struct WorkflowCreateResultProblem: Codable {
+    public let fix: String?
+    public let line: Int
+    public let message: String
+    public let severity: Severity
+    public let stepID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case fix = "fix"
+        case line = "line"
+        case message = "message"
+        case severity = "severity"
+        case stepID = "step_id"
+    }
+
+    public init(fix: String?, line: Int, message: String, severity: Severity, stepID: String?) {
+        self.fix = fix
+        self.line = line
+        self.message = message
+        self.severity = severity
+        self.stepID = stepID
+    }
+}
+
+/// One step read from the source, without running it.
+///
+/// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+/// step's key and the group it belongs to, when the source says them. ``for_each`` and
+/// ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of
+/// the
+/// steps this one follows.
+// MARK: - WorkflowCreateResultStep
+public struct WorkflowCreateResultStep: Codable {
+    public let after: [String]?
+    public let agent: String?
+    public let args: [FluffyWorkflowStepArg]?
+    public let briefLine: Int?
+    public let budget: String?
+    public let budgetLine: Int?
+    public let condition: String?
+    public let does: String?
+    public let forEach: String?
+    public let gets: String?
+    public let group: String?
+    public let groupTitle: String?
+    public let id: String
+    public let item: String?
+    public let key: String?
+    public let kind: String
+    public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case agent = "agent"
+        case args = "args"
+        case briefLine = "brief_line"
+        case budget = "budget"
+        case budgetLine = "budget_line"
+        case condition = "condition"
+        case does = "does"
+        case forEach = "for_each"
+        case gets = "gets"
+        case group = "group"
+        case groupTitle = "group_title"
+        case id = "id"
+        case item = "item"
+        case key = "key"
+        case kind = "kind"
+        case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
+        case title = "title"
+    }
+
+    public init(after: [String]?, agent: String?, args: [FluffyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
+        self.after = after
+        self.agent = agent
+        self.args = args
+        self.briefLine = briefLine
+        self.budget = budget
+        self.budgetLine = budgetLine
+        self.condition = condition
+        self.does = does
+        self.forEach = forEach
+        self.gets = gets
+        self.group = group
+        self.groupTitle = groupTitle
+        self.id = id
+        self.item = item
+        self.key = key
+        self.kind = kind
+        self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
+        self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - FluffyWorkflowStepArg
+public struct FluffyWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
+    }
+}
+
+/// One workflow the daemon found (ADR-062).
+///
+/// ``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the
+/// project folder, null for the user's folder. ``error`` is the traceback tail of a
+/// ``broken``
+/// file. ``trigger`` is null for a workflow with none.
+// MARK: - WorkflowCreateResultWorkflow
+public struct WorkflowCreateResultWorkflow: Codable {
+    public let description: String?
+    public let error: String?
+    public let id: String
+    public let inputs: [PurpleWorkflowInputInfo]?
+    public let model: String?
+    public let name: String
+    public let path: String
+    public let project: String?
+    public let state: WorkflowState
+    public let title: String?
+    public let trigger: PurpleWorkflowTriggerInfo?
+
+    public enum CodingKeys: String, CodingKey {
+        case description = "description"
+        case error = "error"
+        case id = "id"
+        case inputs = "inputs"
+        case model = "model"
+        case name = "name"
+        case path = "path"
+        case project = "project"
+        case state = "state"
+        case title = "title"
+        case trigger = "trigger"
+    }
+
+    public init(description: String?, error: String?, id: String, inputs: [PurpleWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowState, title: String?, trigger: PurpleWorkflowTriggerInfo?) {
+        self.description = description
+        self.error = error
+        self.id = id
+        self.inputs = inputs
+        self.model = model
+        self.name = name
+        self.path = path
+        self.project = project
+        self.state = state
+        self.title = title
+        self.trigger = trigger
+    }
+}
+
+/// One declared input: its name, its type name and the default as written, if any.
+// MARK: - PurpleWorkflowInputInfo
+public struct PurpleWorkflowInputInfo: Codable {
+    public let workflowInputInfoDefault: String?
+    public let name: String
+    public let type: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case workflowInputInfoDefault = "default"
+        case name = "name"
+        case type = "type"
+    }
+
+    public init(workflowInputInfoDefault: String?, name: String, type: String?) {
+        self.workflowInputInfoDefault = workflowInputInfoDefault
+        self.name = name
+        self.type = type
+    }
+}
+
+public enum WorkflowState: String, Codable {
+    case broken = "broken"
+    case ok = "ok"
+    case untrusted = "untrusted"
+}
+
+/// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
+// MARK: - PurpleWorkflowTriggerInfo
+public struct PurpleWorkflowTriggerInfo: Codable {
+    public let expr: String?
+    public let kind: WorkflowTriggerInfoKind
+    public let path: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case expr = "expr"
+        case kind = "kind"
+        case path = "path"
+    }
+
+    public init(expr: String?, kind: WorkflowTriggerInfoKind, path: String?) {
+        self.expr = expr
+        self.kind = kind
+        self.path = path
+    }
+}
+
+public enum WorkflowTriggerInfoKind: String, Codable {
+    case manual = "manual"
+    case onFile = "on_file"
+    case schedule = "schedule"
+}
+
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowCreateResultWorkflowModelInfo
+public struct WorkflowCreateResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
+    }
+}
+
+/// ``workflow.draft``. Ask golem to write a new workflow from a few sentences, before any
+/// file exists. ``name`` is the typed name (as in ``workflow.create``), ``folder`` the
+/// project it
+/// would be saved in (it decides the agents and the local-only rule), and ``model`` the
+/// model
+/// the person picked: it writes the file and is the workflow's ``model=``. Without a model
+/// golem's default model writes it and the file names none. Nothing is written.
+// MARK: - WorkflowDraftParams
+public struct WorkflowDraftParams: Codable {
+    public let ask: String
+    public let folder: String?
+    public let model: String?
+    public let name: String
+
+    public enum CodingKeys: String, CodingKey {
+        case ask = "ask"
+        case folder = "folder"
+        case model = "model"
+        case name = "name"
+    }
+
+    public init(ask: String, folder: String?, model: String?, name: String) {
+        self.ask = ask
+        self.folder = folder
+        self.model = model
+        self.name = name
+    }
+}
+
+/// The proposed file, a note on what its steps do, its outline steps, the problems the check
+/// found and the model that wrote it. Nothing is saved.
+// MARK: - WorkflowDraftResult
+public struct WorkflowDraftResult: Codable {
+    public let code: String
+    public let model: String
+    public let note: String
+    public let problems: [WorkflowDraftResultProblem]?
+    public let steps: [WorkflowDraftResultStep]?
+    public let workflowModel: WorkflowDraftResultWorkflowModelInfo?
+
+    public enum CodingKeys: String, CodingKey {
+        case code = "code"
+        case model = "model"
+        case note = "note"
+        case problems = "problems"
+        case steps = "steps"
+        case workflowModel = "workflow_model"
+    }
+
+    public init(code: String, model: String, note: String, problems: [WorkflowDraftResultProblem]?, steps: [WorkflowDraftResultStep]?, workflowModel: WorkflowDraftResultWorkflowModelInfo?) {
+        self.code = code
+        self.model = model
+        self.note = note
+        self.problems = problems
+        self.steps = steps
+        self.workflowModel = workflowModel
+    }
+}
+
+/// One finding of ``workflow.check``, with the line it is on and the outline step it belongs
+/// to (null for the header or the whole file). ``fix`` is a short replacement text or the
+/// name
+/// of an action.
+// MARK: - WorkflowDraftResultProblem
+public struct WorkflowDraftResultProblem: Codable {
+    public let fix: String?
+    public let line: Int
+    public let message: String
+    public let severity: Severity
+    public let stepID: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case fix = "fix"
+        case line = "line"
+        case message = "message"
+        case severity = "severity"
+        case stepID = "step_id"
+    }
+
+    public init(fix: String?, line: Int, message: String, severity: Severity, stepID: String?) {
+        self.fix = fix
+        self.line = line
+        self.message = message
+        self.severity = severity
+        self.stepID = stepID
+    }
+}
+
+/// One step read from the source, without running it.
+///
+/// ``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the
+/// step's key and the group it belongs to, when the source says them. ``for_each`` and
+/// ``condition`` are the source text of the loop and the guard. ``after`` lists the ids of
+/// the
+/// steps this one follows.
+// MARK: - WorkflowDraftResultStep
+public struct WorkflowDraftResultStep: Codable {
+    public let after: [String]?
+    public let agent: String?
+    public let args: [TentacledWorkflowStepArg]?
+    public let briefLine: Int?
+    public let budget: String?
+    public let budgetLine: Int?
+    public let condition: String?
+    public let does: String?
+    public let forEach: String?
+    public let gets: String?
+    public let group: String?
+    public let groupTitle: String?
+    public let id: String
+    public let item: String?
+    public let key: String?
+    public let kind: String
+    public let lines: [Int]
+    public let model: String?
+    public let modelNow: String?
+    public let modelReady: Bool?
+    public let title: String
+
+    public enum CodingKeys: String, CodingKey {
+        case after = "after"
+        case agent = "agent"
+        case args = "args"
+        case briefLine = "brief_line"
+        case budget = "budget"
+        case budgetLine = "budget_line"
+        case condition = "condition"
+        case does = "does"
+        case forEach = "for_each"
+        case gets = "gets"
+        case group = "group"
+        case groupTitle = "group_title"
+        case id = "id"
+        case item = "item"
+        case key = "key"
+        case kind = "kind"
+        case lines = "lines"
+        case model = "model"
+        case modelNow = "model_now"
+        case modelReady = "model_ready"
+        case title = "title"
+    }
+
+    public init(after: [String]?, agent: String?, args: [TentacledWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
+        self.after = after
+        self.agent = agent
+        self.args = args
+        self.briefLine = briefLine
+        self.budget = budget
+        self.budgetLine = budgetLine
+        self.condition = condition
+        self.does = does
+        self.forEach = forEach
+        self.gets = gets
+        self.group = group
+        self.groupTitle = groupTitle
+        self.id = id
+        self.item = item
+        self.key = key
+        self.kind = kind
+        self.lines = lines
+        self.model = model
+        self.modelNow = modelNow
+        self.modelReady = modelReady
+        self.title = title
+    }
+}
+
+/// One argument of a ``run.*`` call, with its exact place in the source.
+///
+/// ``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets
+/// from 0,
+/// ``end_col`` just after the last character. ``literal`` is true for a plain string, number
+/// or
+/// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
+/// computes has ``literal`` false: it is shown, and set in the code.
+// MARK: - TentacledWorkflowStepArg
+public struct TentacledWorkflowStepArg: Codable {
+    public let col: Int
+    public let endCol: Int
+    public let endLine: Int
+    public let line: Int
+    public let literal: Bool
+    public let name: String
+    public let source: String
+    public let value: String?
+
+    public enum CodingKeys: String, CodingKey {
+        case col = "col"
+        case endCol = "end_col"
+        case endLine = "end_line"
+        case line = "line"
+        case literal = "literal"
+        case name = "name"
+        case source = "source"
+        case value = "value"
+    }
+
+    public init(col: Int, endCol: Int, endLine: Int, line: Int, literal: Bool, name: String, source: String, value: String?) {
+        self.col = col
+        self.endCol = endCol
+        self.endLine = endLine
+        self.line = line
+        self.literal = literal
+        self.name = name
+        self.source = source
+        self.value = value
+    }
+}
+
+/// The workflow's own model (``@workflow(model=)``), for the header of the editor.
+///
+/// ``model`` is as written (null: the file names none). ``now`` is what a model step with no
+/// ``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is
+/// false when
+/// ``now`` is not set up on this machine; ``note`` then says so, in words.
+// MARK: - WorkflowDraftResultWorkflowModelInfo
+public struct WorkflowDraftResultWorkflowModelInfo: Codable {
+    public let model: String?
+    public let note: String?
+    public let now: String?
+    public let ready: Bool?
+
+    public enum CodingKeys: String, CodingKey {
+        case model = "model"
+        case note = "note"
+        case now = "now"
+        case ready = "ready"
+    }
+
+    public init(model: String?, note: String?, now: String?, ready: Bool?) {
+        self.model = model
+        self.note = note
+        self.now = now
+        self.ready = ready
+    }
+}
+
 /// ``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor
 /// holds).
 ///
@@ -32833,7 +33412,7 @@ public struct WorkflowEditStepResultProblem: Codable {
 public struct WorkflowEditStepResultStep: Codable {
     public let after: [String]?
     public let agent: String?
-    public let args: [FluffyWorkflowStepArg]?
+    public let args: [StickyWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -32877,7 +33456,7 @@ public struct WorkflowEditStepResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [FluffyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
+    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -32910,8 +33489,8 @@ public struct WorkflowEditStepResultStep: Codable {
 /// or
 /// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
 /// computes has ``literal`` false: it is shown, and set in the code.
-// MARK: - FluffyWorkflowStepArg
-public struct FluffyWorkflowStepArg: Codable {
+// MARK: - StickyWorkflowStepArg
+public struct StickyWorkflowStepArg: Codable {
     public let col: Int
     public let endCol: Int
     public let endLine: Int
@@ -32988,7 +33567,7 @@ public struct WorkflowEntryInfo: Codable {
     public let name: String
     public let path: String
     public let project: String?
-    public let state: WorkflowEntryInfoState
+    public let state: WorkflowState
     public let title: String?
     public let trigger: WorkflowEntryInfoWorkflowTriggerInfo?
 
@@ -33006,7 +33585,7 @@ public struct WorkflowEntryInfo: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [WorkflowEntryInfoInput]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: WorkflowEntryInfoWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [WorkflowEntryInfoInput]?, model: String?, name: String, path: String, project: String?, state: WorkflowState, title: String?, trigger: WorkflowEntryInfoWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
@@ -33041,12 +33620,6 @@ public struct WorkflowEntryInfoInput: Codable {
     }
 }
 
-public enum WorkflowEntryInfoState: String, Codable {
-    case broken = "broken"
-    case ok = "ok"
-    case untrusted = "untrusted"
-}
-
 /// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
 // MARK: - WorkflowEntryInfoWorkflowTriggerInfo
 public struct WorkflowEntryInfoWorkflowTriggerInfo: Codable {
@@ -33065,12 +33638,6 @@ public struct WorkflowEntryInfoWorkflowTriggerInfo: Codable {
         self.kind = kind
         self.path = path
     }
-}
-
-public enum WorkflowTriggerInfoKind: String, Codable {
-    case manual = "manual"
-    case onFile = "on_file"
-    case schedule = "schedule"
 }
 
 /// ``workflow.get``. One workflow by its ``id``.
@@ -33128,7 +33695,7 @@ public struct WorkflowGetResult: Codable {
 public struct WorkflowGetResultStep: Codable {
     public let after: [String]?
     public let agent: String?
-    public let args: [TentacledWorkflowStepArg]?
+    public let args: [IndigoWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -33172,7 +33739,7 @@ public struct WorkflowGetResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [TentacledWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
+    public init(after: [String]?, agent: String?, args: [IndigoWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -33205,8 +33772,8 @@ public struct WorkflowGetResultStep: Codable {
 /// or
 /// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
 /// computes has ``literal`` false: it is shown, and set in the code.
-// MARK: - TentacledWorkflowStepArg
-public struct TentacledWorkflowStepArg: Codable {
+// MARK: - IndigoWorkflowStepArg
+public struct IndigoWorkflowStepArg: Codable {
     public let col: Int
     public let endCol: Int
     public let endLine: Int
@@ -33250,14 +33817,14 @@ public struct WorkflowGetResultWorkflow: Codable {
     public let description: String?
     public let error: String?
     public let id: String
-    public let inputs: [PurpleWorkflowInputInfo]?
+    public let inputs: [FluffyWorkflowInputInfo]?
     public let model: String?
     public let name: String
     public let path: String
     public let project: String?
-    public let state: WorkflowEntryInfoState
+    public let state: WorkflowState
     public let title: String?
-    public let trigger: PurpleWorkflowTriggerInfo?
+    public let trigger: FluffyWorkflowTriggerInfo?
 
     public enum CodingKeys: String, CodingKey {
         case description = "description"
@@ -33273,7 +33840,7 @@ public struct WorkflowGetResultWorkflow: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [PurpleWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: PurpleWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [FluffyWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowState, title: String?, trigger: FluffyWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
@@ -33289,8 +33856,8 @@ public struct WorkflowGetResultWorkflow: Codable {
 }
 
 /// One declared input: its name, its type name and the default as written, if any.
-// MARK: - PurpleWorkflowInputInfo
-public struct PurpleWorkflowInputInfo: Codable {
+// MARK: - FluffyWorkflowInputInfo
+public struct FluffyWorkflowInputInfo: Codable {
     public let workflowInputInfoDefault: String?
     public let name: String
     public let type: String?
@@ -33309,8 +33876,8 @@ public struct PurpleWorkflowInputInfo: Codable {
 }
 
 /// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
-// MARK: - PurpleWorkflowTriggerInfo
-public struct PurpleWorkflowTriggerInfo: Codable {
+// MARK: - FluffyWorkflowTriggerInfo
+public struct FluffyWorkflowTriggerInfo: Codable {
     public let expr: String?
     public let kind: WorkflowTriggerInfoKind
     public let path: String?
@@ -33418,14 +33985,14 @@ public struct WorkflowElement: Codable {
     public let description: String?
     public let error: String?
     public let id: String
-    public let inputs: [FluffyWorkflowInputInfo]?
+    public let inputs: [TentacledWorkflowInputInfo]?
     public let model: String?
     public let name: String
     public let path: String
     public let project: String?
-    public let state: WorkflowEntryInfoState
+    public let state: WorkflowState
     public let title: String?
-    public let trigger: FluffyWorkflowTriggerInfo?
+    public let trigger: TentacledWorkflowTriggerInfo?
 
     public enum CodingKeys: String, CodingKey {
         case description = "description"
@@ -33441,7 +34008,7 @@ public struct WorkflowElement: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [FluffyWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: FluffyWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [TentacledWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowState, title: String?, trigger: TentacledWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
@@ -33457,8 +34024,8 @@ public struct WorkflowElement: Codable {
 }
 
 /// One declared input: its name, its type name and the default as written, if any.
-// MARK: - FluffyWorkflowInputInfo
-public struct FluffyWorkflowInputInfo: Codable {
+// MARK: - TentacledWorkflowInputInfo
+public struct TentacledWorkflowInputInfo: Codable {
     public let workflowInputInfoDefault: String?
     public let name: String
     public let type: String?
@@ -33477,8 +34044,8 @@ public struct FluffyWorkflowInputInfo: Codable {
 }
 
 /// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
-// MARK: - FluffyWorkflowTriggerInfo
-public struct FluffyWorkflowTriggerInfo: Codable {
+// MARK: - TentacledWorkflowTriggerInfo
+public struct TentacledWorkflowTriggerInfo: Codable {
     public let expr: String?
     public let kind: WorkflowTriggerInfoKind
     public let path: String?
@@ -33903,7 +34470,7 @@ public struct WorkflowProposeResultProblem: Codable {
 public struct WorkflowProposeResultStep: Codable {
     public let after: [String]?
     public let agent: String?
-    public let args: [StickyWorkflowStepArg]?
+    public let args: [IndecentWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -33947,7 +34514,7 @@ public struct WorkflowProposeResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [StickyWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
+    public init(after: [String]?, agent: String?, args: [IndecentWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -33980,8 +34547,8 @@ public struct WorkflowProposeResultStep: Codable {
 /// or
 /// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
 /// computes has ``literal`` false: it is shown, and set in the code.
-// MARK: - StickyWorkflowStepArg
-public struct StickyWorkflowStepArg: Codable {
+// MARK: - IndecentWorkflowStepArg
+public struct IndecentWorkflowStepArg: Codable {
     public let col: Int
     public let endCol: Int
     public let endLine: Int
@@ -35150,7 +35717,7 @@ public struct WorkflowSaveResultProblem: Codable {
 public struct WorkflowSaveResultStep: Codable {
     public let after: [String]?
     public let agent: String?
-    public let args: [IndigoWorkflowStepArg]?
+    public let args: [HilariousWorkflowStepArg]?
     public let briefLine: Int?
     public let budget: String?
     public let budgetLine: Int?
@@ -35194,7 +35761,7 @@ public struct WorkflowSaveResultStep: Codable {
         case title = "title"
     }
 
-    public init(after: [String]?, agent: String?, args: [IndigoWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
+    public init(after: [String]?, agent: String?, args: [HilariousWorkflowStepArg]?, briefLine: Int?, budget: String?, budgetLine: Int?, condition: String?, does: String?, forEach: String?, gets: String?, group: String?, groupTitle: String?, id: String, item: String?, key: String?, kind: String, lines: [Int], model: String?, modelNow: String?, modelReady: Bool?, title: String) {
         self.after = after
         self.agent = agent
         self.args = args
@@ -35227,8 +35794,8 @@ public struct WorkflowSaveResultStep: Codable {
 /// or
 /// bool, or an f-string with no expressions; ``value`` is then its text. A value the code
 /// computes has ``literal`` false: it is shown, and set in the code.
-// MARK: - IndigoWorkflowStepArg
-public struct IndigoWorkflowStepArg: Codable {
+// MARK: - HilariousWorkflowStepArg
+public struct HilariousWorkflowStepArg: Codable {
     public let col: Int
     public let endCol: Int
     public let endLine: Int
@@ -35272,14 +35839,14 @@ public struct WorkflowSaveResultWorkflow: Codable {
     public let description: String?
     public let error: String?
     public let id: String
-    public let inputs: [TentacledWorkflowInputInfo]?
+    public let inputs: [StickyWorkflowInputInfo]?
     public let model: String?
     public let name: String
     public let path: String
     public let project: String?
-    public let state: WorkflowEntryInfoState
+    public let state: WorkflowState
     public let title: String?
-    public let trigger: TentacledWorkflowTriggerInfo?
+    public let trigger: StickyWorkflowTriggerInfo?
 
     public enum CodingKeys: String, CodingKey {
         case description = "description"
@@ -35295,7 +35862,7 @@ public struct WorkflowSaveResultWorkflow: Codable {
         case trigger = "trigger"
     }
 
-    public init(description: String?, error: String?, id: String, inputs: [TentacledWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowEntryInfoState, title: String?, trigger: TentacledWorkflowTriggerInfo?) {
+    public init(description: String?, error: String?, id: String, inputs: [StickyWorkflowInputInfo]?, model: String?, name: String, path: String, project: String?, state: WorkflowState, title: String?, trigger: StickyWorkflowTriggerInfo?) {
         self.description = description
         self.error = error
         self.id = id
@@ -35311,8 +35878,8 @@ public struct WorkflowSaveResultWorkflow: Codable {
 }
 
 /// One declared input: its name, its type name and the default as written, if any.
-// MARK: - TentacledWorkflowInputInfo
-public struct TentacledWorkflowInputInfo: Codable {
+// MARK: - StickyWorkflowInputInfo
+public struct StickyWorkflowInputInfo: Codable {
     public let workflowInputInfoDefault: String?
     public let name: String
     public let type: String?
@@ -35331,8 +35898,8 @@ public struct TentacledWorkflowInputInfo: Codable {
 }
 
 /// What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.
-// MARK: - TentacledWorkflowTriggerInfo
-public struct TentacledWorkflowTriggerInfo: Codable {
+// MARK: - StickyWorkflowTriggerInfo
+public struct StickyWorkflowTriggerInfo: Codable {
     public let expr: String?
     public let kind: WorkflowTriggerInfoKind
     public let path: String?

@@ -6380,6 +6380,70 @@ class WorkflowSaveResult(BaseModel):
     code_hash: str = Field(min_length=1)
 
 
+class WorkflowCreateParams(BaseModel):
+    """``workflow.create``. Write a new workflow file called ``name`` and load it.
+
+    ``name`` is what the person typed ("Weekly invoices"): the file and the function are its
+    lower-case words joined with ``_``. ``folder`` is a trusted project (the file goes in its
+    ``workflows`` folder); without it the file goes in the user's folder. ``code`` is the whole
+    file, such as a proposal from ``workflow.draft``; without it the file is a two-step skeleton.
+    Refused, with the reason, for a name that cannot be a file name, a name in use (the reason
+    gives the path of the file and a free name), an untrusted folder and code the check refuses.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    folder: str | None = None
+    code: str | None = None
+
+
+class WorkflowCreateResult(BaseModel):
+    """The new workflow as the registry loaded it, its steps, the check's warnings and the hash
+    of the file, so a later ``workflow.save`` can name it as its base."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    workflow: WorkflowEntryInfo
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
+    problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
+    code_hash: str = Field(min_length=1)
+    code: str
+    """The text that was written."""
+
+
+class WorkflowDraftParams(BaseModel):
+    """``workflow.draft``. Ask golem to write a new workflow from a few sentences, before any
+    file exists. ``name`` is the typed name (as in ``workflow.create``), ``folder`` the project it
+    would be saved in (it decides the agents and the local-only rule), and ``model`` the model
+    the person picked: it writes the file and is the workflow's ``model=``. Without a model
+    golem's default model writes it and the file names none. Nothing is written."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1)
+    ask: str = Field(min_length=1)
+    folder: str | None = None
+    model: str | None = None
+
+
+class WorkflowDraftResult(BaseModel):
+    """The proposed file, a note on what its steps do, its outline steps, the problems the check
+    found and the model that wrote it. Nothing is saved."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str
+    note: str
+    steps: list[WorkflowOutlineStep] = Field(default_factory=list[WorkflowOutlineStep])
+    workflow_model: WorkflowModelInfo | None = None
+    """The workflow's own model, for the header of the editor."""
+    problems: list[WorkflowProblem] = Field(default_factory=list[WorkflowProblem])
+    model: str
+
+
 class WorkflowStarterRoutine(BaseModel):
     """The routine that comes with a starter: ``name`` and ``schedule`` as ``routine.update``
     takes them, and ``words`` as a short phrase for the card ("every weekday at 07:30")."""

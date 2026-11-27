@@ -1,0 +1,648 @@
+{
+  "$defs": {
+    "WorkflowEntryInfo": {
+      "additionalProperties": false,
+      "description": "One workflow the daemon found (ADR-062).\n\n``id`` is ``<path>::<name>``, or the path for a file with no workflow. ``project`` is the\nproject folder, null for the user's folder. ``error`` is the traceback tail of a ``broken``\nfile. ``trigger`` is null for a workflow with none.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/WorkflowInputInfo"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project"
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "broken",
+            "untrusted"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "trigger": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkflowTriggerInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "path",
+        "state"
+      ],
+      "title": "WorkflowEntryInfo",
+      "type": "object"
+    },
+    "WorkflowInputInfo": {
+      "additionalProperties": false,
+      "description": "One declared input: its name, its type name and the default as written, if any.",
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "WorkflowInputInfo",
+      "type": "object"
+    },
+    "WorkflowModelInfo": {
+      "additionalProperties": false,
+      "description": "The workflow's own model (``@workflow(model=)``), for the header of the editor.\n\n``model`` is as written (null: the file names none). ``now`` is what a model step with no\n``model=`` of its own would use: ``model``, else golem's default model. ``ready`` is false when\n``now`` is not set up on this machine; ``note`` then says so, in words.",
+      "properties": {
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "now": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Now"
+        },
+        "ready": {
+          "default": true,
+          "title": "Ready",
+          "type": "boolean"
+        }
+      },
+      "title": "WorkflowModelInfo",
+      "type": "object"
+    },
+    "WorkflowOutlineStep": {
+      "additionalProperties": false,
+      "description": "One step read from the source, without running it.\n\n``lines`` is the first and last line in the file (from 1). ``key`` and ``group`` are the\nstep's key and the group it belongs to, when the source says them. ``for_each`` and\n``condition`` are the source text of the loop and the guard. ``after`` lists the ids of the\nsteps this one follows.",
+      "properties": {
+        "after": {
+          "items": {
+            "type": "string"
+          },
+          "title": "After",
+          "type": "array"
+        },
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
+        },
+        "args": {
+          "items": {
+            "$ref": "#/$defs/WorkflowStepArg"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "brief_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Brief Line"
+        },
+        "budget": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget"
+        },
+        "budget_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget Line"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "does": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Does"
+        },
+        "for_each": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "For Each"
+        },
+        "gets": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gets"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "group_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Title"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "item": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "lines": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Lines",
+          "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_now": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Now"
+        },
+        "model_ready": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Ready"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "lines"
+      ],
+      "title": "WorkflowOutlineStep",
+      "type": "object"
+    },
+    "WorkflowProblem": {
+      "additionalProperties": false,
+      "description": "One finding of ``workflow.check``, with the line it is on and the outline step it belongs\nto (null for the header or the whole file). ``fix`` is a short replacement text or the name\nof an action.",
+      "properties": {
+        "fix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fix"
+        },
+        "line": {
+          "minimum": 1,
+          "title": "Line",
+          "type": "integer"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "step_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Id"
+        }
+      },
+      "required": [
+        "severity",
+        "line",
+        "message"
+      ],
+      "title": "WorkflowProblem",
+      "type": "object"
+    },
+    "WorkflowStepArg": {
+      "additionalProperties": false,
+      "description": "One argument of a ``run.*`` call, with its exact place in the source.\n\n``line`` and ``end_line`` count from 1; ``col`` and ``end_col`` are character offsets from 0,\n``end_col`` just after the last character. ``literal`` is true for a plain string, number or\nbool, or an f-string with no expressions; ``value`` is then its text. A value the code\ncomputes has ``literal`` false: it is shown, and set in the code.",
+      "properties": {
+        "col": {
+          "minimum": 0,
+          "title": "Col",
+          "type": "integer"
+        },
+        "end_col": {
+          "minimum": 0,
+          "title": "End Col",
+          "type": "integer"
+        },
+        "end_line": {
+          "minimum": 1,
+          "title": "End Line",
+          "type": "integer"
+        },
+        "line": {
+          "minimum": 1,
+          "title": "Line",
+          "type": "integer"
+        },
+        "literal": {
+          "title": "Literal",
+          "type": "boolean"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "literal",
+        "line",
+        "col",
+        "end_line",
+        "end_col"
+      ],
+      "title": "WorkflowStepArg",
+      "type": "object"
+    },
+    "WorkflowTriggerInfo": {
+      "additionalProperties": false,
+      "description": "What starts a workflow. ``expr`` is for ``schedule``, ``path`` for ``on_file``.",
+      "properties": {
+        "expr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expr"
+        },
+        "kind": {
+          "enum": [
+            "manual",
+            "schedule",
+            "on_file"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WorkflowTriggerInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The new workflow as the registry loaded it, its steps, the check's warnings and the hash\nof the file, so a later ``workflow.save`` can name it as its base.",
+  "properties": {
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "code_hash": {
+      "minLength": 1,
+      "title": "Code Hash",
+      "type": "string"
+    },
+    "problems": {
+      "items": {
+        "$ref": "#/$defs/WorkflowProblem"
+      },
+      "title": "Problems",
+      "type": "array"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/WorkflowOutlineStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "workflow": {
+      "$ref": "#/$defs/WorkflowEntryInfo"
+    },
+    "workflow_model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkflowModelInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "workflow",
+    "code_hash",
+    "code"
+  ],
+  "title": "WorkflowCreateResult",
+  "type": "object"
+}

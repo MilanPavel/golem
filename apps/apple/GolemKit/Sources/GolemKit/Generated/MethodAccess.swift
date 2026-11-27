@@ -192,6 +192,8 @@ public enum MethodAccess {
         "workflow.add_starter",
         "workflow.cancel",
         "workflow.check",
+        "workflow.create",
+        "workflow.draft",
         "workflow.edit_step",
         "workflow.get",
         "workflow.list",
