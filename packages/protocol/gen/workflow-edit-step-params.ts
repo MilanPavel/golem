@@ -4,7 +4,7 @@ export type Code = string;
 export type Id = string;
 export type Name = string;
 export type StepId = string;
-export type Value = string | number | boolean;
+export type Value = string | number | boolean | null;
 
 /**
  * ``workflow.edit_step``. Set one argument of one step in ``code`` (the text the editor holds).
@@ -20,5 +20,5 @@ export interface WorkflowEditStepParams {
   id: Id;
   name: Name;
   step_id: StepId;
-  value: Value;
+  value?: Value;
 }

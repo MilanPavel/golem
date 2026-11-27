@@ -32604,7 +32604,7 @@ public struct WorkflowEditStepParams: Codable {
     public let id: String
     public let name: String
     public let stepID: String
-    public let value: Value
+    public let value: Value?
 
     public enum CodingKeys: String, CodingKey {
         case code = "code"
@@ -32614,7 +32614,7 @@ public struct WorkflowEditStepParams: Codable {
         case value = "value"
     }
 
-    public init(code: String, id: String, name: String, stepID: String, value: Value) {
+    public init(code: String, id: String, name: String, stepID: String, value: Value?) {
         self.code = code
         self.id = id
         self.name = name
@@ -32627,6 +32627,7 @@ public enum Value: Codable {
     case bool(Bool)
     case double(Double)
     case string(String)
+    case null
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -32642,6 +32643,10 @@ public enum Value: Codable {
             self = .string(x)
             return
         }
+        if container.decodeNil() {
+            self = .null
+            return
+        }
         throw DecodingError.typeMismatch(Value.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Wrong type for Value"))
     }
 
@@ -32654,6 +32659,8 @@ public enum Value: Codable {
             try container.encode(x)
         case .string(let x):
             try container.encode(x)
+        case .null:
+            try container.encodeNil()
         }
     }
 }

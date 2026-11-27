@@ -18,7 +18,7 @@ from golem.server.dispatcher import INTERNAL_ERROR, INVALID_PARAMS, RequestConte
 from golem.server.routines import routine_update
 from golem.store.workflow_runs import WorkflowRunRecord, WorkflowStepRecord
 from golem.workflows.check import CheckEnv, Problem
-from golem.workflows.edit import EditError, set_argument
+from golem.workflows.edit import EditError, remove_argument, set_argument
 from golem.workflows.model_view import step_model, workflow_model
 from golem.workflows.outline import OutlineError, WorkflowOutline, outline
 from golem.workflows.outputs import OutputError, read_marked_file
@@ -237,9 +237,14 @@ async def workflow_edit_step(
     service = _service(ctx)
     entry = _find(await service.refresh([]), params.id)
     try:
-        code = await asyncio.to_thread(
-            set_argument, params.code, params.step_id, params.name, params.value, entry.name
-        )
+        if params.value is None:
+            code = await asyncio.to_thread(
+                remove_argument, params.code, params.step_id, params.name, entry.name
+            )
+        else:
+            code = await asyncio.to_thread(
+                set_argument, params.code, params.step_id, params.name, params.value, entry.name
+            )
     except EditError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     problems, steps, mine = await asyncio.to_thread(_checked, service, entry, code)

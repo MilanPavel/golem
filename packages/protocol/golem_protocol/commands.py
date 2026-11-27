@@ -6327,7 +6327,9 @@ class WorkflowEditStepParams(BaseModel):
     code: str
     step_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    value: str | float | bool
+    value: str | float | bool | None = None
+    """The new literal. Null (or left out) takes the argument out of the call: its ``name=`` goes,
+    and so does a line that held only it. An argument the call lacks leaves the text as it is."""
 
 
 class WorkflowEditStepResult(BaseModel):

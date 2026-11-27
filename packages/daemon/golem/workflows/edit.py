@@ -159,6 +159,76 @@ def set_argument(
     return _splice(lines, at, at, f" {name}={text}," if trailing else f", {name}={text}")
 
 
+def remove_argument(code: str, step_id: str, name: str, workflow: str | None = None) -> str:
+    """``code`` with argument ``name`` of step ``step_id`` taken out of the call.
+
+    ``step_id`` ``@workflow`` is the decorator, whose ``model=`` can be removed. An argument the
+    call does not have leaves the text as it is. The comma goes with it, and a line that held only
+    that argument goes too; comments and formatting elsewhere stay. Raises :class:`EditError` for
+    an unknown step, a code step, an argument the code computes, and one written by position."""
+    if step_id == DECORATOR:
+        if name != "model":
+            raise EditError("only the model can be removed from the workflow")
+        try:
+            found = builders(code)
+        except OutlineError as exc:
+            raise EditError(f"the code cannot be read: {exc}") from exc
+        builder = next((b for b in found if workflow is None or b.fn.name == workflow), None)
+        deco = (
+            None
+            if builder is None
+            else next((d for d in builder.fn.decorator_list if _is_workflow(d)), None)
+        )
+        if builder is None or deco is None:
+            raise EditError("there is no @workflow function")
+        if not isinstance(deco, ast.Call):
+            return code
+        return _drop(code, builder, deco, name, computed_ok=False)
+    builder, step, call = _find(code, step_id, workflow)
+    if call is None or step.kind == "code":
+        raise EditError("a code step has no fields; its function opens in the code pane")
+    present = {a.name: a for a in step.args}
+    if name not in (*PARAMS.get(step.kind, ()), *KEYWORD_ONLY.get(step.kind, ())) and (
+        name not in present
+    ):
+        raise EditError(f"a {step.kind} step has no argument {name}")
+    arg = present.get(name)
+    if arg is not None and not arg.literal:
+        raise EditError(f"{name} is computed ({arg.source}); set in code")
+    if arg is not None and not any(k.arg == name for k in call.keywords):
+        raise EditError(f"{name} is written by position; remove it in the code")
+    return _drop(code, builder, call, name, computed_ok=False)
+
+
+def _offset(builder: Builder, line: int, col: int) -> int:
+    return sum(len(text) for text in builder.raw[: line - 1]) + builder.char_col(line, col)
+
+
+def _drop(code: str, builder: Builder, call: ast.Call, name: str, *, computed_ok: bool) -> str:
+    kw = next((k for k in call.keywords if k.arg == name), None)
+    if kw is None:
+        return code
+    if not computed_ok and not isinstance(kw.value, ast.Constant | ast.JoinedStr):
+        raise EditError(f"{name} is computed ({ast.unparse(kw.value)}); set in code")
+    start = _offset(builder, kw.lineno, kw.col_offset)
+    stop = _offset(builder, kw.end_lineno or kw.lineno, kw.end_col_offset or 0)
+    comma = re.match(r"[ \t]*,", code[stop:])
+    if comma is not None:
+        end = stop + comma.end()
+        line_start = code.rfind("\n", 0, start) + 1
+        line_end = code.find("\n", end)
+        line_end = len(code) if line_end < 0 else line_end + 1
+        rest = code[end:line_end].strip()
+        if code[line_start:start].strip() == "" and (rest == "" or rest.startswith("#")):
+            return code[:line_start] + code[line_end:]
+        end += len(code[end:]) - len(code[end:].lstrip(" \t"))
+        return code[:start] + code[end:]
+    head = code[:start].rstrip()
+    if head.endswith(","):
+        return code[: len(head) - 1] + code[stop:]
+    return code[:start] + code[stop:]
+
+
 def _splice(lines: list[str], start: Pos, end: Pos, text: str) -> str:
     head = "".join(lines[: start[0] - 1]) + lines[start[0] - 1][: start[1]]
     tail = lines[end[0] - 1][end[1] :] + "".join(lines[end[0] :])

@@ -31,8 +31,12 @@
         },
         {
           "type": "boolean"
+        },
+        {
+          "type": "null"
         }
       ],
+      "default": null,
       "title": "Value"
     }
   },
@@ -40,8 +44,7 @@
     "id",
     "code",
     "step_id",
-    "name",
-    "value"
+    "name"
   ],
   "title": "WorkflowEditStepParams",
   "type": "object"
