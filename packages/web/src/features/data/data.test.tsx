@@ -200,6 +200,7 @@ function form(over: Partial<AddDialogProps> = {}) {
     open: true,
     folder: SAMPLE_FOLDER,
     onInspect: vi.fn().mockResolvedValue(SAMPLE_INSPECT_FILES),
+    onInspectDatabase: vi.fn().mockResolvedValue(SAMPLE_INSPECT_PG),
     onAdd: vi.fn().mockResolvedValue(SAMPLE_BANK),
     onAdded: vi.fn(),
     onCancel: vi.fn(),
@@ -231,16 +232,23 @@ test("the dialog walks kind, where and privacy, and adds the files with the sugg
 
 test("a database goes with its scope and password, and the password is gone from the form after Add", async () => {
   const user = userEvent.setup();
-  const props = form({ onInspect: vi.fn().mockResolvedValue(SAMPLE_INSPECT_PG), onAdd: vi.fn().mockResolvedValue({ ...SAMPLE_BANK, name: "shop_dev", kind: "postgres" }) });
+  const props = form({
+    onInspectDatabase: vi.fn().mockResolvedValue(SAMPLE_INSPECT_PG),
+    onAdd: vi.fn().mockResolvedValue({ ...SAMPLE_BANK, name: "shop_dev", kind: "postgres" }),
+  });
   await user.click(screen.getByRole("radio", { name: /Database/ }));
   await user.click(screen.getByRole("button", { name: "Next" }));
-  await user.type(screen.getByRole("textbox", { name: "Address" }), "postgres://golem_ro@localhost:5432/shop_dev");
+  await user.type(screen.getByRole("textbox", { name: "Host" }), "localhost");
+  await user.type(screen.getByRole("textbox", { name: "Port" }), "5432");
+  await user.type(screen.getByRole("textbox", { name: "Database" }), "shop_dev");
+  await user.type(screen.getByRole("textbox", { name: "User" }), "golem_ro");
   await user.type(screen.getByLabelText("Password"), "s3cret");
   expect(screen.getByText("goes to the macOS Keychain, never to a file or a model")).toBeTruthy();
   await user.click(screen.getByRole("radio", { name: /this project · shop-api/ }));
   await user.click(screen.getByRole("button", { name: "Test connection" }));
-  expect(await screen.findByText("Found 3 tables: users, orders, plans.")).toBeTruthy();
-  expect(props.onInspect).toHaveBeenCalledWith("postgres://golem_ro@localhost:5432/shop_dev");
+  expect(await screen.findByText("connected · PostgreSQL 17.2 · 3 tables · 1 schema")).toBeTruthy();
+  expect(props.onInspectDatabase).toHaveBeenCalledWith({ kind: "postgres", host: "localhost", database: "shop_dev", port: 5432, user: "golem_ro", password: "s3cret" });
+  expect(props.onInspect).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Next" }));
   expect(screen.getByRole("radio", { name: /rows open/ }).getAttribute("aria-checked")).toBe("true");
   await user.click(screen.getByRole("button", { name: "Add source" }));
@@ -256,6 +264,51 @@ test("a database goes with its scope and password, and the password is gone from
   await waitFor(() => expect(props.onAdded).toHaveBeenCalled());
   expect(screen.queryByDisplayValue("s3cret")).toBeNull();
   expect(document.body.textContent).not.toContain("s3cret");
+});
+
+test("a login that can write is warned about, and the warning does not stop Next", async () => {
+  const user = userEvent.setup();
+  const warning = "This login can change data. golem only reads, but a read-only login is safer.";
+  form({ onInspectDatabase: vi.fn().mockResolvedValue({ ...SAMPLE_INSPECT_PG, warning }) });
+  await user.click(screen.getByRole("radio", { name: /Database/ }));
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  await user.type(screen.getByRole("textbox", { name: "Host" }), "db.internal");
+  await user.type(screen.getByRole("textbox", { name: "Database" }), "shop");
+  await user.click(screen.getByRole("button", { name: "Test connection" }));
+  expect(await screen.findByText(warning)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+test("without a test the dialog says what Next does, and a failed test still lets the person go on", async () => {
+  const user = userEvent.setup();
+  const props = form({ onInspectDatabase: vi.fn().mockRejectedValue(new Error("Cannot connect to the postgres database at db.internal: refused")) });
+  await user.click(screen.getByRole("radio", { name: /Database/ }));
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByText(/You have not tested the connection\. Next tests it for you/)).toBeTruthy();
+  await user.type(screen.getByRole("textbox", { name: "Host" }), "db.internal");
+  await user.type(screen.getByRole("textbox", { name: "Database" }), "shop");
+  const next = screen.getByRole("button", { name: "Next" }) as HTMLButtonElement;
+  expect(next.disabled).toBe(false);
+  await user.click(next);
+  expect(props.onInspectDatabase).toHaveBeenCalledTimes(1);
+  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("shop");
+  await user.click(screen.getByRole("button", { name: "Add source" }));
+  expect(props.onAdd).toHaveBeenCalledWith(expect.objectContaining({ location: "postgres://db.internal/shop", kind: "postgres" }));
+});
+
+test("a database source's settings say where the password is, and Change password stores a new one", async () => {
+  const user = userEvent.setup();
+  const onChangePassword = vi.fn().mockResolvedValue(undefined);
+  render(<SourcePage {...page({ source: SAMPLE_SHOP_PROD, described: SAMPLE_PROD_DESCRIBED, tab: "settings", onChangePassword })} />);
+  expect(screen.getByText("password in the macOS Keychain · golem/data/shop_prod")).toBeTruthy();
+  expect(screen.getByText("read-only transaction · 7 s per query · 10 000 rows per result")).toBeTruthy();
+  expect(screen.getByText(/This login can change data/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Change password" }));
+  await user.type(screen.getByLabelText("New password"), "n3w");
+  await user.click(screen.getByRole("button", { name: "Store password" }));
+  expect(onChangePassword).toHaveBeenCalledWith("n3w");
+  await waitFor(() => expect(screen.queryByLabelText("New password")).toBeNull());
+  expect(document.body.textContent).not.toContain("n3w");
 });
 
 test("a failed check shows under the field, and Next still works; Add source shows the real error", async () => {

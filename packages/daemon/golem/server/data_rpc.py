@@ -27,6 +27,7 @@ from golem.config_edit import (
     remove_data_source,
     update_data_source,
 )
+from golem.data.database import DatabaseTarget, build_url, kind_of_url, parse_url
 from golem.data.draft import INSTRUCTION, UNUSABLE, build_prompt, clean
 from golem.data.draft import SAMPLE_ROWS as DRAFT_ROWS
 from golem.data.notes import MAX_BYTES, TOO_LONG, write_notes
@@ -35,15 +36,17 @@ from golem.data.sources import DataSources, SourceInfo, TableInfo
 from golem.data.types import DataError, NeedsExtension
 from golem.models.errors import BudgetSpent, ModelUnreachable
 from golem.models.router import ModelConfigError
+from golem.secrets import SecretStoreError
 from golem.server.dispatcher import (
     BUDGET_SPENT,
     INTERNAL_ERROR,
     INVALID_PARAMS,
+    KEYCHAIN_UNAVAILABLE,
     MODEL_NOT_CONFIGURED,
     RequestContext,
     RpcCallError,
 )
-from golem.server.mcp_edit import config_target, get_scope
+from golem.server.mcp_edit import config_target, get_scope, store_secrets
 from golem.sessions.manager import SchemaMismatchError, SessionNotFoundError
 from golem_protocol.commands import (
     DataAddParams,
@@ -117,6 +120,9 @@ def wire_source(info: SourceInfo) -> DataSource:
         rows=info.rows,
         watch=info.watch,
         needs_extension=info.needs_extension,  # type: ignore[arg-type]
+        in_keychain=info.in_keychain,
+        timeout_s=info.timeout_s,
+        warning=info.warning,
     )
 
 
@@ -250,7 +256,14 @@ def _announce(ctx: RequestContext, source: str | None, reason: str) -> None:
 async def data_inspect(ctx: RequestContext, params: DataInspectParams) -> DataInspectResult:
     root = await _root(ctx, params.session_id)
     try:
-        found = await _sources(ctx).inspect(params.location, root)
+        if params.kind is not None:
+            found = await _sources(ctx).inspect_database(
+                _target(params), _plain(params.password), root
+            )
+        elif params.location is None:
+            raise DataError("Say what to look at: a location, or a database with its host.")
+        else:
+            found = await _sources(ctx).inspect(params.location, root)
     except DataError as exc:
         raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
     return DataInspectResult(
@@ -263,7 +276,26 @@ async def data_inspect(ctx: RequestContext, params: DataInspectParams) -> DataIn
         privacy_reason=found.privacy_reason,
         notes=list(found.notes),
         needs_extension=found.needs_extension,  # type: ignore[arg-type]
+        url=found.url,
+        server_version=found.server_version,
+        warning=found.warning,
     )
+
+
+def _plain(secret: Any) -> str | None:
+    """The text of a ``SecretStr``, or None when there is none or it is empty."""
+    value = None if secret is None else secret.get_secret_value()
+    return value or None
+
+
+def _target(params: DataInspectParams) -> DatabaseTarget:
+    """The server ``params`` names. The address is built and read back, so it is checked."""
+    if params.kind is None or not params.host or not params.database:
+        raise DataError("A database needs a host and a database name.")
+    raw = DatabaseTarget(
+        params.kind, params.host, params.port, params.database, params.user, params.ssl_mode
+    )
+    return parse_url(build_url(raw))
 
 
 async def _listed(ctx: RequestContext, root: Path | None, name: str) -> DataSource:
@@ -291,6 +323,9 @@ async def data_add(ctx: RequestContext, params: DataAddParams) -> DataAddResult:
         raise RpcCallError(INVALID_PARAMS, f"{name} is the built-in source: pick another name.")
     if name in sources.taken_names(root):
         raise RpcCallError(INVALID_PARAMS, f"There is already a source called {name}.")
+    kind = params.kind or kind_of_url(params.location)
+    if kind in ("postgres", "mysql"):
+        return await _add_database(ctx, params, path, root)
     if params.password is not None:
         raise RpcCallError(INVALID_PARAMS, "A file or a folder has no password.")
     place = Path(params.location).expanduser()
@@ -328,6 +363,51 @@ async def data_add(ctx: RequestContext, params: DataAddParams) -> DataAddResult:
     return DataAddResult(source=await _listed(ctx, root, name))
 
 
+async def _add_database(
+    ctx: RequestContext, params: DataAddParams, path: Path, root: Path | None
+) -> DataAddResult:
+    """Add a Postgres or MySQL source. Its password goes to the user's Keychain, never a file."""
+    sources = _sources(ctx)
+    name = params.name
+    try:
+        target = parse_url(params.location)
+    except DataError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+    if params.kind is not None and params.kind != target.kind:
+        raise RpcCallError(INVALID_PARAMS, f"The address is a {target.kind} address.")
+    password = _plain(params.password)
+    table: dict[str, Any] = {"url": build_url(target), "privacy": params.privacy}
+    if password is not None:
+        table["password"] = f"keychain:data/{name}"
+    try:
+        DataSourceSettings.model_validate({**table, "kind": target.kind})
+    except ValidationError as exc:
+        raise RpcCallError(INVALID_PARAMS, str(exc.errors()[0]["msg"])) from exc
+    if password is not None:
+        await store_secrets(ctx, {f"data/{name}": password})
+    try:
+        await asyncio.to_thread(add_data_source, path, name, table)
+    except (DataExistsError, OSError, ValueError) as exc:
+        await _drop_secret(ctx, name, password is not None)
+        if isinstance(exc, DataExistsError):
+            raise RpcCallError(INVALID_PARAMS, str(exc)) from exc
+        raise RpcCallError(INTERNAL_ERROR, f"could not write the config file: {exc}") from exc
+    await sources.forget(name)
+    _announce(ctx, name, "added")
+    return DataAddResult(source=await _listed(ctx, root, name))
+
+
+async def _drop_secret(ctx: RequestContext, name: str, stored: bool) -> None:
+    """Delete the Keychain entry ``data/<name>`` when ``stored`` says there is one."""
+    store = ctx.state.secrets
+    if not stored or store is None:
+        return
+    try:
+        await asyncio.to_thread(store.delete, f"data/{name}")
+    except SecretStoreError as exc:
+        raise RpcCallError(KEYCHAIN_UNAVAILABLE, str(exc)) from exc
+
+
 def _find(sources: DataSources, root: Path | None, name: str) -> tuple[SourceInfo, Path]:
     """The source called ``name`` and the config file that holds it."""
     found = next((i for i in sources.snapshot(root) if i.name == name), None)
@@ -351,6 +431,14 @@ async def data_update(ctx: RequestContext, params: DataUpdateParams) -> DataUpda
     changes: dict[str, Any] = {}
     if params.privacy is not None:
         changes["privacy"] = params.privacy
+    if params.timeout_s is not None:
+        changes["timeout_s"] = params.timeout_s
+    password = _plain(params.password)
+    if password is not None:
+        if info.kind not in ("postgres", "mysql"):
+            raise RpcCallError(INVALID_PARAMS, "A file or a folder has no password.")
+        await store_secrets(ctx, {f"data/{info.name}": password})
+        changes["password"] = f"keychain:data/{info.name}"
     if params.watch is not None:
         changes["watch"] = True if params.watch else None
     if params.include is not None or params.exclude is not None:
@@ -376,7 +464,7 @@ async def data_update(ctx: RequestContext, params: DataUpdateParams) -> DataUpda
 async def data_remove(ctx: RequestContext, params: DataRemoveParams) -> DataRemoveResult:
     sources = _sources(ctx)
     root = await _root(ctx, params.session_id)
-    _, path = _find(sources, root, params.name)
+    info, path = _find(sources, root, params.name)
     try:
         await asyncio.to_thread(remove_data_source, path, params.name)
     except DataTableError as exc:
@@ -384,6 +472,9 @@ async def data_remove(ctx: RequestContext, params: DataRemoveParams) -> DataRemo
     except (OSError, ValueError) as exc:
         raise RpcCallError(INTERNAL_ERROR, f"could not write the config file: {exc}") from exc
     await sources.forget(params.name)
+    # The Keychain entry goes with its source, unless another source of that name still uses it.
+    if info.in_keychain and params.name not in sources.taken_names(root):
+        await _drop_secret(ctx, params.name, True)
     _announce(ctx, params.name, "removed")
     return DataRemoveResult()
 

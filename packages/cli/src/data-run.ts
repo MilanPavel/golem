@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { isAbsolute, resolve } from "node:path";
 
+import { kindWord, PRIVACY_CHIP } from "@golem/view";
 import { RpcError, type DataDescribeResult, type DataListResult, type DataResult, type GolemClient } from "@golem/client";
 
 import type { DataArgs, ExportFormat } from "./data-command.ts";
@@ -26,6 +27,8 @@ export interface DataDeps {
   onInterrupt: (handler: () => void) => () => void;
   /** Opens `text` in the person's editor and returns what they saved, or null when the editor failed. */
   edit?: (text: string, fileName: string) => Promise<string | null>;
+  /** Asks for a secret and shows nothing as it is typed. Set only when stdin is a terminal. */
+  readPassword?: (prompt: string) => Promise<string>;
   /** A new id for a query, so it can be cancelled by it. */
   newId?: () => string;
   /** The folder a relative file name is relative to. The process folder by default. */
@@ -44,12 +47,55 @@ async function guarded<T>(body: () => Promise<T>): Promise<T> {
   }
 }
 
-type Client = Pick<GolemClient, "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult">;
+type Client = Pick<GolemClient, "addData" | "listData" | "describeData" | "queryData" | "cancelData" | "getDataNotes" | "setDataNotes" | "exportDataResult">;
 
 /** `golem data list`. */
 export async function runDataList(client: Client, json: boolean, deps: DataDeps): Promise<number> {
   const result: DataListResult = await guarded(() => client.listData());
   deps.write(`${json ? JSON.stringify(result, null, 2) : formatDataList(result.sources)}\n`);
+  return 0;
+}
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"]);
+const PASSWORD_IN_ADDRESS = "That address has a password in it. Remove it: golem asks for the password separately and keeps it in the Keychain, never in a file.";
+
+/** The database address in `location`, or null when it is a file or a folder. */
+function databaseAddress(location: string): URL | null {
+  if (!/^(postgres|postgresql|mysql):\/\//i.test(location)) return null;
+  try {
+    return new URL(location);
+  } catch {
+    return null;
+  }
+}
+
+/** `golem data add`: a file, a folder, or a database whose password goes to the Keychain. */
+export async function runDataAdd(client: Client, args: Extract<DataArgs, { kind: "add" }>, deps: DataDeps): Promise<number> {
+  const address = databaseAddress(args.location);
+  let password: string | null = null;
+  if (address !== null) {
+    if (address.password !== "") {
+      deps.error(PASSWORD_IN_ADDRESS);
+      return 1;
+    }
+    if (args.passwordStdin) {
+      password = (await deps.readStdin()).replace(/\r?\n$/, "");
+    } else if (deps.readPassword !== undefined) {
+      const who = address.username === "" ? address.hostname : `${decodeURIComponent(address.username)}@${address.hostname}`;
+      password = await deps.readPassword(`Password for ${who} (Enter for none): `);
+    }
+    if (password === "") password = null;
+  } else if (args.passwordStdin) {
+    deps.error("A file or a folder has no password.");
+    return 1;
+  }
+  const privacy = args.privacy ?? (address !== null && !LOCAL_HOSTS.has(address.hostname.toLowerCase()) ? "schema" : "local");
+  const added = await guarded(() => client.addData({ name: args.name, location: args.location, privacy, scope: "user", ...(password === null ? {} : { password }) }));
+  const source = added.source;
+  deps.write(`Added ${source.name} (${kindWord(source.kind)}, ${PRIVACY_CHIP[source.privacy]}).\n`);
+  if (password !== null) deps.write(`The password is in the macOS Keychain as golem/data/${source.name}. It is not in config.toml.\n`);
+  if (source.status === "error" && source.error) deps.write(`It could not be read yet: ${source.error}\n`);
+  if (source.warning) deps.write(`${source.warning}\n`);
   return 0;
 }
 

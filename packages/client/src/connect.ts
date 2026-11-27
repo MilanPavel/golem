@@ -78,6 +78,7 @@ import type { DataExportResult } from "../../protocol/gen/data-export-result.ts"
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
+import type { DataInspectParams } from "../../protocol/gen/data-inspect-params.ts";
 import type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
 import type { DataListResult } from "../../protocol/gen/data-list-result.ts";
 import type { DataQueryParams } from "../../protocol/gen/data-query-params.ts";
@@ -962,9 +963,11 @@ export interface GolemClient {
   /** `data.cancel`: stop a query that is still running, by its `result_id`. */
   cancelData(resultId: string): Promise<DataCancelResult>;
   /** `data.extension.install`: download the Excel or SQLite add-on once. Only when the person asks. */
-  installDataExtension(name: "excel" | "sqlite"): Promise<DataExtensionInstallResult>;
+  installDataExtension(name: "excel" | "sqlite" | "postgres" | "mysql"): Promise<DataExtensionInstallResult>;
   /** `data.inspect`: look at a location before it is added. Nothing is saved. */
   inspectData(location: string): Promise<DataInspectResult>;
+  /** `data.inspect` of a Postgres or MySQL database. The password is used for this one connection and is not stored. */
+  inspectDatabase(params: DataInspectParams): Promise<DataInspectResult>;
   /** `data.add`: add a source. `password` goes to the Keychain and is never written to a file. */
   addData(params: DataAddParams): Promise<DataAddResult>;
   /** `data.update`: change the privacy or the watch of a source. */
@@ -3376,7 +3379,7 @@ export function connectGolem(options: ConnectOptions): GolemClient {
       }
       return result;
     },
-    async installDataExtension(name: "excel" | "sqlite"): Promise<DataExtensionInstallResult> {
+    async installDataExtension(name: "excel" | "sqlite" | "postgres" | "mysql"): Promise<DataExtensionInstallResult> {
       await ready;
       const result = await call("data.extension.install", { name });
       if (!isDataExtensionInstallResult(result)) {
@@ -3387,6 +3390,14 @@ export function connectGolem(options: ConnectOptions): GolemClient {
     async inspectData(location: string): Promise<DataInspectResult> {
       await ready;
       const result = await call("data.inspect", { location });
+      if (!isDataInspectResult(result)) {
+        throw new Error("invalid data.inspect result");
+      }
+      return result;
+    },
+    async inspectDatabase(params: DataInspectParams): Promise<DataInspectResult> {
+      await ready;
+      const result = await call("data.inspect", { ...params });
       if (!isDataInspectResult(result)) {
         throw new Error("invalid data.inspect result");
       }

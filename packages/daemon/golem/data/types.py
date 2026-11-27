@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
-SourceKind = Literal["files", "sqlite", "duckdb", "builtin"]
-SOURCE_KINDS: tuple[SourceKind, ...] = ("files", "sqlite", "duckdb", "builtin")
+SourceKind = Literal["files", "sqlite", "duckdb", "postgres", "mysql", "builtin"]
+SOURCE_KINDS: tuple[SourceKind, ...] = (
+    "files", "sqlite", "duckdb", "postgres", "mysql", "builtin"
+)  # fmt: skip
+DATABASE_KINDS = ("postgres", "mysql")
+"""The kinds that are a server golem connects to, with a password the daemon resolves."""
 """``builtin`` is an empty in-memory database the daemon fills with ``load_table``."""
 
 EXTENSION_FILES = {
@@ -21,6 +25,8 @@ EXTENSION_FILES = {
 EXTENSION_NEEDS = {
     "excel": ("Excel", "2 MB"),
     "sqlite": ("SQLite files", "3 MB"),
+    "postgres": ("PostgreSQL databases", "30 MB"),
+    "mysql": ("MySQL databases", "30 MB"),
 }
 """What a person is told about an extension a source needs: what it reads, and how big it is."""
 
@@ -43,14 +49,25 @@ class NeedsExtension(DataError):
 
 @dataclass(frozen=True, slots=True)
 class SourceSpec:
-    """One source: ``kind`` says how to read ``location``, a path or a glob."""
+    """One source: ``kind`` says how to read ``location``, a path, a glob or a database URL.
+
+    ``password`` is for a database only. It is resolved by the daemon, goes to the worker over
+    its pipe, and is left out of ``repr``. ``location`` never holds it.
+    """
 
     name: str
     kind: SourceKind
     location: str
+    password: str | None = field(default=None, repr=False)
+    timeout_s: float = 15.0
 
     def to_json(self) -> dict[str, Any]:
-        return {"name": self.name, "kind": self.kind, "location": self.location}
+        out: dict[str, Any] = {"name": self.name, "kind": self.kind, "location": self.location}
+        if self.kind in DATABASE_KINDS:
+            out["timeout_s"] = self.timeout_s
+            if self.password is not None:
+                out["password"] = self.password
+        return out
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> SourceSpec:
@@ -60,4 +77,11 @@ class SourceSpec:
         name, location = data.get("name"), data.get("location")
         if not isinstance(name, str) or not name or not isinstance(location, str) or not location:
             raise DataError("A source needs a name and a location.")
-        return cls(name=name, kind=kind, location=location)
+        password, timeout = data.get("password"), data.get("timeout_s", 15.0)
+        return cls(
+            name=name,
+            kind=kind,
+            location=location,
+            password=password if isinstance(password, str) else None,
+            timeout_s=float(timeout) if isinstance(timeout, int | float) else 15.0,
+        )

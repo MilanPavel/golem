@@ -3,8 +3,10 @@
 export type Exclude = string[] | null;
 export type Include = string[] | null;
 export type Name = string;
+export type Password = string | null;
 export type Privacy = ('open' | 'local' | 'schema') | null;
 export type SessionId = string | null;
+export type TimeoutS = number | null;
 export type Watch = boolean | null;
 
 /**
@@ -14,7 +16,9 @@ export interface DataUpdateParams {
   exclude?: Exclude;
   include?: Include;
   name: Name;
+  password?: Password;
   privacy?: Privacy;
   session_id?: SessionId;
+  timeout_s?: TimeoutS;
   watch?: Watch;
 }

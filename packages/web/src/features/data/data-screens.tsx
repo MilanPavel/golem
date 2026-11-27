@@ -28,6 +28,7 @@ export function LiveAddDialog({ open, onClose }: { open: boolean; onClose: () =>
       open={open}
       folder={folder}
       onInspect={actions.dataInspect}
+      onInspectDatabase={actions.dataInspectDatabase}
       onInstallExtension={actions.dataInstallExtension}
       onAdd={actions.dataAdd}
       onAdded={(source: DataSource) => {
@@ -159,6 +160,9 @@ export function DataSourceScreen({ name, tab }: { name: string; tab: DataTab }) 
         onDraftNotes={() => actions.dataNotesDraft(name)}
         onPrivacy={async (privacy) => {
           await actions.dataUpdate({ name, privacy });
+        }}
+        onChangePassword={async (password) => {
+          await actions.dataUpdate({ name, password });
         }}
         onWatch={async (watch) => {
           await actions.dataUpdate({ name, watch });

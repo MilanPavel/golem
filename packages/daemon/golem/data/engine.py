@@ -12,6 +12,7 @@ instead of a permission error.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import decimal
 import glob as globlib
@@ -28,7 +29,20 @@ from typing import Any, cast
 import duckdb
 
 from golem.data import guard
-from golem.data.types import EXTENSION_FILES, DataError, NeedsExtension, SourceSpec
+from golem.data.database import (
+    DatabaseTarget,
+    connection_string,
+    grants_can_write,
+    parse_url,
+    version_label,
+)
+from golem.data.types import (
+    DATABASE_KINDS,
+    EXTENSION_FILES,
+    DataError,
+    NeedsExtension,
+    SourceSpec,
+)
 
 _FILE_KINDS = {
     ".csv": "csv",
@@ -54,6 +68,7 @@ _READERS = {
 _WILDCARDS = re.compile(r"[*?\[]")
 _TABLE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _COLUMN_TYPES = frozenset({"VARCHAR", "BIGINT", "DOUBLE", "BOOLEAN", "DATE", "TIMESTAMP"})
+_PASSWORD_PAIR = re.compile(r"(pass(?:wor)?d\s*=\s*)('(?:[^'\\]|\\.)*'|\S+)", re.IGNORECASE)
 _SIZE = re.compile(r"^\d+(\.\d+)?\s?(B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)$", re.IGNORECASE)
 
 
@@ -65,6 +80,16 @@ class Limits:
     threads: int = 4
     extension_dir: Path | None = None
     temp_dir: Path | None = None
+
+
+_passwords: set[str] = set()
+
+
+def redact(text: str) -> str:
+    """``text`` with every password this worker knows, and any ``password=...``, hidden."""
+    for secret in sorted(_passwords, key=len, reverse=True):
+        text = text.replace(secret, "***")
+    return _PASSWORD_PAIR.sub(r"\1***", text)
 
 
 def extension_installed(directory: Path, name: str) -> bool:
@@ -93,12 +118,52 @@ def install_extension(directory: Path, name: str) -> None:
         connection.close()
 
 
+PG_ESTIMATES = (
+    "select n.nspname, c.relname, c.reltuples::bigint from pg_class c "
+    "join pg_namespace n on n.oid = c.relnamespace "
+    "where c.relkind in ('r', 'p', 'm', 'f') "
+    "and n.nspname not in ('pg_catalog', 'information_schema')"
+)
+PG_CAN_WRITE = (
+    "select coalesce(bool_or(has_table_privilege(c.oid, 'INSERT') "
+    "or has_table_privilege(c.oid, 'UPDATE') or has_table_privilege(c.oid, 'DELETE')), false) "
+    "or (select rolsuper from pg_roles where rolname = current_user) "
+    "from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+    "where c.relkind in ('r', 'p') and n.nspname not in ('pg_catalog', 'information_schema')"
+)
+MYSQL_ESTIMATES = (
+    "select table_schema, table_name, table_rows from information_schema.tables "
+    "where table_schema not in ('mysql', 'sys', 'information_schema', 'performance_schema')"
+)
+
+
+def attach_server(connection: Any, spec: SourceSpec, target: DatabaseTarget) -> None:
+    """``ATTACH`` the server as ``src``, read-only. The one place a password meets SQL text."""
+    text = connection_string(target, spec.password, spec.timeout_s)
+    try:
+        connection.execute(f"attach {_literal(text)} as src (type {spec.kind}, read_only)")
+    except duckdb.Error as exc:
+        raise DataError(
+            f"Cannot connect to the {spec.kind} database at {target.host}: {_message(exc)}"
+        ) from exc
+
+
 class Source:
     """An attached source: its connection, its tables, and its queries."""
 
     def __init__(self, spec: SourceSpec, limits: Limits) -> None:
         self.spec = spec
         self._attached = False
+        self._remote: dict[str, tuple[str, str]] = {}
+        self._remote_kinds: dict[str, str] = {}
+        """A database's tables: the name shown, then its schema and its name there."""
+        self._estimates: dict[tuple[str, str], int] = {}
+        self._schema: str | None = None
+        self.info: dict[str, Any] = {}
+        """What the server told on connect: ``version``, and ``can_write`` when known."""
+        if spec.password:
+            _passwords.add(spec.password)
+            _passwords.add(spec.password.replace("\\", "\\\\").replace("'", "\\'"))
         if not _SIZE.match(limits.memory.strip()):
             raise DataError(f"worker_memory is a size such as 2GB, not {limits.memory!r}.")
         self._connection = duckdb.connect(":memory:")
@@ -115,10 +180,19 @@ class Source:
         """A cursor of its own, which ``interrupt()`` stops without touching the others."""
         cursor = self._connection.cursor()
         if self._attached:
-            cursor.execute("use src")
+            cursor.execute(f"use src.{_ident(self._schema)}" if self._schema else "use src")
         return cursor
 
-    def tables(self) -> list[dict[str, str]]:
+    def tables(self) -> list[dict[str, Any]]:
+        if self.spec.kind in DATABASE_KINDS:
+            return [
+                {
+                    "name": name,
+                    "type": kind,
+                    "rows": self._estimates.get(self._remote[name]),
+                }
+                for name, kind in self._remote_kinds.items()
+            ]
         rows = self._connection.execute(
             "select table_name, table_type from information_schema.tables "
             "where table_catalog = current_database() and table_schema = current_schema() "
@@ -133,6 +207,8 @@ class Source:
         if table not in {t["name"] for t in self.tables()}:
             known = ", ".join(t["name"] for t in self.tables()) or "none"
             raise DataError(f"There is no table called {table}. The tables are: {known}.")
+        if self.spec.kind in DATABASE_KINDS:
+            return self._describe_remote(table)
         cursor = self.cursor()
         try:
             rows = cursor.execute(f"summarize {_ident(table)}").fetchall()
@@ -151,6 +227,32 @@ class Source:
             for row in rows
         ]
         return {"table": table, "rows": int(count[0]) if count else 0, "columns": columns}
+
+    def _describe_remote(self, table: str) -> dict[str, Any]:
+        """The columns of a database table from the catalog. It reads no rows of the table."""
+        schema, name = self._remote[table]
+        rows = self._connection.execute(
+            "select column_name, data_type from duckdb_columns() "
+            "where database_name = 'src' and schema_name = ? and table_name = ? "
+            "order by column_index",
+            [schema, name],
+        ).fetchall()
+        columns = [
+            {
+                "name": str(column),
+                "type": str(kind),
+                "min": None,
+                "max": None,
+                "distinct": None,
+                "null_percent": None,
+            }
+            for column, kind in rows
+        ]
+        return {
+            "table": table,
+            "rows": self._estimates.get((schema, name)),
+            "columns": columns,
+        }
 
     def load_table(
         self, table: str, columns: list[dict[str, str]], rows: list[list[Any]], replace: bool
@@ -253,6 +355,8 @@ class Source:
             allowed = self._files(spec, limits)
         elif spec.kind == "builtin":
             allowed = []
+        elif spec.kind in DATABASE_KINDS:
+            allowed = self._server(spec, limits)
         else:
             allowed = self._database(spec, limits)
         con.execute("set allowed_paths = ?", [allowed])
@@ -278,6 +382,75 @@ class Source:
                 f"Cannot open {path} as a {spec.kind} database: {_message(exc)}"
             ) from exc
         return [str(real)]
+
+    def _server(self, spec: SourceSpec, limits: Limits) -> list[str]:
+        """Attach a Postgres or MySQL database read-only. Nothing of it is a file."""
+        target = parse_url(spec.location)
+        if target.kind != spec.kind:
+            raise DataError(f"The address is a {target.kind} address, not a {spec.kind} one.")
+        self._load(spec.kind, EXTENSION_FILES[spec.kind], limits)
+        attach_server(self._connection, spec, target)
+        self._attached = True
+        self._list_server(target)
+        self._probe_server(target)
+        return []
+
+    def _list_server(self, target: DatabaseTarget) -> None:
+        con = self._connection
+        rows = con.execute(
+            "select schema_name, table_name, kind from ("
+            "select schema_name, table_name, 'table' as kind from duckdb_tables() "
+            "where database_name = 'src' and not internal "
+            "union all select schema_name, view_name, 'view' from duckdb_views() "
+            "where database_name = 'src' and not internal) "
+            "order by schema_name, table_name"
+        ).fetchall()
+        schemas = {str(schema) for schema, _, _ in rows}
+        bare = next((s for s in target.bare_schemas if s in schemas), None)
+        self._schema = bare
+        for schema, name, kind in rows:
+            shown = str(name) if str(schema) == bare else f"{schema}.{name}"
+            self._remote[shown] = (str(schema), str(name))
+            self._remote_kinds[shown] = str(kind)
+
+    def _probe_server(self, target: DatabaseTarget) -> None:
+        """Ask the server its version, its row estimates and what this login may change.
+
+        Every question is optional: one that fails leaves its answer unknown, and the source
+        still opens.
+        """
+        func = "postgres_query" if target.kind == "postgres" else "mysql_query"
+
+        def ask(sql: str) -> list[tuple[Any, ...]] | None:
+            try:
+                return self._connection.execute(
+                    f"select * from {func}('src', {_literal(sql)})"
+                ).fetchall()
+            except duckdb.Error:
+                return None
+
+        version = ask("select version()")
+        if version:
+            self.info["version"] = version_label(target.kind, str(version[0][0]))
+        if target.kind == "postgres":
+            counts = ask(PG_ESTIMATES)
+            writes = ask(PG_CAN_WRITE)
+            if writes:
+                self.info["can_write"] = _truthy(writes[0][0])
+        else:
+            counts = ask(MYSQL_ESTIMATES)
+            grants = ask("show grants")
+            if grants:
+                self.info["can_write"] = grants_can_write([str(row[0]) for row in grants])
+            for session in (
+                "set session transaction read only",
+                f"set session max_execution_time = {int(self.spec.timeout_s * 1000)}",
+            ):
+                with contextlib.suppress(duckdb.Error):
+                    self._connection.execute(f"call mysql_execute('src', {_literal(session)})")
+        for schema, name, rows in counts or []:
+            if rows is not None and int(rows) >= 0:
+                self._estimates[(str(schema), str(name))] = int(rows)
 
     def _load(self, extension: str, file: str, limits: Limits) -> None:
         """Load an extension from golem's folder. It is never downloaded here."""
@@ -398,6 +571,8 @@ def matched_files(location: str) -> list[tuple[Path, str]]:
 
 def stamp(spec: SourceSpec) -> tuple[tuple[str, int, int], ...]:
     """The path, modified time and size of each file a source reads. Empty when it has none."""
+    if spec.kind in DATABASE_KINDS:
+        return ()  # a server's data is read live, not kept
     try:
         if spec.kind == "files":
             paths = [path for path, _ in matched_files(spec.location)]
@@ -415,8 +590,8 @@ def stamp(spec: SourceSpec) -> tuple[tuple[str, int, int], ...]:
 def needed_extension(spec: SourceSpec) -> str | None:
     """The extension a source needs, from its files alone. It does not open the source."""
     try:
-        if spec.kind == "sqlite":
-            return "sqlite"
+        if spec.kind in ("sqlite", "postgres", "mysql"):
+            return spec.kind
         if spec.kind == "files" and any(
             kind == "excel" for _, kind in matched_files(spec.location)
         ):
@@ -474,8 +649,13 @@ def _literal(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
 
 
+def _truthy(value: object) -> bool:
+    """A yes from a server: ``True``, ``1``, ``t`` or ``true``."""
+    return value is True or str(value).strip().lower() in ("1", "t", "true")
+
+
 def _message(exc: Exception) -> str:
-    text = str(exc).strip()
+    text = redact(str(exc).strip())
     return text.splitlines()[0] if text else type(exc).__name__
 
 

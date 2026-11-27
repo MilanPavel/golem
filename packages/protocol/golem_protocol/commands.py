@@ -6581,7 +6581,7 @@ DataPrivacy = Literal["open", "local", "schema"]
 
 DataSourceKind = Literal["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url"]
 DataScope = Literal["builtin", "user", "project"]
-DataExtension = Literal["excel", "sqlite"]
+DataExtension = Literal["excel", "sqlite", "postgres", "mysql"]
 DataSourceStatus = Literal["ready", "reading", "untrusted", "error"]
 DataValue = str | int | float | bool | None
 """One cell on the wire. Dates and times are ISO strings, decimals are numbers."""
@@ -6630,6 +6630,12 @@ class DataSource(BaseModel):
     notes_path: str | None = None
     needs_extension: DataExtension | None = None
     """The extension to download once before this source can be read."""
+    in_keychain: bool = False
+    """True when the password is in the Keychain as ``data/<name>``. It is never sent."""
+    timeout_s: float | None = None
+    """For a database: seconds a query may run on the server."""
+    warning: str | None = None
+    """For a database: a sentence when its login can change data."""
 
 
 class DataSavedQuery(BaseModel):
@@ -6674,11 +6680,23 @@ class DataListResult(BaseModel):
 
 
 class DataInspectParams(BaseModel):
-    """``data.inspect``. Look at a location before it is added."""
+    """``data.inspect``. Look at a location before it is added.
+
+    A file or a folder is a ``location``. A database is ``kind`` (``postgres`` or ``mysql``) with
+    ``host``, ``port``, ``database``, ``user`` and ``ssl_mode``, and its ``password`` for this
+    one look: it is used to connect and is not stored.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    location: str = Field(min_length=1)
+    location: str | None = Field(default=None, min_length=1)
+    kind: Literal["postgres", "mysql"] | None = None
+    host: str | None = Field(default=None, min_length=1)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    database: str | None = Field(default=None, min_length=1)
+    user: str | None = Field(default=None, min_length=1)
+    ssl_mode: str | None = Field(default=None, min_length=1)
+    password: SecretStr | None = None
     session_id: str | None = Field(default=None, min_length=1)
 
 
@@ -6698,6 +6716,12 @@ class DataInspectResult(BaseModel):
     needs_extension: DataExtension | None = None
     """Set when the location cannot be read until that extension is downloaded. ``notes`` then
     holds the sentence that asks, and ``tables`` is empty."""
+    url: str | None = None
+    """For a database: its address with no password, which ``data.add`` takes as ``location``."""
+    server_version: str | None = None
+    """For a database: such as ``PostgreSQL 17.2``."""
+    warning: str | None = None
+    """For a database: a sentence when its login can change data, with a way to make a safer one."""
 
 
 class DataAddParams(BaseModel):
@@ -6731,6 +6755,9 @@ class DataUpdateParams(BaseModel):
     name: str = Field(min_length=1)
     privacy: DataPrivacy | None = None
     watch: bool | None = None
+    password: SecretStr | None = None
+    """A new password for a database source. It goes to the Keychain and is never returned."""
+    timeout_s: float | None = Field(default=None, gt=0, le=3600)
     include: list[str] | None = None
     exclude: list[str] | None = None
     session_id: str | None = Field(default=None, min_length=1)

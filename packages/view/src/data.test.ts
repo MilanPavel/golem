@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { askText, columnStats, countText, groupSources, inspectSummary, kindGlyph, kindWord, sampleCaption, sourceDetail, sourceFileType, stepName, type DataSourceLike } from "./data.ts";
+import { askText, columnStats, countText, databaseReady, databaseSummary, databaseUrl, groupSources, inspectSummary, keychainLine, kindGlyph, kindWord, limitsLine, sampleCaption, sourceDetail, sourceFileType, stepName, type DataSourceLike } from "./data.ts";
 
 const source = (over: Partial<DataSourceLike> = {}): DataSourceLike => ({ name: "bank", kind: "files", scope: "user", privacy: "local", status: "ready", ...over });
 
@@ -65,4 +65,18 @@ test("the type of a source's files comes from its location", () => {
 
 test("every kind has a one-character glyph for the terminal", () => {
   for (const kind of ["builtin", "files", "sqlite", "duckdb", "postgres", "mysql", "url"] as const) assert.equal([...kindGlyph(kind)].length, 1);
+});
+
+test("a database form becomes an address with no password, and a test reads as one line", () => {
+  const fields = { type: "postgres", host: " db.internal ", port: "5433", database: "shop dev", user: "golem ro", ssl: "require" } as const;
+  assert.equal(databaseReady(fields), true);
+  assert.equal(databaseReady({ ...fields, database: " " }), false);
+  assert.equal(databaseUrl(fields), "postgres://golem%20ro@db.internal:5433/shop%20dev?sslmode=require");
+  assert.equal(databaseUrl({ type: "mysql", host: "h", port: "", database: "d", user: "", ssl: "required" }), "mysql://h/d?ssl_mode=required");
+  const tables = [{ name: "orders" }, { name: "app.invoices" }, { name: "app.big" }];
+  assert.equal(databaseSummary({ server_version: "PostgreSQL 17.2", tables }), "connected · PostgreSQL 17.2 · 3 tables · 2 schemas");
+  assert.equal(databaseSummary({ tables: [{ name: "a" }] }), "connected · 1 table · 1 schema");
+  assert.equal(keychainLine("shop"), "password in the macOS Keychain · golem/data/shop");
+  assert.equal(limitsLine(null), "read-only transaction · 15 s per query · 10 000 rows per result");
+  assert.equal(limitsLine(7), "read-only transaction · 7 s per query · 10 000 rows per result");
 });

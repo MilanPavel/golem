@@ -270,13 +270,11 @@ async def test_an_untrusted_projects_source_is_listed_and_never_opened(
 async def test_a_source_that_cannot_open_says_why_and_the_others_work(
     make: Make, paths: GolemPaths
 ) -> None:
-    _config(
-        paths, '[data.gone]\npath = "/no/such/folder/*.csv"\n[data.db]\nurl = "postgres://h/d"\n'
-    )
+    _config(paths, '[data.gone]\npath = "/no/such/folder/*.csv"\n[data.db]\nurl = "https://h/d"\n')
     sources = make()
     listed = {s.name: s for s in await sources.list(None)}
     assert listed["gone"].status == "error" and "There is no folder" in (listed["gone"].error or "")
-    assert listed["db"].status == "error" and "postgres" in (listed["db"].error or "")
+    assert listed["db"].status == "error" and "cannot open" in (listed["db"].error or "")
     assert listed["golem"].status == "ready"
 
 

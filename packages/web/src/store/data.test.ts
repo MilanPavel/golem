@@ -51,6 +51,8 @@ test("add, update, remove and the notes actions call the client, and a change ma
   expect(await page.actions.dataNotesSet("bank", "# hi")).toBe("~/.golem/data/x.md");
   expect(await page.actions.dataNotesDraft("bank")).toBe("# x\n");
   expect(await page.actions.dataInspect("~/b/*.csv")).toMatchObject({ suggested_name: "x" });
+  await page.actions.dataInspectDatabase({ kind: "mysql", host: "h", database: "d", password: "pw" });
+  expect(fake.raw.inspectDatabase).toHaveBeenCalledWith({ kind: "mysql", host: "h", database: "d", password: "pw" });
 });
 
 test("a failed add still marks the list stale, and its reason is thrown", async () => {

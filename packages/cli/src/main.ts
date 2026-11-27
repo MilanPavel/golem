@@ -34,7 +34,7 @@ import { formatStatus } from "./format-status.ts";
 import { formatCliVersion } from "./format-version.ts";
 import { DEVICES_USAGE, parseDevicesArgs, runDevicesList, runDevicesPair, runDevicesRename, runDevicesRevoke, type DevicesDeps } from "./devices.ts";
 import { DATA_HELP, parseDataArgs } from "./data-command.ts";
-import { runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
+import { runDataAdd, runDataDescribe, runDataExport, runDataList, runDataNotes, runDataQuery, type DataDeps } from "./data-run.ts";
 import { parseMcpArgs, type McpArgs } from "./mcp-command.ts";
 import { planAdd } from "./add-plan.ts";
 import { exportServers } from "./mcp-export.ts";
@@ -639,9 +639,12 @@ async function runData(given: string[]): Promise<number> {
       return () => void process.off("SIGINT", handler);
     },
     edit: (text, fileName) => editInEditor(text, fileName),
+    ...(process.stdin.isTTY === true ? { readPassword: readSecret } : {}),
   };
   return runWithClient((client) => {
     switch (parsed.kind) {
+      case "add":
+        return runDataAdd(client, parsed, deps);
       case "list":
         return runDataList(client, parsed.json, deps);
       case "describe":

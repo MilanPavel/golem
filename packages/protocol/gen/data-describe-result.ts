@@ -7,10 +7,11 @@ export type Name = string;
 export type Sql = string;
 export type Queries = DataSavedQuery[];
 export type Error = string | null;
+export type InKeychain = boolean;
 export type Kind = 'builtin' | 'files' | 'sqlite' | 'duckdb' | 'postgres' | 'mysql' | 'url';
 export type Location = string;
 export type Name1 = string;
-export type NeedsExtension = ('excel' | 'sqlite') | null;
+export type NeedsExtension = ('excel' | 'sqlite' | 'postgres' | 'mysql') | null;
 export type NotesPath = string | null;
 export type Privacy = 'open' | 'local' | 'schema';
 export type PrivacyReason = string | null;
@@ -19,6 +20,8 @@ export type Rows = number | null;
 export type Scope = 'builtin' | 'user' | 'project';
 export type Status = 'ready' | 'reading' | 'untrusted' | 'error';
 export type Tables = number | null;
+export type TimeoutS = number | null;
+export type Warning = string | null;
 export type Watch = boolean;
 export type Distinct = number | null;
 export type Max = string | null;
@@ -64,6 +67,7 @@ export interface Sample {
  */
 export interface DataSource {
   error?: Error;
+  in_keychain?: InKeychain;
   kind: Kind;
   location: Location;
   name: Name1;
@@ -76,6 +80,8 @@ export interface DataSource {
   scope: Scope;
   status: Status;
   tables?: Tables;
+  timeout_s?: TimeoutS;
+  warning?: Warning;
   watch?: Watch;
 }
 /**

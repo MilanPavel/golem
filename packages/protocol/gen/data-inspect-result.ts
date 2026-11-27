@@ -2,9 +2,10 @@
 
 export type Files = number | null;
 export type Kind = 'builtin' | 'files' | 'sqlite' | 'duckdb' | 'postgres' | 'mysql' | 'url';
-export type NeedsExtension = ('excel' | 'sqlite') | null;
+export type NeedsExtension = ('excel' | 'sqlite' | 'postgres' | 'mysql') | null;
 export type Notes = string[];
 export type PrivacyReason = string | null;
+export type ServerVersion = string | null;
 export type SuggestedName = string;
 export type SuggestedPrivacy = 'open' | 'local' | 'schema';
 export type Distinct = number | null;
@@ -17,6 +18,8 @@ export type Columns = DataColumn[];
 export type Name1 = string;
 export type Rows = number | null;
 export type Tables = DataTable[];
+export type Url = string | null;
+export type Warning = string | null;
 
 /**
  * What a location holds. ``notes`` are plain-language guesses. ``sample``: 20 rows a table.
@@ -28,9 +31,12 @@ export interface DataInspectResult {
   notes?: Notes;
   privacy_reason?: PrivacyReason;
   sample: Sample;
+  server_version?: ServerVersion;
   suggested_name: SuggestedName;
   suggested_privacy: SuggestedPrivacy;
   tables: Tables;
+  url?: Url;
+  warning?: Warning;
 }
 export interface Sample {
   [k: string]: (string | number | boolean | null)[][];

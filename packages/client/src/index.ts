@@ -87,6 +87,7 @@ export type { DataChanged } from "../../protocol/gen/data-changed.ts";
 export type { DataColumn } from "../../protocol/gen/data-column.ts";
 export type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
 export type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
+export type { DataInspectParams } from "../../protocol/gen/data-inspect-params.ts";
 export type { DataInspectResult } from "../../protocol/gen/data-inspect-result.ts";
 export type { DataListResult } from "../../protocol/gen/data-list-result.ts";
 export type { DataNotesDraftResult } from "../../protocol/gen/data-notes-draft-result.ts";

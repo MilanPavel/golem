@@ -143,7 +143,9 @@
         {
           "enum": [
             "excel",
-            "sqlite"
+            "sqlite",
+            "postgres",
+            "mysql"
           ],
           "type": "string"
         },
@@ -202,6 +204,18 @@
       "title": "Sample",
       "type": "object"
     },
+    "server_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Server Version"
+    },
     "suggested_name": {
       "title": "Suggested Name",
       "type": "string"
@@ -221,6 +235,30 @@
       },
       "title": "Tables",
       "type": "array"
+    },
+    "url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Url"
+    },
+    "warning": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Warning"
     }
   },
   "required": [

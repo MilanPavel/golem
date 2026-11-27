@@ -353,6 +353,7 @@ class DaemonApp:
                         params=DataChanged(source=name, reason=reason)  # type: ignore[arg-type]
                     )
                 )
+                data.secrets = self.state.secrets
                 self.state.data = data
                 self.state.artifacts = ArtifactStore(database)
                 data.results.artifacts = self.state.artifacts

@@ -458,11 +458,13 @@ class DataSourceSettings(BaseModel):
     types only. ``password`` is only ever ``keychain:data/<name>``.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
 
     path: str | None = Field(default=None, min_length=1)
     url: str | None = Field(default=None, min_length=1)
     kind: DataKind | None = None
+    timeout_s: float | None = Field(default=None, gt=0, le=3600)
+    """Seconds a query on a database may run on the server. 15 when left out."""
     privacy: DataPrivacyLevel = "local"
     watch: bool = False
     password: str | None = None
@@ -472,6 +474,8 @@ class DataSourceSettings(BaseModel):
     def _one_place(self) -> DataSourceSettings:
         if (self.path is None) == (self.url is None):
             raise ValueError("a data source needs either path (files) or url (a database)")
+        if self.url is not None and urlsplit(self.url).password is not None:
+            raise ValueError("url has a password in it; golem keeps it in the Keychain (password)")
         if self.password is not None and DATA_SECRET.match(self.password) is None:
             raise ValueError("password is only keychain:data/<name>, never the password itself")
         return self
@@ -556,7 +560,9 @@ class DataSettings(BaseModel):
         return self
 
 
-_DATA_SOURCES: TypeAdapter[DataSourceTables] = TypeAdapter(DataSourceTables)
+_DATA_SOURCES: TypeAdapter[DataSourceTables] = TypeAdapter(
+    DataSourceTables, config=ConfigDict(hide_input_in_errors=True)
+)
 
 
 def load_data_sources(path: Path) -> DataSourceTables:
@@ -1204,6 +1210,7 @@ class GolemSettings(BaseSettings):
         env_prefix="GOLEM_",
         extra="forbid",
         env_ignore_empty=True,
+        hide_input_in_errors=True,
     )
 
     log_level: Annotated[LogLevel, BeforeValidator(_normalize_log_level)] = "INFO"

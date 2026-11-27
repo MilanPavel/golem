@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import {
   BUILTIN_PRIVACY_NOTE,
   COLUMNS_CAPTION,
@@ -6,8 +6,11 @@ import {
   countText,
   DATA_NOT_AVAILABLE,
   DATA_PRIVACIES,
+  keychainLine,
   kindWord,
+  limitsLine,
   NOTES_NOT_AVAILABLE,
+  PASSWORD_NOTE,
   PRIVACY_SENTENCE,
   QUERIES_EMPTY,
   REMOVE_SENTENCE,
@@ -22,6 +25,7 @@ import { Badge } from "../../ui/badge.tsx";
 import { Button } from "../../ui/button.tsx";
 import { Code } from "../../ui/code.tsx";
 import { DataSourceIcon } from "../../ui/data-icons.tsx";
+import { Input } from "../../ui/input.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs.tsx";
 import { dataErrorText, type DataDescribeResult, type DataExtensionName, type DataSavedQuery, type DataSource, type DataTable } from "../../store/data.ts";
 import { DATA_TABS, type DataTab } from "../../store/router.ts";
@@ -319,20 +323,80 @@ function QueriesTab({ queries, onRun }: { queries: readonly DataSavedQuery[]; on
   );
 }
 
+/** The password of a database source: where it is kept, and a way to store a new one. The old one is never shown. */
+function PasswordRow({ source, onChange, busy, attempt }: { source: DataSource; onChange: (password: string) => Promise<void>; busy: boolean; attempt: (work: () => Promise<void>, fallback: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const id = useId();
+  return (
+    <div className="flex gap-3">
+      <dt className="w-28 shrink-0 text-faint">Password</dt>
+      <dd className="flex min-w-0 flex-col gap-1.5">
+        <span>{source.in_keychain === true ? keychainLine(source.name) : "none stored: the login has no password"}</span>
+        {editing ? (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (value === "") return;
+              attempt(
+                () =>
+                  onChange(value).then(() => {
+                    setValue("");
+                    setEditing(false);
+                  }),
+                "Could not store the password.",
+              );
+            }}
+          >
+            <label htmlFor={id} className="sr-only">
+              New password
+            </label>
+            <Input id={id} type="password" value={value} onChange={(event) => setValue(event.target.value)} autoComplete="new-password" className="w-56" />
+            <Button size="sm" kind="primary" type="submit" disabled={busy || value === ""}>
+              Store password
+            </Button>
+            <Button
+              size="sm"
+              kind="ghost"
+              onClick={() => {
+                setValue("");
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <span className="basis-full text-meta text-muted">{PASSWORD_NOTE}</span>
+          </form>
+        ) : (
+          <span>
+            <Button size="sm" disabled={busy} onClick={() => setEditing(true)}>
+              Change password
+            </Button>
+          </span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
 function SettingsTab({
   source,
   onPrivacy,
   onWatch,
   onRemove,
+  onChangePassword,
 }: {
   source: DataSource;
   onPrivacy: (privacy: DataPrivacy) => Promise<void>;
   onWatch: (watch: boolean) => Promise<void>;
   onRemove: () => Promise<void>;
+  onChangePassword?: (password: string) => Promise<void>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const builtin = source.scope === "builtin";
+  const server = source.kind === "postgres" || source.kind === "mysql";
 
   function attempt(work: () => Promise<void>, fallback: string): void {
     setError(null);
@@ -395,6 +459,21 @@ function SettingsTab({
             <dt className="w-28 shrink-0 text-faint">Saved in</dt>
             <dd>{savedInText(source.scope)}</dd>
           </div>
+          {server && onChangePassword !== undefined ? <PasswordRow source={source} onChange={onChangePassword} busy={busy} attempt={attempt} /> : null}
+          {server ? (
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-faint">Limits</dt>
+              <dd>{limitsLine(source.timeout_s)}</dd>
+            </div>
+          ) : null}
+          {server && source.warning != null ? (
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-faint">Login</dt>
+              <dd className="text-wait">
+                <span role="status">{source.warning}</span>
+              </dd>
+            </div>
+          ) : null}
           {source.kind === "files" && !builtin ? (
             <div className="flex gap-3">
               <dt className="w-28 shrink-0 text-faint">New files</dt>
@@ -447,6 +526,8 @@ export type SourcePageProps = {
   onPrivacy: (privacy: DataPrivacy) => Promise<void>;
   onWatch: (watch: boolean) => Promise<void>;
   onRemove: () => Promise<void>;
+  /** Stores a new password for a database source in the Keychain. Without it the page has no Change password button. */
+  onChangePassword?: (password: string) => Promise<void>;
   /** Downloads the add-on the source needs. Without it the page only says the add-on is missing. */
   onInstallExtension?: (name: DataExtensionName) => Promise<void>;
 };
@@ -468,6 +549,7 @@ export function SourcePage({
   onPrivacy,
   onWatch,
   onRemove,
+  onChangePassword,
   onInstallExtension,
 }: SourcePageProps) {
   const detail = sourceDetail(source);
@@ -523,7 +605,7 @@ export function SourcePage({
           {described === null ? <p className="text-sm text-muted">{describeMissing ? DATA_NOT_AVAILABLE : "Loading the queries."}</p> : <QueriesTab queries={described.queries ?? []} onRun={onRun} />}
         </TabsContent>
         <TabsContent value="settings">
-          <SettingsTab source={source} onPrivacy={onPrivacy} onWatch={onWatch} onRemove={onRemove} />
+          <SettingsTab source={source} onPrivacy={onPrivacy} onWatch={onWatch} onRemove={onRemove} {...(onChangePassword === undefined ? {} : { onChangePassword })} />
         </TabsContent>
       </Tabs>
     </div>

@@ -25,6 +25,7 @@ export const SAMPLE_SHOP_DEV: DataSource = {
   status: "ready",
   tables: 3,
   rows: 27117,
+  in_keychain: true,
 };
 
 export const SAMPLE_SHOP_PROD: DataSource = {
@@ -36,6 +37,9 @@ export const SAMPLE_SHOP_PROD: DataSource = {
   privacy: "schema",
   status: "ready",
   tables: 2,
+  in_keychain: true,
+  timeout_s: 7,
+  warning: "This login can change data. golem only reads, but a read-only login is safer. To make one: CREATE ROLE golem_ro LOGIN PASSWORD '...'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO golem_ro;",
 };
 
 export const SAMPLE_LOGS: DataSource = {
@@ -229,4 +233,13 @@ export const SAMPLE_INSPECT_PG: DataInspectResult = {
   suggested_privacy: "open",
   privacy_reason: "The database is on localhost and the emails look like seed data.",
   notes: [],
+  url: "postgres://golem_ro@localhost:5432/shop_dev",
+  server_version: "PostgreSQL 17.2",
+};
+
+/** What a test of a database found when the login can write: the same, with the warning. */
+export const SAMPLE_INSPECT_PG_WRITABLE: DataInspectResult = {
+  ...SAMPLE_INSPECT_PG,
+  tables: [...SAMPLE_INSPECT_PG.tables, { name: "audit.events", rows: 1200000, columns: [{ name: "id", type: "BIGINT" }] }],
+  warning: "This login can change data. golem only reads, but a read-only login is safer. To make one: CREATE ROLE golem_ro LOGIN PASSWORD '...'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO golem_ro;",
 };
