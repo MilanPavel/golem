@@ -96,7 +96,8 @@ export function pressRunsManager(
     const cancellable = cancellableWorkflowRun(run);
     return { state, action: cancellable === null ? { kind: "none" } : { kind: "cancel", workflowRunId: cancellable } };
   }
-  return { state, action: isWorkflow ? { kind: "open-workflow", workflowRunId } : { kind: "open", sessionId: run.session_id } };
+  if (isWorkflow) return { state, action: { kind: "open-workflow", workflowRunId } };
+  return { state, action: run.session_id === undefined || run.session_id === null ? { kind: "none" } : { kind: "open", sessionId: run.session_id } };
 }
 
 /** ! needs you, ● running, ✔ finished, ✘ failed, ○ skipped or stopped. */

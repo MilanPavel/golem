@@ -68,6 +68,15 @@ test("Enter on a workflow run opens its steps, also when a routine started it; a
   assert.deepEqual(pressRunsManager({ ...state, selected: 2 }, runs, "enter", NOW).action, { kind: "open", sessionId: "morning-brief" });
 });
 
+test("a workflow run with no session opens by its run id, and a row with no id opens nothing", () => {
+  const bare = { ...wfRun } as Partial<RunInfo> & Pick<RunInfo, "kind" | "origin" | "status">;
+  delete bare.session_id;
+  const state = openRunsManager();
+  assert.deepEqual(pressRunsManager(state, [bare as RunInfo], "enter", NOW).action, { kind: "open-workflow", workflowRunId: "wr_7f3a" });
+  const nothing = { ...bare, workflow_run_id: null } as RunInfo;
+  assert.deepEqual(pressRunsManager(state, [nothing], "enter", NOW).action, { kind: "none" });
+});
+
 test("c cancels a workflow run that has not ended, and does nothing for another row", () => {
   const runs = [wfRun, wfDone, brief, live];
   assert.deepEqual(pressRunsManager(openRunsManager(), runs, "cancel", NOW).action, { kind: "cancel", workflowRunId: "wr_7f3a" });

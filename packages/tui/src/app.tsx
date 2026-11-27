@@ -1145,9 +1145,9 @@ export function App({
     ? RETRY_QUESTION
     : (keychainNotice(keychainWaiting) ?? chat.error ?? serviceText ?? warming ?? chat.notice ?? unreadNotice ?? planNotice ?? setupLine ?? runsSignalNow.banner?.text ?? welcomeLine);
   const runsBannerShown = runsSignalNow.banner !== null && banner === runsSignalNow.banner.text;
-  /** The session whose banner Esc dismisses, while that banner is what shows. */
+  /** The key of the run whose banner Esc dismisses, while that banner is what shows. */
   const runsBannerRef = useRef<string | null>(null);
-  runsBannerRef.current = runsBannerShown ? (runsSignalNow.banner?.sessionId ?? null) : null;
+  runsBannerRef.current = runsBannerShown ? (runsSignalNow.banner?.key ?? null) : null;
   const hintText = liveHint(hint, Date.now())?.text ?? (runsBannerShown ? "Esc to dismiss" : null);
   const suggestMatches =
     chat.busy ||
