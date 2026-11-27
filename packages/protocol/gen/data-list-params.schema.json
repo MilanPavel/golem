@@ -2,6 +2,19 @@
   "additionalProperties": false,
   "description": "``data.list``. Every source the user can see.",
   "properties": {
+    "project": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project"
+    },
     "session_id": {
       "anyOf": [
         {

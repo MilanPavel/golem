@@ -32,6 +32,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   "daemon.status",
   "data.add",
   "data.browse",
+  "data.browse.keep",
   "data.cancel",
   "data.describe",
   "data.export",

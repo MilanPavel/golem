@@ -2,6 +2,7 @@
 
 export type Format = ('csv' | 'parquet' | 'json' | 'xlsx') | null;
 export type Path = string;
+export type Project = string | null;
 export type ResultId = string;
 export type SessionId = string | null;
 
@@ -11,6 +12,7 @@ export type SessionId = string | null;
 export interface DataExportParams {
   format?: Format;
   path: Path;
+  project?: Project;
   result_id: ResultId;
   session_id?: SessionId;
 }

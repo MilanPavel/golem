@@ -6766,6 +6766,8 @@ class DataListParams(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataListResult(BaseModel):
@@ -6905,6 +6907,8 @@ class DataDescribeParams(BaseModel):
     source: str = Field(min_length=1)
     table: str | None = Field(default=None, min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataDescribeResult(BaseModel):
@@ -6930,6 +6934,8 @@ class DataQueryParams(BaseModel):
     result_id: str | None = Field(default=None, min_length=1)
     """An id the client picks, so it can ``data.cancel`` the query by it. None: the daemon picks."""
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataResultPageParams(BaseModel):
@@ -6952,6 +6958,8 @@ class DataProfileParams(BaseModel):
     source: str = Field(min_length=1)
     table: str = Field(min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataTopValue(BaseModel):
@@ -7043,6 +7051,38 @@ class DataBrowseParams(BaseModel):
     search: str | None = Field(default=None, max_length=200)
     """Rows with this text in any text column, in any case."""
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
+
+
+class DataBrowseKeepParams(BaseModel):
+    """``data.browse.keep``. The whole view of a table, kept as a result a person can export.
+
+    The view is the same as ``data.browse``, with no paging. It carries no SQL.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: str = Field(min_length=1)
+    table: str = Field(min_length=1)
+    sort: DataBrowseSort | None = None
+    filters: list[DataBrowseFilter] = Field(default_factory=list[DataBrowseFilter])
+    """At most 20: the data engine refuses more."""
+    search: str | None = Field(default=None, max_length=200)
+    session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
+
+
+class DataBrowseKeepResult(BaseModel):
+    """The kept view. ``truncated`` is true when the usual row cap cut it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    result_id: str = Field(min_length=1)
+    rows: int = Field(ge=0)
+    """How many rows were kept."""
+    truncated: bool = False
 
 
 class DataBrowseResult(BaseModel):
@@ -7066,6 +7106,8 @@ class DataExportParams(BaseModel):
     format: Literal["csv", "parquet", "json", "xlsx"] | None = None
     """None: from the end of ``path``."""
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
     """The session whose folder a relative ``path`` is relative to, and whose sources count."""
 
 
@@ -7100,6 +7142,8 @@ class DataNotesGetParams(BaseModel):
 
     source: str = Field(min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataNotesGetResult(BaseModel):
@@ -7119,6 +7163,8 @@ class DataNotesSetParams(BaseModel):
     source: str = Field(min_length=1)
     text: str
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataNotesSetResult(BaseModel):
@@ -7136,6 +7182,8 @@ class DataNotesDraftParams(BaseModel):
 
     source: str = Field(min_length=1)
     session_id: str | None = Field(default=None, min_length=1)
+    project: str | None = Field(default=None, min_length=1)
+    """A trusted project folder whose sources count, when there is no ``session_id``."""
 
 
 class DataNotesDraftResult(BaseModel):
@@ -7274,6 +7322,8 @@ __all__ = [
     "DataAddParams",
     "DataAddResult",
     "DataBrowseFilter",
+    "DataBrowseKeepParams",
+    "DataBrowseKeepResult",
     "DataBrowseParams",
     "DataBrowseResult",
     "DataBrowseSort",

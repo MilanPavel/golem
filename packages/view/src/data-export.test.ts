@@ -3,7 +3,12 @@ import { test } from "node:test";
 
 import { approvalQuestion } from "./activity.ts";
 import { countText } from "./data.ts";
-import { defaultExportPath, exportedText, exportHeading, formatOfPath, withFormat } from "./data-export.ts";
+import { defaultExportPath, exportCutText, exportedText, exportHeading, formatOfPath, withFormat } from "./data-export.ts";
+
+test("the cut line says how many rows go into the file, out of how many", () => {
+  assert.equal(exportCutText(1000, 5000), `${countText(1000)} rows of ${countText(5000)} rows will be exported: the query had more rows than were kept.`);
+  assert.equal(exportCutText(1, null), "1 row will be exported: the query had more rows than were kept.");
+});
 
 test("the name a dialog starts with is the source, today's local date and the ending of the format", () => {
   const day = new Date(2026, 10, 5, 23, 59);

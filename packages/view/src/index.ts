@@ -101,6 +101,7 @@ export {
   EXPORT_FORMATS,
   EXPORT_NEW_FILE_NOTE,
   EXPORT_TITLE,
+  exportCutText,
   exportHeading,
   exportedText,
   formatOfPath,

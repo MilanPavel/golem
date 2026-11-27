@@ -85,6 +85,7 @@ from golem.server.chat_edit import (
 from golem.server.data_rpc import (
     data_add,
     data_browse,
+    data_browse_keep,
     data_cancel,
     data_describe,
     data_export,
@@ -302,6 +303,7 @@ from golem_protocol.commands import (
     CostTotals,
     DaemonStatus,
     DataAddParams,
+    DataBrowseKeepParams,
     DataBrowseParams,
     DataCancelParams,
     DataDescribeParams,
@@ -2606,6 +2608,9 @@ def standard_methods() -> dict[str, Method]:
         "data.query": Method("data.query", DataQueryParams, True, data_query),
         "data.profile": Method("data.profile", DataProfileParams, True, data_profile),
         "data.browse": Method("data.browse", DataBrowseParams, True, data_browse),
+        "data.browse.keep": Method(
+            "data.browse.keep", DataBrowseKeepParams, True, data_browse_keep
+        ),
         "data.cancel": Method("data.cancel", DataCancelParams, True, data_cancel),
         "data.inspect": Method("data.inspect", DataInspectParams, True, data_inspect),
         "data.add": Method("data.add", DataAddParams, True, data_add),

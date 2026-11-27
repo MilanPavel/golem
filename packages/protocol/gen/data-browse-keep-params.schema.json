@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "DataBrowseFilter": {
+      "additionalProperties": false,
+      "description": "One test on a column. ``=`` needs a ``value``; ``is null`` takes none.",
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "=",
+            "is null"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "column",
+        "op"
+      ],
+      "title": "DataBrowseFilter",
+      "type": "object"
+    },
+    "DataBrowseSort": {
+      "additionalProperties": false,
+      "description": "A column to sort a view by.",
+      "properties": {
+        "column": {
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "desc": {
+          "default": false,
+          "title": "Desc",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "column"
+      ],
+      "title": "DataBrowseSort",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "``data.browse.keep``. The whole view of a table, kept as a result a person can export.\n\nThe view is the same as ``data.browse``, with no paging. It carries no SQL.",
+  "properties": {
+    "filters": {
+      "items": {
+        "$ref": "#/$defs/DataBrowseFilter"
+      },
+      "title": "Filters",
+      "type": "array"
+    },
+    "project": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project"
+    },
+    "search": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Search"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "sort": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DataBrowseSort"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "table": {
+      "minLength": 1,
+      "title": "Table",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "table"
+  ],
+  "title": "DataBrowseKeepParams",
+  "type": "object"
+}

@@ -19,7 +19,7 @@ import { MEMORY_LIST_KEY, MEMORY_PAGE, type MemoryExportParams, type MemoryExpor
 import { ROUTINE_GET_KEY, ROUTINE_LIST_KEY, type RoutineGetResult, type RoutineInfo, type RoutineListResult, type RoutineRunResult } from "./routines.ts";
 import { RUN_LIST_KEY, type RunListResult } from "./runs.ts";
 import { WORKFLOW_LIST_KEY, WORKFLOW_STATUS_KEY, workflowGetKey, type ReviewVerdict, type WorkflowAddStarterResult, type WorkflowCancelResult, type WorkflowCheckResult, type WorkflowProposeResult, type WorkflowSaveResult, type WorkflowGetResult, type WorkflowListResult, type WorkflowStartersResult, type WorkflowReadOutputResult, type WorkflowResumeResult, type WorkflowStatusResult, type WorkflowEditStepResult } from "./workflows.ts";
-import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
+import { DATA_DESCRIBE_KEY, DATA_LIST_KEY, DATA_NOTES_KEY, dataAnswer, type DataBrowseKeepResult, type DataBrowseKeepView, type DataBrowseResult, type DataBrowseView, type DataProfileResult, type DataAddParams, type DataAnswer, type DataExportParams, type DataExportResult, type DataExtensionName, type DataResult, type DataResultPageParams, type DataDescribeResult, type DataInspectParams, type DataInspectResult, type DataListResult, type DataNotesGetResult, type DataSource, type DataUpdateParams } from "./data.ts";
 import { createPulls, type Pulls } from "./pulls.ts";
 import { createQueryClient, keepQueriesHonest } from "./query.ts";
 import { createRouter, type Router } from "./router.ts";
@@ -78,6 +78,7 @@ export type PageClient = Pick<
   | "pageDataResult"
   | "profileData"
   | "browseData"
+  | "browseDataKeep"
   | "exportDataResult"
   | "installDataExtension"
   | "addData"
@@ -430,11 +431,13 @@ export type PageActions = {
   /** Connects to a Postgres or MySQL database with a password for this one look, and reads its tables. Nothing is saved. Rejects with the daemon's reason. */
   dataInspectDatabase(params: DataInspectParams): Promise<DataInspectResult>;
   /** One page of a table of a source, sorted and filtered across all of it. Rejects with the daemon's reason, such as a column that is not there. */
-  dataBrowse(name: string, table: string, view: DataBrowseView): Promise<DataBrowseResult>;
+  dataBrowse(name: string, table: string, view: DataBrowseView, project: string | null): Promise<DataBrowseResult>;
+  /** Keeps the whole current view of a table as a result to export: the same filters, search and sort, no paging. The daemon builds the SQL. */
+  dataBrowseKeep(name: string, table: string, view: DataBrowseKeepView, project: string | null): Promise<DataBrowseKeepResult>;
   /** One page of a kept query result. Rejects with the daemon's reason, such as a result that is no longer kept. */
   dataResultPage(params: DataResultPageParams): Promise<DataResult>;
   /** Writes a kept result to a new file. The answer has `needs_extension` and no file when the Excel add-on is not here. Rejects with the reason, such as a file that exists. */
-  dataExportResult(params: DataExportParams): Promise<DataExportResult>;
+  dataExportResult(params: DataExportParams, project?: string | null): Promise<DataExportResult>;
   /** Downloads the Excel or SQLite add-on, once. The sources are read again. Rejects with the reason, such as no network. */
   dataInstallExtension(name: DataExtensionName): Promise<void>;
   /** Adds a source. The list is read again. Rejects with the daemon's reason. */
@@ -444,9 +447,9 @@ export type PageActions = {
   /** Forgets a source. The list is read again. */
   dataRemove(name: string): Promise<void>;
   /** Saves the notes of a source. Resolves with the file they were saved to. */
-  dataNotesSet(name: string, text: string): Promise<string>;
+  dataNotesSet(name: string, text: string, project: string | null): Promise<string>;
   /** A proposal for the notes of a source. It is not saved. */
-  dataNotesDraft(name: string): Promise<string>;
+  dataNotesDraft(name: string, project: string | null): Promise<string>;
   /** Starts a run of the workflow `id` with `inputs`. Resolves with the workflow run id, which `/runs/:id` opens it by. */
   startWorkflow(id: string, inputs: Record<string, unknown>): Promise<string>;
   /** Writes a starter as a workflow file: in `folder` for a starter that reads a project, in the user's folder when `folder` is null. With `routine` it also makes the starter's routine, and the routine list is read again too. The workflow list is read again. Resolves with the result: its `id` is the new workflow's, which `/workflows/:id` opens it by, and `routine_problem` says why the routine was not made. Rejects with the daemon's reason: the folder is not trusted, the file exists. */
@@ -552,13 +555,13 @@ export type PageQueries = {
   /** One run of a workflow, with its steps and the reviews that wait. */
   workflowStatus(workflowRunId: string): Promise<WorkflowStatusResult>;
   /** Every data source the person can see, or the news that the daemon does not know `data.list`. */
-  dataList(): Promise<DataAnswer<DataListResult>>;
+  dataList(project: string | null): Promise<DataAnswer<DataListResult>>;
   /** One source with its tables and sample. With `table`, that table's sample on its own. */
-  dataDescribe(name: string, table: string | null): Promise<DataAnswer<DataDescribeResult>>;
+  dataDescribe(name: string, table: string | null, project: string | null): Promise<DataAnswer<DataDescribeResult>>;
   /** The shape of each column of one table of a source, or the news that the daemon does not know `data.profile`. */
-  dataProfile(name: string, table: string): Promise<DataAnswer<DataProfileResult>>;
+  dataProfile(name: string, table: string, project: string | null): Promise<DataAnswer<DataProfileResult>>;
   /** The notes of a source. */
-  dataNotes(name: string): Promise<DataAnswer<DataNotesGetResult>>;
+  dataNotes(name: string, project: string | null): Promise<DataAnswer<DataNotesGetResult>>;
   /** The runs, one per headless session, newest first. With `sessionId`, that session's row alone. */
   runList(sessionId: string | null): Promise<RunListResult>;
   /** One routine and its recent runs, newest first. `folder` is a project routine's project, null a user routine. */
@@ -706,10 +709,10 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       workflowStarters: () => client.listWorkflowStarters(),
       workflowGet: (id) => client.getWorkflow(id),
       workflowStatus: (workflowRunId) => client.workflowStatus(workflowRunId),
-      dataList: () => dataAnswer(() => client.listData()),
-      dataDescribe: (name, table) => dataAnswer(() => (table === null ? client.describeData(name) : client.describeData(name, table))),
-      dataProfile: (name, table) => dataAnswer(() => client.profileData(name, table)),
-      dataNotes: (name) => dataAnswer(() => client.getDataNotes(name)),
+      dataList: (project) => dataAnswer(() => (project === null ? client.listData() : client.listData(project))),
+      dataDescribe: (name, table, project) => dataAnswer(() => (project !== null ? client.describeData(name, table ?? undefined, project) : table === null ? client.describeData(name) : client.describeData(name, table))),
+      dataProfile: (name, table, project) => dataAnswer(() => (project === null ? client.profileData(name, table) : client.profileData(name, table, project))),
+      dataNotes: (name, project) => dataAnswer(() => (project === null ? client.getDataNotes(name) : client.getDataNotes(name, project))),
       runList: (sessionId) => (sessionId === null ? client.listRuns() : client.listRuns({ sessionId })),
       routineGet: (name, folder) => (folder === null ? client.getRoutine(name) : client.getRoutine(name, folder)),
       config: (cwd, sessionId) => client.getConfig(cwd ?? undefined, sessionId ?? undefined),
@@ -1010,9 +1013,10 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
       },
       dataInspect: (location) => client.inspectData(location),
       dataInspectDatabase: (params) => client.inspectDatabase(params),
-      dataBrowse: (name, table, view) => client.browseData({ source: name, table, ...view }),
+      dataBrowse: (name, table, view, project) => client.browseData({ source: name, table, ...view, ...(project === null ? {} : { project }) }),
+      dataBrowseKeep: (name, table, view, project) => client.browseDataKeep({ source: name, table, ...view, ...(project === null ? {} : { project }) }),
       dataResultPage: (params) => client.pageDataResult(params.result_id, params.offset, params.limit),
-      dataExportResult: (params) => client.exportDataResult(params.result_id, params.path, params.format),
+      dataExportResult: (params, project) => (project == null ? client.exportDataResult(params.result_id, params.path, params.format) : client.exportDataResult(params.result_id, params.path, params.format, undefined, project)),
       async dataInstallExtension(name) {
         try {
           await client.installDataExtension(name);
@@ -1043,12 +1047,12 @@ export function createPage(client: PageClient, options: PageOptions = {}): Page 
           await queryClient.invalidateQueries({ queryKey: DATA_LIST_KEY });
         }
       },
-      async dataNotesSet(name, text) {
-        const saved = await client.setDataNotes(name, text);
+      async dataNotesSet(name, text, project) {
+        const saved = await (project === null ? client.setDataNotes(name, text) : client.setDataNotes(name, text, project));
         await queryClient.invalidateQueries({ queryKey: [...DATA_NOTES_KEY, name] });
         return saved.path;
       },
-      dataNotesDraft: async (name) => (await client.draftDataNotes(name)).text,
+      dataNotesDraft: async (name, project) => (await (project === null ? client.draftDataNotes(name) : client.draftDataNotes(name, project))).text,
       async startWorkflow(id, inputs) {
         const started = await client.startWorkflow(id, inputs);
         void queryClient.invalidateQueries({ queryKey: RUN_LIST_KEY });

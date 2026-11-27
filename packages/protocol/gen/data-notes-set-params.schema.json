@@ -2,6 +2,19 @@
   "additionalProperties": false,
   "description": "``data.notes.set``.",
   "properties": {
+    "project": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project"
+    },
     "session_id": {
       "anyOf": [
         {

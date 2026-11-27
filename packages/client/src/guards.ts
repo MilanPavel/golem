@@ -78,6 +78,7 @@ import type { DataChanged } from "../../protocol/gen/data-changed.ts";
 import type { DataExportResult } from "../../protocol/gen/data-export-result.ts";
 import type { DataExtensionInstallResult } from "../../protocol/gen/data-extension-install-result.ts";
 import type { DataCancelResult } from "../../protocol/gen/data-cancel-result.ts";
+import type { DataBrowseKeepResult } from "../../protocol/gen/data-browse-keep-result.ts";
 import type { DataBrowseResult } from "../../protocol/gen/data-browse-result.ts";
 import type { DataDescribeResult } from "../../protocol/gen/data-describe-result.ts";
 import type { DataProfileResult } from "../../protocol/gen/data-profile-result.ts";
@@ -594,6 +595,10 @@ export function isDataProfileResult(value: unknown): value is DataProfileResult 
     Array.isArray(value["columns"]) &&
     value["columns"].every((column) => isRecord(column) && typeof column["name"] === "string" && typeof column["shape"] === "string" && typeof column["empty"] === "number" && typeof column["distinct"] === "number")
   );
+}
+
+export function isDataBrowseKeepResult(value: unknown): value is DataBrowseKeepResult {
+  return isRecord(value) && typeof value["result_id"] === "string" && typeof value["rows"] === "number" && (value["truncated"] === undefined || typeof value["truncated"] === "boolean");
 }
 
 export function isDataBrowseResult(value: unknown): value is DataBrowseResult {

@@ -56,6 +56,7 @@ public enum MethodAccess {
         "daemon.status",
         "data.add",
         "data.browse",
+        "data.browse.keep",
         "data.cancel",
         "data.describe",
         "data.export",

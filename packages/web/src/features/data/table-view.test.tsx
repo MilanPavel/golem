@@ -8,7 +8,7 @@ import type { ConnectionSnapshot } from "../../store/connection.ts";
 import { createPage } from "../../store/page.ts";
 import { PageProvider } from "../../store/page-context.tsx";
 import { fakeClient, fakeFrame, rpcError } from "../../store/test-support.ts";
-import type { DataBrowseResult, DataBrowseView } from "../../store/data.ts";
+import type { DataBrowseKeepResult, DataBrowseKeepView, DataBrowseResult, DataBrowseView } from "../../store/data.ts";
 import type { DataTab } from "../../store/router.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { SAMPLE_BANK_DESCRIBED } from "./sample.ts";
@@ -302,4 +302,89 @@ test("a daemon without data.profile says to update, and the rest of the page sti
   });
   expect((await screen.findByText(/Column charts need a newer golem/)).getAttribute("role")).toBe("alert");
   expect(screen.getByRole("tab", { name: "Queries" })).toBeTruthy();
+});
+
+// -- Export on the Rows tab -------------------------------------------------------------------------
+
+function ExportHarness({ onKeep, onExport = () => Promise.resolve({ path: "/tmp/a.csv", rows: 3 }), first }: { onKeep: (table: string, view: DataBrowseKeepView) => Promise<DataBrowseKeepResult>; onExport?: () => Promise<{ path: string; rows: number }>; first: RowsView }) {
+  const [view, setView] = useState(first);
+  return <RowsBrowser source="titanic" table="titanic" columns={COLUMNS} tableRows={TOTAL} view={view} onView={setView} onBrowse={(_table, each) => Promise.resolve(answer(each, 312))} onAskView={() => {}} onKeep={onKeep} onExport={onExport} />;
+}
+
+test("Export asks for the kept view with the filters, the search and the sort, and no paging or SQL, then opens the dialog", async () => {
+  const user = userEvent.setup();
+  const onKeep = vi.fn(() => Promise.resolve({ result_id: "res_kept", rows: 312, truncated: false }));
+  render(<ExportHarness onKeep={onKeep} first={{ filters: [{ column: "Sex", op: "=", value: "female" }], search: "Ann", sort: { column: "Fare", desc: true } }} />);
+  await ready();
+  await user.click(screen.getByRole("button", { name: "Export…" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(onKeep).toHaveBeenCalledTimes(1);
+  expect(onKeep.mock.calls[0]).toEqual(["titanic", { sort: { column: "Fare", desc: true }, filters: [{ column: "Sex", op: "=", value: "female" }], search: "Ann" }]);
+  expect(JSON.stringify(onKeep.mock.calls)).not.toMatch(/select|offset|limit/i);
+  expect(within(dialog).getByText(/312 rows from @titanic/)).toBeTruthy();
+  expect(within(dialog).queryByText(/more rows than were kept/)).toBeNull();
+});
+
+test("a view cut by the row cap says how many rows go into the file, out of how many", async () => {
+  const user = userEvent.setup();
+  render(<ExportHarness onKeep={() => Promise.resolve({ result_id: "res_kept", rows: 100, truncated: true })} first={EMPTY_VIEW} />);
+  await ready();
+  await user.click(screen.getByRole("button", { name: "Export…" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText(/100 rows of 312 rows will be exported: the query had more rows than were kept\./)).toBeTruthy();
+});
+
+test("a view that cannot be kept says why, and no dialog opens", async () => {
+  const user = userEvent.setup();
+  render(<ExportHarness onKeep={() => Promise.reject(new Error("There is no column called Nope in this table."))} first={EMPTY_VIEW} />);
+  await ready();
+  await user.click(screen.getByRole("button", { name: "Export…" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("There is no column called Nope in this table.");
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("on the live page, Export keeps the view of the source's project and writes it", async () => {
+  const user = userEvent.setup();
+  sidebarItemStore.set("data");
+  const mine = { ...SAMPLE_TITANIC, scope: "project", project: "/work/shop" } as const;
+  const fake = mount("/data/titanic?tab=rows", ({ raw }) => {
+    raw.listData.mockResolvedValue({ sources: [mine] });
+    raw.describeData.mockResolvedValue({ source: mine, tables: [SAMPLE_TITANIC_TABLE], sample: {}, queries: [] });
+    raw.browseData.mockImplementation((params) => Promise.resolve(answer(params)));
+    raw.browseDataKeep.mockResolvedValue({ result_id: "res_kept", rows: 2000, truncated: false });
+    raw.exportDataResult.mockResolvedValue({ path: "/tmp/a.csv", rows: 2000 });
+  });
+  await ready();
+  await user.click(screen.getByRole("button", { name: "Export…" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(fake.raw.browseDataKeep).toHaveBeenCalledWith({ source: "titanic", table: "titanic", filters: [], project: "/work/shop" });
+  await user.click(within(dialog).getByRole("button", { name: "Export" }));
+  await waitFor(() => expect(fake.raw.exportDataResult).toHaveBeenCalled());
+  expect(fake.raw.exportDataResult.mock.calls[0]).toEqual(["res_kept", expect.stringMatching(/\.csv$/), "csv", undefined, "/work/shop"]);
+});
+
+// -- notes of a project's source, with no chat open --------------------------------------------------
+
+test("the Notes tab of a project's source loads with no session, through the source's project folder", async () => {
+  sidebarItemStore.set("data");
+  const mine = { ...SAMPLE_TITANIC, name: "mine", scope: "project", project: "/work/shop" } as const;
+  const fake = mount("/data/mine?tab=notes", ({ raw }) => {
+    raw.listData.mockResolvedValue({ sources: [mine] });
+    raw.describeData.mockResolvedValue({ source: mine, tables: [SAMPLE_TITANIC_TABLE], sample: {}, queries: [] });
+    raw.getDataNotes.mockResolvedValue({ text: "Prices are in euros.", path: "/work/shop/.golem/data/mine/DATA.md" });
+  });
+  expect(await screen.findByText(/Prices are in euros\./)).toBeTruthy();
+  expect(fake.raw.getDataNotes).toHaveBeenCalledWith("mine", "/work/shop");
+  expect(fake.raw.describeData).toHaveBeenCalledWith("mine", undefined, "/work/shop");
+});
+
+test("a project that is not trusted is said in one sentence on the Notes tab", async () => {
+  sidebarItemStore.set("data");
+  const mine = { ...SAMPLE_TITANIC, name: "mine", scope: "project", project: "/work/shop" } as const;
+  mount("/data/mine?tab=notes", ({ raw }) => {
+    raw.listData.mockResolvedValue({ sources: [mine] });
+    raw.describeData.mockResolvedValue({ source: mine, tables: [SAMPLE_TITANIC_TABLE], sample: {}, queries: [] });
+    raw.getDataNotes.mockRejectedValue(new Error("The project /work/shop is not trusted, so its sources are not opened. Trust the project first."));
+  });
+  expect(await screen.findByText("The project /work/shop is not trusted, so its sources are not opened. Trust the project first.")).toBeTruthy();
 });

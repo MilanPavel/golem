@@ -16,21 +16,21 @@ const SOURCE = { name: "bank", kind: "files", scope: "user", location: "~/b/*.cs
 test("list and describe read through the client, and a source's table is its own key", async () => {
   const { fake, page } = build();
   fake.raw.listData.mockResolvedValue({ sources: [SOURCE] });
-  expect(await page.queries.dataList()).toEqual({ status: "ready", data: { sources: [SOURCE] } });
-  await page.queries.dataDescribe("bank", null);
-  await page.queries.dataDescribe("bank", "transactions");
-  expect(fake.raw.describeData.mock.calls).toEqual([["bank"], ["bank", "transactions"]]);
+  expect(await page.queries.dataList(null)).toEqual({ status: "ready", data: { sources: [SOURCE] } });
+  await page.queries.dataDescribe("bank", null, null);
+  await page.queries.dataDescribe("bank", "transactions", "/work/shop");
+  expect(fake.raw.describeData.mock.calls).toEqual([["bank"], ["bank", "transactions", "/work/shop"]]);
   expect(dataDescribeKey("bank")).not.toEqual(dataDescribeKey("bank", "transactions"));
 });
 
 test("a method the daemon does not know is a state, any other failure is thrown", async () => {
   const { fake, page } = build();
   fake.raw.listData.mockRejectedValue(rpcError(-32601, "method not found"));
-  expect(await page.queries.dataList()).toEqual({ status: "missing" });
+  expect(await page.queries.dataList(null)).toEqual({ status: "missing" });
   fake.raw.getDataNotes.mockRejectedValue(rpcError(-32601, "method not found"));
-  expect(await page.queries.dataNotes("bank")).toEqual({ status: "missing" });
+  expect(await page.queries.dataNotes("bank", null)).toEqual({ status: "missing" });
   fake.raw.describeData.mockRejectedValue(new Error("boom"));
-  await expect(page.queries.dataDescribe("bank", null)).rejects.toThrow("boom");
+  await expect(page.queries.dataDescribe("bank", null, null)).rejects.toThrow("boom");
   await expect(dataAnswer(() => Promise.reject(rpcError(-32602, "bad")))).rejects.toThrow("bad");
   expect(dataErrorText(rpcError(-32601, "x"), "f")).toContain("Update golem");
   expect(dataErrorText(new Error("no such file"), "f")).toBe("no such file");
@@ -48,8 +48,8 @@ test("add, update, remove and the notes actions call the client, and a change ma
   expect(fake.raw.updateData).toHaveBeenCalledWith({ name: "bank", privacy: "schema" });
   await page.actions.dataRemove("bank");
   expect(fake.raw.removeData).toHaveBeenCalledWith("bank");
-  expect(await page.actions.dataNotesSet("bank", "# hi")).toBe("~/.golem/data/x.md");
-  expect(await page.actions.dataNotesDraft("bank")).toBe("# x\n");
+  expect(await page.actions.dataNotesSet("bank", "# hi", null)).toBe("~/.golem/data/x.md");
+  expect(await page.actions.dataNotesDraft("bank", null)).toBe("# x\n");
   expect(await page.actions.dataInspect("~/b/*.csv")).toMatchObject({ suggested_name: "x" });
   await page.actions.dataInspectDatabase({ kind: "mysql", host: "h", database: "d", password: "pw" });
   expect(fake.raw.inspectDatabase).toHaveBeenCalledWith({ kind: "mysql", host: "h", database: "d", password: "pw" });
@@ -75,4 +75,21 @@ test("data.changed marks the list and that source stale; with no source, every d
   fake.emitData({ reason: "added", source: null });
   expect(stale()).toHaveLength(4);
   off();
+});
+
+test("a project's source is asked for by its project folder, in the list, the notes and the kept view", async () => {
+  const { fake, page } = build();
+  fake.raw.listData.mockResolvedValue({ sources: [SOURCE] });
+  await page.queries.dataList("/work/shop");
+  await page.queries.dataNotes("mine", "/work/shop");
+  await page.actions.dataNotesSet("mine", "# hi", "/work/shop");
+  await page.actions.dataNotesDraft("mine", "/work/shop");
+  expect(fake.raw.listData).toHaveBeenCalledWith("/work/shop");
+  expect(fake.raw.getDataNotes).toHaveBeenCalledWith("mine", "/work/shop");
+  expect(fake.raw.setDataNotes).toHaveBeenCalledWith("mine", "# hi", "/work/shop");
+  expect(fake.raw.draftDataNotes).toHaveBeenCalledWith("mine", "/work/shop");
+  await page.actions.dataBrowseKeep("mine", "t", { filters: [{ column: "a", op: "=", value: 1 }], search: "x" }, "/work/shop");
+  expect(fake.raw.browseDataKeep).toHaveBeenCalledWith({ source: "mine", table: "t", filters: [{ column: "a", op: "=", value: 1 }], search: "x", project: "/work/shop" });
+  await page.actions.dataBrowseKeep("mine", "t", { filters: [] }, null);
+  expect(fake.raw.browseDataKeep).toHaveBeenLastCalledWith({ source: "mine", table: "t", filters: [] });
 });

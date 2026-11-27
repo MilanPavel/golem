@@ -91,6 +91,19 @@
       "title": "Offset",
       "type": "integer"
     },
+    "project": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project"
+    },
     "search": {
       "anyOf": [
         {

@@ -933,6 +933,51 @@ class DataSources:
             answer["columns"], answer["rows"], total, int(answer.get("elapsed_ms", 0))
         )
 
+    async def keep_browse(
+        self,
+        root: Path | None,
+        name: str,
+        table: str,
+        *,
+        sort: dict[str, Any] | None = None,
+        filters: list[dict[str, Any]] | None = None,
+        search: str | None = None,
+        result_id: str | None = None,
+    ) -> QueryResult:
+        """The whole view of ``table`` as a kept result, up to the usual row cap.
+
+        It is the same view :meth:`browse` pages, built by the same worker code, and it runs
+        the way a query does, so ``truncated`` says when the cap cut it. Raises
+        :class:`DataError`.
+        """
+        entry = self._entry(root, name)
+        opened = await self._ensure(entry)
+        self._visible_table(entry, opened, table)
+        ident = result_id or f"res_{uuid.uuid4().hex[:12]}"
+        label = f"A view of {table}"
+        answer = await self._worker.browse_keep(
+            entry.key,
+            table,
+            {
+                "sort": sort,
+                "filters": list(filters or []),
+                "search": (search or "").strip() or None,
+            },
+            store=self.results.path(ident),
+            result_id=ident,
+            label=label,
+        )
+        return QueryResult(
+            result_id=ident,
+            source=name,
+            columns=answer["columns"],
+            rows=answer["rows"],
+            truncated=bool(answer["truncated"]),
+            elapsed_ms=int(answer["elapsed_ms"]),
+            stored=bool(answer.get("stored", False)),
+            sql=label,
+        )
+
     async def _sample(self, entry: _Entry, table: str, count: int) -> list[list[Any]]:
         server = entry.kind in DATABASE_KINDS
         bound = f" limit {count}" if server else ""

@@ -649,29 +649,30 @@ export function useWorkflowStatus(workflowRunId: string): UseQueryResult<Workflo
 /** The data sources, or the news that the daemon does not know them yet. Marked stale by `data.changed` and by every data action. */
 export function useDataList(enabled = true): UseQueryResult<DataAnswer<DataListResult>> {
   const { queries } = usePage();
-  return useQuery({ queryKey: [...DATA_LIST_KEY], queryFn: queries.dataList, enabled, retry: false });
+  const [folder] = useNewSessionFolder();
+  return useQuery({ queryKey: [...DATA_LIST_KEY, folder], queryFn: () => queries.dataList(folder), enabled, retry: false });
 }
 
 /** One source with its tables, sample, notes and saved queries. `table` asks for that table's sample on its own; `enabled` false waits. */
-export function useDataDescribe(name: string, table: string | null = null, enabled = true): UseQueryResult<DataAnswer<DataDescribeResult>> {
+export function useDataDescribe(name: string, project: string | null, table: string | null = null, enabled = true): UseQueryResult<DataAnswer<DataDescribeResult>> {
   const { queries } = usePage();
-  return useQuery({ queryKey: dataDescribeKey(name, table), queryFn: () => queries.dataDescribe(name, table), enabled, retry: false });
+  return useQuery({ queryKey: [...dataDescribeKey(name, table), project], queryFn: () => queries.dataDescribe(name, table, project), enabled, retry: false });
 }
 
 /** Reads the shape of each column of one table of a source. A missing method rejects with its error. */
-export function useDataProfileLoader(name: string): (table: string) => Promise<DataProfileResult> {
+export function useDataProfileLoader(name: string, project: string | null): (table: string) => Promise<DataProfileResult> {
   const { queries } = usePage();
   return async (table) => {
-    const answer = await queries.dataProfile(name, table);
+    const answer = await queries.dataProfile(name, table, project);
     if (answer.status === "missing") throw new RpcError(-32601, "method not found");
     return answer.data;
   };
 }
 
 /** The notes of a source. */
-export function useDataNotes(name: string): UseQueryResult<DataAnswer<DataNotesGetResult>> {
+export function useDataNotes(name: string, project: string | null, enabled = true): UseQueryResult<DataAnswer<DataNotesGetResult>> {
   const { queries } = usePage();
-  return useQuery({ queryKey: dataNotesKey(name), queryFn: () => queries.dataNotes(name), retry: false });
+  return useQuery({ queryKey: [...dataNotesKey(name), project], queryFn: () => queries.dataNotes(name, project), enabled, retry: false });
 }
 
 /** The runs, one per headless session, newest first. Marked stale when a routine fires or ends and when a headless session changes. */
