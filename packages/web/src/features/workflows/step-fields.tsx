@@ -144,12 +144,13 @@ function Control({ spec, step, value, id, busy, agents, models, onCommit }: { sp
 }
 
 /**
- * `key=` as a tick box. Ticking a step with no key writes one made from its title. A key the code already has cannot be
- * taken out from here (the daemon sets arguments, it does not remove them), and a step that repeats needs a key for each
- * round, which only the code can say: both point to the code.
+ * `key=` as a tick box. Ticking a step with no key writes one made from its title; unticking takes the key out of the
+ * call (a null value). A key the code computes cannot be taken out from here (the daemon refuses a computed value), and a
+ * step that repeats needs a key for each round, which only the code can say: both point to the code, with the reason shown.
  */
-function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: WorkflowOutlineStep; arg: WorkflowStepArg | undefined; id: string; busy: boolean; error: string | null; onSet: (value: string) => void; onJump?: (line: number) => void }) {
+function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: WorkflowOutlineStep; arg: WorkflowStepArg | undefined; id: string; busy: boolean; error: string | null; onSet: (value: string | null) => void; onJump?: (line: number) => void }) {
   const on = arg !== undefined;
+  const computed = on && !arg.literal;
   const repeats = !on && Boolean(step.for_each);
   const hint = on ? `key=${arg.source}` : repeats ? "key=f\"…{item}\"" : `key="${suggestedKey(step)}"`;
   return (
@@ -160,8 +161,8 @@ function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: Workflow
           type="checkbox"
           aria-describedby={`${id}-note`}
           checked={on}
-          disabled={busy || on || repeats}
-          onChange={() => onSet(suggestedKey(step))}
+          disabled={busy || computed || repeats}
+          onChange={() => onSet(on ? null : suggestedKey(step))}
           className="mt-1 accent-clay"
         />
         <span className="min-w-0">
@@ -177,9 +178,11 @@ function OnceBox({ step, arg, id, busy, error, onSet, onJump }: { step: Workflow
             ? "Writing…"
             : repeats
               ? "This step repeats, so each round needs its own key. Write it in the code."
-              : on
-                ? `To turn it off, take key out of line ${arg.line} of the code.`
-                : "Not written in the code. Ticking it adds it.")}
+              : computed
+                ? `The code computes this key, so it is set in code (line ${arg.line}).`
+                : on
+                  ? `Unticking it takes key out of line ${arg.line} of the code.`
+                  : "Not written in the code. Ticking it adds it.")}
         {on && onJump !== undefined ? (
           <>
             {" "}

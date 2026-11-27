@@ -182,6 +182,7 @@ def test_the_outline_is_numbered_for_the_prompt() -> None:
 class _Service:
     def __init__(self, made: Any) -> None:
         self.made = made
+        self.check_env = None
 
     async def refresh(self, folders: list[Any]) -> list[Any]:
         return [SimpleNamespace(id="w1", name="flow")]

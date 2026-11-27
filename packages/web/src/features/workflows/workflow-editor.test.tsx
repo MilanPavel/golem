@@ -432,6 +432,33 @@ test("a field that was not changed writes nothing, and a missing one is added wh
   await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", "worker-upgrade-httpx-fix"));
 });
 
+function keyedSteps(literal: boolean) {
+  const key = literal ? { name: "key", source: '"worker-upgrade"', literal: true, value: "worker-upgrade", line: 7, col: 10, end_line: 7, end_col: 26 } : { name: "key", source: 'f"upgrade-{n}"', literal: false, line: 7, col: 10, end_line: 7, end_col: 24 };
+  return SAMPLE_UPGRADE_STEPS.map((step) => (step.id === "agent:worker" ? { ...step, key: key.source, args: [...(step.args ?? []), key] } : step));
+}
+
+test("a written key is a ticked box, and unticking it sends a null value that takes key out", async () => {
+  const user = userEvent.setup();
+  const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
+  render(fieldsEditor(onEditStep, { steps: keyedSteps(true) }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const box = pane.getByRole("checkbox", { name: "Only once" }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  expect(box.disabled).toBe(false);
+  expect(pane.getByText("Unticking it takes key out of line 7 of the code.")).toBeTruthy();
+  await user.click(box);
+  await waitFor(() => expect(onEditStep).toHaveBeenCalledWith(SAMPLE_UPGRADE_CODE, "agent:worker", "key", null));
+});
+
+test("a key the code computes stays ticked and says it is set in code", () => {
+  render(fieldsEditor(vi.fn<EditFn>(), { steps: keyedSteps(false) }));
+  const pane = within(screen.getByRole("group", { name: "Selected step" }));
+  const box = pane.getByRole("checkbox", { name: "Only once" }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  expect(box.disabled).toBe(true);
+  expect(pane.getByText("The code computes this key, so it is set in code (line 7).")).toBeTruthy();
+});
+
 test("a value the code computes is shown as source, set in code, and jumps to its line", async () => {
   const user = userEvent.setup();
   const onEditStep = vi.fn<EditFn>(async (code) => ({ code, steps: SAMPLE_UPGRADE_STEPS, problems: [] }));
