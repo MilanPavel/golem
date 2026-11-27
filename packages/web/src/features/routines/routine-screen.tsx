@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { nextRunText } from "@golem/view";
-import { useNavigate, usePageActions, useRoutine, useRoutineList } from "../../store/page-context.tsx";
+import { useNavigate, usePageActions, useRoutine, useRoutineList, useWorkflowList } from "../../store/page-context.tsx";
 import { actionErrorText } from "../../store/errors.ts";
 import { routinePath } from "../../store/router.ts";
+import type { RoutineInfo } from "../../store/routines.ts";
+import type { WorkflowEntryInfo } from "../../store/workflows.ts";
 import { useNow } from "../sessions/use-now.ts";
 import { RoutineDetail } from "./routine-detail.tsx";
 import { LiveRoutineEditor } from "./routine-editor-live.tsx";
@@ -53,9 +55,19 @@ export function RoutinesScreen() {
   );
 }
 
+/** The id of the workflow a routine runs: the project's own first, then the user's, as the daemon looks it up. */
+function workflowIdOf(routine: RoutineInfo, workflows: readonly WorkflowEntryInfo[] | undefined): string | null {
+  const name = routine.config.workflow;
+  if (name === undefined || name === null || workflows === undefined) return null;
+  const named = workflows.filter((each) => each.name === name);
+  const mine = named.find((each) => (each.project ?? null) === (routine.folder ?? null)) ?? named.find((each) => each.project === undefined || each.project === null);
+  return mine?.id ?? null;
+}
+
 /** `/routines/:name`: one routine, from `routine.get`, with its History. */
 export function RoutineScreen({ name, folder }: { name: string; folder: string | null }) {
   const query = useRoutine(name, folder);
+  const workflows = useWorkflowList();
   const actions = usePageActions();
   const navigate = useNavigate();
   const now = useNow();
@@ -72,6 +84,7 @@ export function RoutineScreen({ name, folder }: { name: string; folder: string |
       <RoutineDetail
         key={`${folder ?? ""}/${name}`}
         routine={routine}
+        workflowId={workflowIdOf(routine, workflows.data?.workflows)}
         runs={runs ?? []}
         now={now}
         onNavigate={navigate}
@@ -94,18 +107,34 @@ export function RoutineScreen({ name, folder }: { name: string; folder: string |
   );
 }
 
-/** `/routines?new`: the form for a new routine, empty or filled from the starter in `?new=`. Saving opens the routine. */
-export function RoutineNewScreen({ starter }: { starter: string | null }) {
+/** A routine name from a workflow's name: lowercase letters, digits and dashes, with no dash at either end. */
+export function routineNameFor(workflowName: string): string {
+  return workflowName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** `/routines?new`: the form for a new routine, empty or filled from the starter in `?new=` or the workflow in `&workflow=`. Saving opens the routine. */
+export function RoutineNewScreen({ starter, workflow = null }: { starter: string | null; workflow?: string | null }) {
   const navigate = useNavigate();
   const now = useNow();
+  const workflows = useWorkflowList();
+  if (workflow !== null && workflows.data === undefined && !workflows.error) {
+    return (
+      <Frame>
+        <p className="text-sm text-muted">Loading the workflow.</p>
+      </Frame>
+    );
+  }
+  const entry = workflow === null ? undefined : workflows.data?.workflows.find((each) => each.id === workflow);
+  const draft = entry === undefined ? (starterDraft(starter) ?? {}) : { name: routineNameFor(entry.name), workflow: entry.name };
   return (
     <Frame>
       <div className="flex max-w-3xl flex-col gap-2">
         <h1 className="font-ui text-lg font-semibold">New routine</h1>
+        {workflow !== null && entry === undefined ? <p className="text-sm text-muted">That workflow is not in the list, so the form is empty.</p> : null}
         <LiveRoutineEditor
-          key={starter ?? ""}
+          key={`${starter ?? ""}/${workflow ?? ""}`}
           create
-          draft={starterDraft(starter) ?? {}}
+          draft={draft}
           now={now}
           onSaved={(name) => navigate(routinePath(name))}
           onCancel={() => navigate(routinePath())}

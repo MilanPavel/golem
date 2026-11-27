@@ -38,6 +38,8 @@ class Starter:
     line: str
     needs_folder: bool
     """True when the workflow reads a project (it goes in the project's ``workflows/``)."""
+    schedule: str | None = None
+    """Said before the starter is added when its file starts runs by itself, else None."""
     routine: StarterRoutine | None = None
 
 

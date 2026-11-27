@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { actionErrorText, folderDialogErrorText, revealErrorText } from "../../store/errors.ts";
 import { useAgentList, useFolderDialog, useNavigate, useNewSessionFolder, usePageActions, useRoutineList, useRunList, useWorkflow, useWorkflowList, useWorkflowStarters } from "../../store/page-context.tsx";
 import { useNow } from "../sessions/use-now.ts";
@@ -22,6 +22,8 @@ export function WorkflowsScreen() {
   const actions = usePageActions();
   const navigate = useNavigate();
   const [folder] = useNewSessionFolder();
+  const [routineNote, setRoutineNote] = useState<string | null>(null);
+  const note = routineNote === null ? null : <p role="status" className="mb-3 max-w-2xl rounded-md border border-line px-2.5 py-1.5 text-sm text-pretty wrap-anywhere">{routineNote}</p>;
   if (list.data === undefined) {
     return (
       <Frame>
@@ -33,9 +35,16 @@ export function WorkflowsScreen() {
   const broken = workflows.filter((workflow) => workflow.state === "broken").length;
   const known = starters.data?.starters ?? [];
   // A starter that reads a project goes in the folder a new session would start in.
-  const add = async (starter: { id: string; needs_folder: boolean }) => {
+  const add = async (starter: { id: string; needs_folder: boolean }, routine: boolean) => {
     try {
-      navigate(workflowPath(await actions.addWorkflowStarter(starter.id, starter.needs_folder ? folder : null)));
+      const added = await actions.addWorkflowStarter(starter.id, starter.needs_folder ? folder : null, routine);
+      const why = added.routine_problem ?? null;
+      if (why === null) {
+        navigate(workflowPath(added.id));
+      } else {
+        // The workflow is there; stay, so the reason can be read.
+        setRoutineNote(`The workflow was added. ${why.charAt(0).toUpperCase()}${why.slice(1)}`);
+      }
     } catch (error) {
       throw new Error(actionErrorText(error, "The workflow could not be added."));
     }
@@ -43,12 +52,14 @@ export function WorkflowsScreen() {
   if (workflows.length === 0 && known.length > 0) {
     return (
       <Frame>
+        {note}
         <WorkflowsEmpty starters={known} folder={folder} onAdd={add} />
       </Frame>
     );
   }
   return (
     <Frame>
+      {note}
       <div className="flex max-w-2xl flex-col gap-1">
         <h1 className="font-prose text-2xl font-normal tracking-tight">Workflows</h1>
         <p className="text-sm text-muted">

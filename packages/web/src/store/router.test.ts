@@ -109,12 +109,21 @@ test("routinePath round-trips through parseRoute", () => {
 });
 
 test("/routines?new is the form for a new routine, with a starter when named", () => {
-  expect(parseRoute("/routines", "?new")).toEqual({ name: "routine-new", starter: null });
-  expect(parseRoute("/routines", "?new=morning-brief")).toEqual({ name: "routine-new", starter: "morning-brief" });
+  expect(parseRoute("/routines", "?new")).toEqual({ name: "routine-new", starter: null, workflow: null });
+  expect(parseRoute("/routines", "?new=morning-brief")).toEqual({ name: "routine-new", starter: "morning-brief", workflow: null });
   for (const path of [routineNewPath(), routineNewPath("morning-brief"), routineNewPath(null)]) {
     const [pathname, search] = path.split("?");
     expect(parseRoute(pathname ?? "", `?${search}`).name).toBe("routine-new");
   }
+});
+
+test("/routines?new&workflow=<id> names the workflow the form starts from, and the helper round-trips it", () => {
+  const id = "/Users/me/.golem/workflows/pr_digest.py::pr_digest";
+  expect(routineNewPath(null, id)).toBe(`/routines?new&workflow=${encodeURIComponent(id)}`);
+  expect(routineNewPath(undefined, id)).toBe(routineNewPath(null, id));
+  const [pathname, search] = routineNewPath(null, id).split("?");
+  expect(parseRoute(pathname ?? "", `?${search}`)).toEqual({ name: "routine-new", starter: null, workflow: id });
+  expect(routineNewPath("morning-brief", id)).toBe(`/routines?new=morning-brief&workflow=${encodeURIComponent(id)}`);
 });
 
 test("parseRoute reads the settings page and its sections", () => {

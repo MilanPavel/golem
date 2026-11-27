@@ -11,6 +11,7 @@ import { fakeClient, fakeFrame } from "../../store/test-support.ts";
 import { sidebarItemStore } from "../sidebar/sidebar-item.ts";
 import { RoutineDetail } from "./routine-detail.tsx";
 import { RoutinesPanel } from "./routines-panel.tsx";
+import { SAMPLE_WORKFLOW_LIST } from "../workflows/sample.ts";
 import { ROUTINES_NOW, SAMPLE_LIST, SAMPLE_MORNING_BRIEF, SAMPLE_ROUTINES, SAMPLE_RUNS } from "./sample.ts";
 import { nextTimesText, runWhenText } from "@golem/view";
 
@@ -147,6 +148,27 @@ test("/routines with nothing set up shows the empty state; the morning brief sta
     ),
   );
   await waitFor(() => expect(location.pathname).toBe("/routines/morning-brief"));
+});
+
+test("/routines?new&workflow=<id> opens the form with A workflow chosen, that workflow picked and a name from it", async () => {
+  const id = "/Users/you/.golem/workflows/pr_digest.py::pr_digest";
+  mount(`/routines?new&workflow=${encodeURIComponent(id)}`, ({ raw }) => {
+    raw.listWorkflows.mockResolvedValue(SAMPLE_WORKFLOW_LIST);
+    raw.previewRoutine.mockResolvedValue({ next: TIMES });
+  });
+  expect(await screen.findByRole("heading", { name: "New routine" })).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("pr-digest");
+  expect(screen.getByRole("radio", { name: "A workflow", checked: true })).toBeTruthy();
+  // The inputs of the chosen workflow are asked for, so it is the one picked.
+  expect(screen.getByRole("textbox", { name: /repo/ })).toBeTruthy();
+});
+
+test("/routines?new&workflow=<id> for a workflow that is not listed opens an empty form and says so", async () => {
+  mount("/routines?new&workflow=%2Fnope.py%3A%3Anope", ({ raw }) => {
+    raw.listWorkflows.mockResolvedValue(SAMPLE_WORKFLOW_LIST);
+  });
+  expect(await screen.findByText("That workflow is not in the list, so the form is empty.")).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("");
 });
 
 test("the Watch a folder starter opens the editor on a new file, and Save writes on and no schedule", async () => {

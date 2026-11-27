@@ -6,7 +6,7 @@ export type Route =
   | { name: "trace"; id: string; span: string | null }
   | { name: "settings"; section: string }
   | { name: "routines" }
-  | { name: "routine-new"; starter: string | null }
+  | { name: "routine-new"; starter: string | null; workflow: string | null }
   | { name: "routine"; routine: string; folder: string | null }
   | { name: "data" }
   | { name: "data-source"; source: string; tab: DataTab }
@@ -44,7 +44,7 @@ export type Router = StoreSource<Route> & {
  * `/s/:id/trace` is a session's trace, and `?span=` in `search` names the selected span.
  * `/routines` is the routines page with none picked, `/routines/:routine` one routine (name decoded, no further `/`),
  * and `?folder=` in `search` names the project of a project routine. `/routines?new` is the form for a new routine,
- * and `?new=<starter>` fills it from a starter.
+ * `?new=<starter>` fills it from a starter, and `&workflow=<id>` from a workflow (its id, decoded).
  * `/workflows` is the workflows page with none picked, and `/workflows/:id` one workflow (its id, `<path>::<name>`, decoded).
  * `/runs` is the Runs page: what needs you, what is running, and what ran. `/runs/:id` is one workflow run, by its `workflow_run_id` (decoded, not empty).
  * `/data` is the Data page with none picked, and `/data/:name` one source (name decoded, no further `/`); `?tab=` names its tab (tables when missing or unknown).
@@ -65,8 +65,10 @@ export function parseRoute(pathname: string, search = ""): Route {
     return { name: "settings", section: DEFAULT_SETTINGS_SECTION };
   }
   if (pathname === "/routines") {
-    const make = new URLSearchParams(search).get("new");
-    return make === null ? { name: "routines" } : { name: "routine-new", starter: make === "" ? null : make };
+    const params = new URLSearchParams(search);
+    const make = params.get("new");
+    const workflow = params.get("workflow");
+    return make === null ? { name: "routines" } : { name: "routine-new", starter: make === "" ? null : make, workflow: workflow === "" ? null : workflow };
   }
   if (pathname === "/runs") {
     return { name: "runs" };
@@ -207,9 +209,10 @@ export function runPath(workflowRunId: string): string {
   return `/runs/${encodeURIComponent(workflowRunId)}`;
 }
 
-/** The path of the form for a new routine, filled from `starter` when given. */
-export function routineNewPath(starter?: string | null): string {
-  return starter === undefined || starter === null ? "/routines?new" : `/routines?new=${encodeURIComponent(starter)}`;
+/** The path of the form for a new routine, filled from `starter` or from the workflow with id `workflow` when given. */
+export function routineNewPath(starter?: string | null, workflow?: string | null): string {
+  const base = starter === undefined || starter === null ? "/routines?new" : `/routines?new=${encodeURIComponent(starter)}`;
+  return workflow === undefined || workflow === null ? base : `${base}&workflow=${encodeURIComponent(workflow)}`;
 }
 
 /** The path of `/welcome` at a step. The first step and no origin are the bare path. */
@@ -227,7 +230,7 @@ function sameRoute(a: Route, b: Route): boolean {
   }
   if (a.name === "trace") return b.name === "trace" && a.id === b.id && a.span === b.span;
   if (a.name === "welcome") return b.name === "welcome" && a.step === b.step && a.from === b.from;
-  if (a.name === "routine-new") return b.name === "routine-new" && a.starter === b.starter;
+  if (a.name === "routine-new") return b.name === "routine-new" && a.starter === b.starter && a.workflow === b.workflow;
   if (a.name === "run") return b.name === "run" && a.id === b.id;
   if (a.name === "data-source") return b.name === "data-source" && a.source === b.source && a.tab === b.tab;
   if (a.name === "workflow") return b.name === "workflow" && a.id === b.id;

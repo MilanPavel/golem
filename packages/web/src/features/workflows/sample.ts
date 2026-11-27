@@ -263,6 +263,7 @@ export const SAMPLE_BRIEFING: WorkflowStarterInfo = {
   line: "Read your project folders, logs and feeds and leave one short briefing in the Inbox.",
   needs_folder: false,
   schedule: null,
+  routine: { name: "morning-briefing", schedule: "weekdays 07:30", words: "every weekday at 07:30" },
 };
 
 /** A starter that works on a project, which none ships yet. The gallery shows how it reads, so the page is ready for one. */

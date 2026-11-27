@@ -32,7 +32,7 @@ This one needs no network and no model. It counts the lines in three Markdown fi
 # examples/workflows/hello.py
 from pathlib import Path
 
-from golem.workflow import Run, manual, workflow
+from golem.workflow import Run, workflow
 
 
 def find_files(folder: str) -> list[str]:

@@ -54,7 +54,7 @@ function Content() {
     case "routines":
       return <RoutinesScreen />;
     case "routine-new":
-      return <RoutineNewScreen starter={route.starter} />;
+      return <RoutineNewScreen starter={route.starter} workflow={route.workflow} />;
     case "routine":
       return <RoutineScreen name={route.routine} folder={route.folder} />;
     case "data":
