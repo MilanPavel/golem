@@ -124,8 +124,8 @@ def build_url(target: DatabaseTarget) -> str:
     return text
 
 
-def _quoted(value: str) -> str:
-    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+def _quoted(value: str, quote: str = "'") -> str:
+    return quote + value.replace("\\", "\\\\").replace(quote, "\\" + quote) + quote
 
 
 def connection_string(target: DatabaseTarget, password: str | None, timeout_s: float) -> str:
@@ -156,16 +156,16 @@ def connection_string(target: DatabaseTarget, password: str | None, timeout_s: f
             ("password", password),
             ("ssl_mode", target.ssl_mode),
         ]
-    return " ".join(f"{key}={_quoted(value)}" for key, value in pairs if value)
+    # libpq takes single quotes; the MySQL scanner reads a single-quoted value literally
+    # (``port='3306'`` fails with "stoi: no conversion"), but double quotes work.
+    quote = "'" if target.kind == "postgres" else '"'
+    return " ".join(f"{key}={_quoted(value, quote)}" for key, value in pairs if value)
 
 
-def grants_can_write(grants: Sequence[str]) -> bool:
-    """Whether MySQL's ``SHOW GRANTS`` lines give a login any privilege that changes data."""
-    for line in grants:
-        before = re.split(r"\bON\b", line, maxsplit=1, flags=re.IGNORECASE)[0]
-        if _WRITE_PRIVILEGES.search(before.replace("GRANT", "", 1)):
-            return True
-    return False
+def privileges_can_write(privileges: Sequence[str]) -> bool:
+    """Whether a MySQL login's privilege types (global, on the database, or on one of its tables)
+    include one that changes data."""
+    return any(_WRITE_PRIVILEGES.fullmatch(str(kind).strip()) for kind in privileges)
 
 
 def version_label(kind: str, raw: str) -> str:

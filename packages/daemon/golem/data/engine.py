@@ -12,7 +12,6 @@ instead of a permission error.
 
 from __future__ import annotations
 
-import contextlib
 import datetime as dt
 import decimal
 import glob as globlib
@@ -32,8 +31,8 @@ from golem.data import guard
 from golem.data.database import (
     DatabaseTarget,
     connection_string,
-    grants_can_write,
     parse_url,
+    privileges_can_write,
     version_label,
 )
 from golem.data.types import (
@@ -132,6 +131,20 @@ PG_CAN_WRITE = (
     "or (select rolsuper from pg_roles where rolname = current_user) "
     "from pg_class c join pg_namespace n on n.oid = c.relnamespace "
     "where c.relkind in ('r', 'p') and n.nspname not in ('pg_catalog', 'information_schema')"
+)
+# ``SHOW GRANTS`` cannot run through ``mysql_query`` (it has no result types), so the login's
+# privileges come from information_schema: global ones, then the database's, then its tables'.
+_MYSQL_GRANTEE = (
+    "concat(char(39), substring_index(current_user(), char(64), 1), char(39), char(64), "
+    "char(39), substring_index(current_user(), char(64), -1), char(39))"
+)
+MYSQL_PRIVILEGES = (
+    "select privilege_type from information_schema.user_privileges "
+    f"where grantee = {_MYSQL_GRANTEE} "
+    "union all select privilege_type from information_schema.schema_privileges "
+    f"where grantee = {_MYSQL_GRANTEE} and table_schema = database() "
+    "union all select privilege_type from information_schema.table_privileges "
+    f"where grantee = {_MYSQL_GRANTEE} and table_schema = database()"
 )
 MYSQL_ESTIMATES = (
     "select table_schema, table_name, table_rows from information_schema.tables "
@@ -458,15 +471,12 @@ class Source:
                 self.info["can_write"] = _truthy(writes[0][0])
         else:
             counts = ask(MYSQL_ESTIMATES)
-            grants = ask("show grants")
-            if grants:
-                self.info["can_write"] = grants_can_write([str(row[0]) for row in grants])
-            for session in (
-                "set session transaction read only",
-                f"set session max_execution_time = {int(self.spec.timeout_s * 1000)}",
-            ):
-                with contextlib.suppress(duckdb.Error):
-                    self._connection.execute(f"call mysql_execute('src', {_literal(session)})")
+            privileges = ask(MYSQL_PRIVILEGES)
+            if privileges is not None:
+                self.info["can_write"] = privileges_can_write([str(row[0]) for row in privileges])
+            # The source is attached read-only, so DuckDB refuses ``mysql_execute`` and the
+            # server cannot be asked for a read-only session or a time limit. DuckDB's read-only
+            # attach and the guard keep writes out; golem's own query timeout cuts a slow query.
         for schema, name, rows in counts or []:
             if rows is not None and int(rows) >= 0:
                 self._estimates[(str(schema), str(name))] = int(rows)
