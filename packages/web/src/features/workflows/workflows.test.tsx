@@ -92,22 +92,28 @@ function detail(extra: Partial<Parameters<typeof WorkflowDetail>[0]> = {}) {
   );
 }
 
-test("the Overview shows the description, the inputs, the steps with their lines, and what starts it", async () => {
+test("the header shows the name, the state and the description on one line, and the tabs are Code, Runs and Triggers", async () => {
   const { container } = render(detail());
   expect(screen.getByRole("heading", { name: /pr_digest/ })).toBeTruthy();
-  expect(screen.getByText("One line for each open pull request, checked by you, then a notice.", { selector: "p" })).toBeTruthy();
-  const inputs = within(screen.getByRole("table", { name: "Inputs" }));
-  expect(inputs.getAllByRole("row")).toHaveLength(4);
-  expect(inputs.getByText('"1d"')).toBeTruthy();
-  expect(inputs.getAllByText("required")).toHaveLength(2);
-  const steps = within(screen.getByRole("list", { name: "Steps" }));
-  expect(steps.getAllByRole("listitem")).toHaveLength(4);
-  expect(steps.getByText("line 15")).toBeTruthy();
-  expect(steps.getByText("llm · for each pulls")).toBeTruthy();
-  expect(screen.getByText("By hand")).toBeTruthy();
+  const description = screen.getByText("One line for each open pull request, checked by you, then a notice.");
+  expect(description.getAttribute("title")).toBe(SAMPLE_PR_DIGEST.description);
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Code", "Runs", "Triggers"]);
+  expect(screen.getByRole("tab", { name: "Code" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.queryByRole("table", { name: "Inputs" })).toBeNull();
   // Without a way to start, Run… is there and disabled.
   expect((screen.getByRole("button", { name: "Run…" }) as HTMLButtonElement).disabled).toBe(true);
   expect((await axe.run(container, noContrast)).violations).toEqual([]);
+});
+
+test("the Triggers tab says By hand with no routine, and shows a routine's next run", async () => {
+  const user = userEvent.setup();
+  const { unmount } = render(detail({ initialTab: "triggers" }));
+  expect(screen.getByText("Starts: By hand")).toBeTruthy();
+  expect(screen.getByText(/No routine starts this workflow/)).toBeTruthy();
+  unmount();
+  render(detail({ routines: [SAMPLE_WORKFLOW_ROUTINE] }));
+  await user.click(screen.getByRole("tab", { name: "Triggers" }));
+  expect(screen.getByRole("list", { name: "Routines that start it" }).textContent).toMatch(/next in \d+ h/); // WORKFLOWS_NOW is local time and next_at is fixed at +01:00, so the hours depend on the time zone.
 });
 
 test("the Code tab shows the file read only with a dot on each step's line, and Show in Finder reveals it", async () => {

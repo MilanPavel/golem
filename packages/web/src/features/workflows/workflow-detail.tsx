@@ -15,7 +15,7 @@ import { RoutineDot } from "../routines/routine-dot.tsx";
 import { RunDialog } from "./run-dialog.tsx";
 import { WorkflowDot } from "./workflow-dot.tsx";
 import { WorkflowEditor, type WorkflowEditorProps } from "./workflow-editor.tsx";
-import { errorLine, stepNotes, stepStart, triggerText } from "./text.ts";
+import { errorLine, triggerText } from "./text.ts";
 
 export type WorkflowDetailProps = {
   workflow: WorkflowEntryInfo;
@@ -51,11 +51,14 @@ export type WorkflowDetailProps = {
   onChooseFolder?: (start: string | null) => Promise<string | null>;
   /** Opens the Run… dialog at the start. For the gallery and tests. */
   initialRunOpen?: boolean;
-  /** The tab shown first. The Overview by default. */
-  initialTab?: "overview" | "code" | "runs" | "triggers";
+  /** The tab shown first. The Code by default. */
+  initialTab?: "code" | "runs" | "triggers";
 };
 
-type Tab = "overview" | "code" | "runs" | "triggers";
+type Tab = "code" | "runs" | "triggers";
+
+/** A tab body: the header and the tab list stay put and this scrolls. The Code tab fills it from lg up and scrolls inside its columns. */
+const BODY = "min-h-0 flex-1 overflow-y-auto";
 
 const STATE_LINE: Record<WorkflowEntryInfo["state"], string> = {
   ok: "Ready",
@@ -72,87 +75,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function InputsTable({ workflow }: { workflow: WorkflowEntryInfo }) {
-  if (workflow.inputs === undefined || workflow.inputs.length === 0) return <p className="text-sm text-muted">No inputs.</p>;
-  return (
-    <table className="w-full max-w-2xl border-collapse text-sm">
-      <caption className="sr-only">Inputs</caption>
-      <thead>
-        <tr className="border-b border-line text-left text-meta text-faint">
-          <th scope="col" className="py-1.5 pr-3 font-normal">
-            Name
-          </th>
-          <th scope="col" className="py-1.5 pr-3 font-normal">
-            Type
-          </th>
-          <th scope="col" className="py-1.5 font-normal">
-            Default
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {workflow.inputs.map((input) => (
-          <tr key={input.name} className="border-b border-line last:border-b-0">
-            <td className="py-1.5 pr-3">
-              <Code>{input.name}</Code>
-            </td>
-            <td className="py-1.5 pr-3">{input.type ? <Code tone="muted">{input.type}</Code> : <span className="text-muted">any</span>}</td>
-            <td className="py-1.5">{input.default ? <Code tone="muted">{input.default}</Code> : <span className="text-muted">required</span>}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function StepsOutline({ steps }: { steps: readonly WorkflowOutlineStep[] }) {
-  if (steps.length === 0) return <p className="text-sm text-muted">No steps found in the file.</p>;
-  return (
-    <ol aria-label="Steps" className="flex max-w-2xl flex-col divide-y divide-line rounded-lg border border-line bg-surface">
-      {steps.map((step, at) => {
-        const line = stepStart(step);
-        return (
-          <li key={step.id} className="flex items-baseline gap-3 px-3 py-2">
-            <span className="w-5 shrink-0 text-right text-meta text-faint">{at + 1}</span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-sm font-medium">{step.title}</span>
-              <span className="text-meta text-muted wrap-anywhere">{stepNotes(step).join(" · ")}</span>
-            </span>
-            {line === null ? null : <span className="shrink-0 text-meta text-faint">line {line}</span>}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 function ErrorBox({ error }: { error: string }) {
   return (
-    <div role="alert" className="flex flex-col gap-1.5 rounded-lg border border-deny bg-deny-soft p-3">
+    <div role="alert" className="flex max-h-40 shrink-0 flex-col gap-1.5 overflow-y-auto rounded-lg border border-deny bg-deny-soft p-3">
       <p className="text-sm font-medium text-deny">{errorLine(error)}</p>
       <pre className="overflow-x-auto font-mono text-code whitespace-pre-wrap text-ink">{error}</pre>
     </div>
   );
 }
 
-function Overview({ workflow, steps }: { workflow: WorkflowEntryInfo; steps: readonly WorkflowOutlineStep[] }) {
-  return (
-    <div className="flex flex-col gap-5">
-      <Section title="What it does">
-        <p className="max-w-2xl text-sm text-pretty">{!workflow.description ? <span className="text-muted">No description.</span> : workflow.description}</p>
-      </Section>
-      <Section title="Inputs">
-        <InputsTable workflow={workflow} />
-      </Section>
-      <Section title="Steps">
-        <StepsOutline steps={steps} />
-      </Section>
-      <Section title="Starts">
-        <p className="text-sm">{triggerText(workflow.trigger)}</p>
-      </Section>
-    </div>
-  );
-}
+const LINK = "text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2";
 
 function CodeTab({ workflow, steps, code, codeHash, onCheck, onSave, onPropose, onEditStep, agents, onOpenAgent, onReveal, onDirtyChange, initialEditor }: Pick<WorkflowDetailProps, "workflow" | "steps" | "code" | "codeHash" | "onCheck" | "onSave" | "onPropose" | "onEditStep" | "agents" | "onReveal" | "initialEditor"> & { onDirtyChange: (dirty: boolean) => void; onOpenAgent: (name: string) => void }) {
   if (code === null) {
@@ -195,8 +127,6 @@ function RunsTab({ runs, now, onNavigate }: Pick<WorkflowDetailProps, "runs" | "
   );
 }
 
-const LINK = "text-clay-ink underline underline-offset-2 outline-offset-2 outline-clay focus-visible:outline-2";
-
 /** The inputs a routine gives the workflow: `repo=MilanPavel/golem, since=1d`. Empty for none. */
 function inputsText(routine: RoutineInfo): string {
   return Object.entries(routine.config.inputs ?? {})
@@ -204,10 +134,11 @@ function inputsText(routine: RoutineInfo): string {
     .join(", ");
 }
 
-function TriggersTab({ routines, now, onNavigate }: { routines: readonly RoutineInfo[]; now: number; onNavigate: (path: string) => void }) {
+function TriggersTab({ workflow, routines, now, onNavigate }: { workflow: WorkflowEntryInfo; routines: readonly RoutineInfo[]; now: number; onNavigate: (path: string) => void }) {
   return (
     <div className="flex max-w-3xl flex-col gap-3">
       <p className="text-sm text-muted">Everything that can start this workflow. A workflow has no trigger of its own; routines hold the &quot;when&quot;, so this tab lists the routines that point here.</p>
+      <p className="text-sm">Starts: {triggerText(workflow.trigger)}</p>
       <Section title="Routines that start it">
         {routines.length === 0 ? (
           <p className="text-sm text-muted">
@@ -242,8 +173,8 @@ function TriggersTab({ routines, now, onNavigate }: { routines: readonly Routine
   );
 }
 
-/** One workflow in the main area: its state, Run…, and the Overview, Code, Runs and Triggers tabs. */
-export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "overview" }: WorkflowDetailProps) {
+/** One workflow in the main area: its state, Run…, and the Code, Runs and Triggers tabs. */
+export function WorkflowDetail({ workflow, steps, code, runs, routines = [], codeHash, onCheck, onSave, onPropose, onEditStep, agents, initialEditor, now, onNavigate: navigateTo, onReveal, onStart, onChooseFolder, initialRunOpen = false, initialTab = "code" }: WorkflowDetailProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [runOpen, setRunOpen] = useState(initialRunOpen);
   const [dirty, setDirty] = useState(false);
@@ -254,8 +185,8 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
     navigateTo(path);
   };
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <header className="flex flex-wrap-reverse items-start justify-between gap-x-3 gap-y-2">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <header className="flex shrink-0 flex-wrap-reverse items-start justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
           <h1 className="flex items-center gap-2 font-ui text-lg font-semibold">
             <WorkflowDot state={workflow.state} />
@@ -263,6 +194,11 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
             {workflow.project === null || workflow.project === undefined ? null : <Badge>project</Badge>}
           </h1>
           <p className="text-meta text-muted">{STATE_LINE[workflow.state]}</p>
+          {workflow.description ? (
+            <p title={workflow.description} className="truncate text-meta text-muted">
+              {workflow.description}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {workflow.state === "ok" && onStart !== undefined ? (
@@ -287,25 +223,21 @@ export function WorkflowDetail({ workflow, steps, code, runs, routines = [], cod
           }}
           onCancel={() => setRunOpen(false)} onChooseFolder={onChooseFolder} />}
       {workflow.state === "broken" && workflow.error ? <ErrorBox error={workflow.error} /> : null}
-      <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex flex-col gap-4">
-        <TabsList aria-label={`${workflow.name} details`}>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)} className="flex min-h-0 flex-1 flex-col gap-4">
+        <TabsList className="shrink-0" aria-label={`${workflow.name} details`}>
           <TabsTrigger value="code">Code</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
           <TabsTrigger value="triggers">Triggers</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview">
-          <Overview workflow={workflow} steps={steps} />
-        </TabsContent>
         {/* Kept mounted, so an edit survives a look at another tab. */}
-        <TabsContent value="code" forceMount hidden={tab !== "code"}>
+        <TabsContent value="code" forceMount hidden={tab !== "code"} className={BODY}>
           <CodeTab workflow={workflow} steps={steps} code={code} codeHash={codeHash} onCheck={onCheck} onSave={onSave} onPropose={onPropose} onEditStep={onEditStep} agents={agents} onOpenAgent={() => onNavigate(settingsPath("agents"))} onReveal={onReveal} onDirtyChange={onDirtyChange} initialEditor={initialEditor} />
         </TabsContent>
-        <TabsContent value="runs">
+        <TabsContent value="runs" className={BODY}>
           <RunsTab runs={runs} now={now} onNavigate={onNavigate} />
         </TabsContent>
-        <TabsContent value="triggers">
-          <TriggersTab routines={routines} now={now} onNavigate={onNavigate} />
+        <TabsContent value="triggers" className={BODY}>
+          <TriggersTab workflow={workflow} routines={routines} now={now} onNavigate={onNavigate} />
         </TabsContent>
       </Tabs>
     </div>

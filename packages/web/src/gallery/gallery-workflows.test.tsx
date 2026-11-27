@@ -15,9 +15,6 @@ test("the gallery's Workflows section shows the panels and a detail for each tab
   expect(within(screen.getByRole("complementary", { name: "Workflows, two projects, slip" })).getByRole("link", { name: /deploy/ }).textContent).toContain("not trusted");
   expect(within(screen.getByRole("complementary", { name: "Workflows, empty, slip" })).getByText(/No workflows yet/)).toBeTruthy();
   expect(within(screen.getByRole("complementary", { name: "Workflows, loading, slip" })).getByText("Loading workflows.")).toBeTruthy();
-  const overview = within(screen.getByRole("region", { name: "Workflow detail, Overview, slip" }));
-  expect(overview.getByRole("table", { name: "Inputs" })).toBeTruthy();
-  expect(overview.getByRole("list", { name: "Steps" })).toBeTruthy();
   const code = within(screen.getByRole("region", { name: "Workflow detail, Code, slip" }));
   expect(code.getByRole("textbox", { name: "Code of pr_digest" })).toBeTruthy();
   expect(within(screen.getByRole("region", { name: "Workflow detail, Runs, slip" })).getByRole("list", { name: "Runs" })).toBeTruthy();
